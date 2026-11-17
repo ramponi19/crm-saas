@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { ChevronDown, MapPin, Plus, UserPlus } from 'lucide-react'
-import { Input, Select, Textarea, Button, notify } from '@/components/ui'
+import { Input, Select, Textarea, Button, ConfirmDialog, notify } from '@/components/ui'
+import { abaixoDoCatalogo, descricaoConfirmeValor } from '@/lib/valor-abaixo-do-catalogo'
 import { nadaGravado } from '@/lib/linhas-afetadas'
 import ClienteModal from '@/app/(dashboard)/clientes/components/cliente-modal'
 import { formatCurrency } from '@/lib/utils'
@@ -93,6 +94,8 @@ export function EncomendaForm({ clientes, taxas = [], celulares = false }: {
   const [obs, setObs] = useState('')
   const [vendedor, setVendedor] = useState('')
   const [salvando, setSalvando] = useState(false)
+  /** Itens com valor abaixo da metade do preço do catálogo: pergunta antes de lançar, sem bloquear. */
+  const [confirmarValor, setConfirmarValor] = useState(false)
 
   /** So vale o endereco do cliente que esta selecionado agora. */
   const endereco = enderecoDe?.id === clienteId ? enderecoDe.texto : null
@@ -202,7 +205,11 @@ export function EncomendaForm({ clientes, taxas = [], celulares = false }: {
     }
   }
 
-  async function salvar() {
+  const valoresBaixos = abaixoDoCatalogo(validos.map((i) => ({
+    nome: descreverItem(i), valor: Number(i.valor) || 0, precoCatalogo: i.produtoId ? i.precoCatalogo : null,
+  })))
+
+  async function salvar(valorConfirmado = false) {
     // Cliente é obrigatório: o produto vai ser comprado por causa dele e alguém
     // precisa avisá-lo quando chegar. Encomenda sem contato encalha na prateleira.
     if (!clienteId) { notify.warn('Selecione o cliente', 'Cadastre-o aqui mesmo se ainda não estiver no sistema.'); return }
@@ -231,6 +238,8 @@ export function EncomendaForm({ clientes, taxas = [], celulares = false }: {
       notify.warn('Entrada maior que o total', 'Confira os dois números.')
       return
     }
+    // Abaixo da metade do preço do catálogo (o R$ 7,60 de 17/11): pergunta, não bloqueia.
+    if (!valorConfirmado && valoresBaixos.length > 0) { setConfirmarValor(true); return }
 
     const empresaId = await resolverEmpresaId()
     if (!empresaId) { notify.bad('Não foi possível identificar a empresa', 'Recarregue a página e tente de novo.'); return }
@@ -562,9 +571,20 @@ export function EncomendaForm({ clientes, taxas = [], celulares = false }: {
 
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="ghost" onClick={() => { limpar(); setAberto(false) }}>Cancelar</Button>
-          <Button onClick={salvar} loading={salvando}>Lançar encomenda</Button>
+          <Button onClick={() => { void salvar() }} loading={salvando}>Lançar encomenda</Button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmarValor}
+        onClose={() => setConfirmarValor(false)}
+        onConfirm={() => { setConfirmarValor(false); void salvar(true) }}
+        title="Valor bem abaixo do catálogo"
+        description={descricaoConfirmeValor(valoresBaixos)}
+        confirmLabel="O valor está certo, lançar"
+        cancelLabel="Corrigir"
+        tone="danger"
+      />
 
       {cadastroAberto && (
         <ClienteModal

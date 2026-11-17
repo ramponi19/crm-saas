@@ -29,6 +29,8 @@ export interface ItemEncomenda {
   id: string
   produto: string
   produtoId: number | null
+  /** Preço do produto no catálogo, para o aviso de valor muito abaixo (lib/valor-abaixo-do-catalogo). */
+  precoCatalogo: number | null
   capacidade: string
   cor: string
   valor: string
@@ -39,7 +41,7 @@ export interface ItemEncomenda {
 
 export const itemVazio = (): ItemEncomenda => ({
   id: `i${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
-  produto: '', produtoId: null, capacidade: '', cor: '', valor: '',
+  produto: '', produtoId: null, precoCatalogo: null, capacidade: '', cor: '', valor: '',
   coresDisp: [], armazDisp: [],
 })
 
@@ -81,7 +83,7 @@ export function EncomendaItens({ itens, onChange, celulares = false }: {
 
   async function escolherProduto(id: string, p: { id: number; nome: string; preco: number | null }) {
     mexer(id, (x) => ({
-      produto: p.nome, produtoId: p.id, cor: '', capacidade: '',
+      produto: p.nome, produtoId: p.id, precoCatalogo: p.preco ?? null, cor: '', capacidade: '',
       // O preço do cadastro entra só se o vendedor ainda não digitou um: o que
       // ele combinou com o cliente vale mais que a tabela.
       valor: !x.valor && p.preco ? String(p.preco) : x.valor,
@@ -119,7 +121,7 @@ export function EncomendaItens({ itens, onChange, celulares = false }: {
             label="Produto"
             value={item.produto}
             onChange={(v) => mexer(item.id, {
-              produto: v, produtoId: null, coresDisp: [], armazDisp: [], cor: '', capacidade: '',
+              produto: v, produtoId: null, precoCatalogo: null, coresDisp: [], armazDisp: [], cor: '', capacidade: '',
             })}
             onSelect={(p) => escolherProduto(item.id, p)}
           />

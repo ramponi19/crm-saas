@@ -51,7 +51,9 @@ export interface Dashboard {
   perfis: { rotulo: string; leads: number }[];
   inatividade: { faixa: string; leads: number }[];
   calor: [number, number, number][];
-  modelos: { modelo: string; leads: number }[];
+  /** `sozinho` = clientes que escreveram o produto com as próprias palavras; `anuncio` = só pelo card do
+   *  anúncio (clique para o WhatsApp) ou pela mensagem pronta dele (migração 20261117000400; ausentes antes). */
+  modelos: { modelo: string; leads: number; sozinho?: number; anuncio?: number }[];
   silencio: { frase: string; vezes: number; venderam: number }[];
   analises: { comAnalise: number; desatualizadas: number; semAnalise: number; semResposta: number };
   porLoja: { id: number; nome: string; ativos7d: number; esperando: number; quentes: number; vendasMes: number; respostaMin: number | null }[];

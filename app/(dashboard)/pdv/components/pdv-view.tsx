@@ -22,6 +22,7 @@ import { textoDoAceite, TOLERANCIA_PADRAO, type PrecoRef } from '@/lib/troca-ref
 import { useTrocaPdv, TrocaPdvBloco, TEXTOS_TROCA_PDV } from '@/components/modules/celulares/pdv-troca'
 import { PDV_CELULAR } from '@/components/modules/celulares/rotulos'
 import { CAMPO_COMANDA } from '@/components/modules/cardapio/rotulos'
+import { abaixoDoCatalogo, descricaoConfirmeValor } from '@/lib/valor-abaixo-do-catalogo'
 import {
   resumirPagamentos, valorComJuros, formaResumida, parcelasResumidas, parcelasDisponiveis,
   FORMAS_PARCELAVEIS, type LinhaPagamento,
@@ -35,6 +36,8 @@ interface ItemEstoque {
   estado: string | null; preco_custo: number | null; preco_venda: number | null; status: string
   /** Garantia do modelo; null cai no padrão da loja. */
   produto_garantia_dias?: number | null
+  /** Preço do produto no catálogo (`estoque_produtos.preco`): referência do aviso de valor muito abaixo. */
+  produto_preco?: number | null
   /** Fotos desta unidade (URLs separadas por vírgula) e foto do modelo. */
   fotos_urls?: string | null
   produto_foto?: string | null
@@ -273,6 +276,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
   const descontoNum = parseFloat(desconto.replace(',', '.')) || 0
   const acessoriosTotal = acessorios.reduce((a, x) => a + (Number(x.valor) || 0), 0)
   const [confirmarTroca, setConfirmarTroca] = useState(false)
+  const [confirmarValor, setConfirmarValor] = useState(false)
   const abatimento = descontoNum + trocaNum
 
   const totais = useMemo(() => {
@@ -331,7 +335,22 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
    */
   const semPreco = carrinho.filter((c) => !c.item.preco_venda)
 
-  async function finalizarVenda(jaConfirmado = false, trocaAceita = false) {
+  /**
+   * Itens que sairiam por menos da METADE do preço do catálogo (17/11/2026): o valor de uma peça já com a
+   * parte do desconto, comparado com `estoque_produtos.preco`. Pergunta antes de fechar, não bloqueia
+   * (lib/valor-abaixo-do-catalogo).
+   */
+  const valoresBaixos = useMemo(() => {
+    const sub = carrinho.reduce((s, c) => s + (c.item.preco_venda ?? 0) * c.qtd, 0) + acessoriosTotal
+    return abaixoDoCatalogo(carrinho.map((c) => {
+      const cheio = (c.item.preco_venda ?? 0) * c.qtd
+      const parteDesconto = sub > 0 ? descontoNum * (cheio / sub) : 0
+      const porPeca = c.qtd > 0 ? (cheio - parteDesconto) / c.qtd : 0
+      return { nome: c.item.produto_nome, valor: Math.round(porPeca * 100) / 100, precoCatalogo: c.item.produto_preco }
+    }))
+  }, [carrinho, descontoNum, acessoriosTotal])
+
+  async function finalizarVenda(jaConfirmado = false, trocaAceita = false, valorAceito = false) {
     if (carrinho.length === 0) { notify.warn('Carrinho vazio'); return }
     const subtotalBruto = carrinho.reduce((s, c) => s + (c.item.preco_venda ?? 0) * c.qtd, 0) + acessoriosTotal
     if (descontoNum < 0) { notify.warn('Desconto não pode ser negativo'); return }
@@ -340,6 +359,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
     // Troca acima da referência: o vendedor precisa aceitar, e o aceite é gravado
     // logo abaixo. Sem passar por aqui a venda não fecha.
     if (!trocaAceita && trocasAcima.length > 0) { setConfirmarTroca(true); return }
+    // Abaixo da metade do preço do catálogo: pergunta (o R$ 7,60 num produto de R$ 7 mil).
+    if (!valorAceito && valoresBaixos.length > 0) { setConfirmarValor(true); return }
     setFinalizando(true)
     // Rollback: venda não é atômica sem RPC. Se algo falhar no meio, desfazemos o
     // que foi gravado nesta tentativa (unidades reivindicadas + vendas/pagamentos).
@@ -885,6 +906,18 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         title={TEXTOS_TROCA_PDV.acimaTitulo(trocasAcima.length)}
         description={TEXTOS_TROCA_PDV.acimaDescricao(trocasAcima)}
         confirmLabel="Estou ciente, finalizar"
+        tone="danger"
+      />
+
+      {/* Valor abaixo da metade do catálogo: confirma, não bloqueia (desconto grande e brinde existem). */}
+      <ConfirmDialog
+        open={confirmarValor}
+        onClose={() => setConfirmarValor(false)}
+        onConfirm={() => { setConfirmarValor(false); finalizarVenda(true, true, true) }}
+        title="Valor bem abaixo do catálogo"
+        description={descricaoConfirmeValor(valoresBaixos)}
+        confirmLabel="O valor está certo, finalizar"
+        cancelLabel="Corrigir"
         tone="danger"
       />
 

@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { AlertTriangle, Check, MessageCircle, PackageCheck, Pencil, ShoppingCart, Truck } from 'lucide-react'
-import { Badge, Button, EmptyState, Input, notify } from '@/components/ui'
+import { Badge, Button, ConfirmDialog, EmptyState, Input, notify } from '@/components/ui'
+import { abaixoDoCatalogo, descricaoConfirmeValor, type LinhaComValor } from '@/lib/valor-abaixo-do-catalogo'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { diagnosticar, ordenarPorUrgencia, agruparPorEncomenda, ETAPAS, indiceEtapa, type Etapa } from '@/lib/encomendas'
 import { formatCurrency } from '@/lib/utils'
@@ -51,6 +52,8 @@ export interface EncomendaPDV {
   trocas: { descricao: string; imei: string | null; valor: number }[]
   cliente_id: number | null
   grupo_pdv: string | null
+  /** Preço do produto no catálogo (aviso de valor muito abaixo no ajuste); nulo sem produto cadastrado. */
+  preco_catalogo?: number | null
 }
 
 /** Uma encomenda na tela: os itens somados, com a lista por dentro. */
@@ -144,6 +147,10 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
   const supabase = createClient()
   const [ocupado, setOcupado] = useState<number | null>(null)
   const [editando, setEditando] = useState<number | null>(null)
+  /** Ajuste com valor abaixo da metade do catálogo, esperando o "está certo". */
+  const [confirmarValor, setConfirmarValor] = useState<{
+    e: Encomenda; linhas: { id: number; venda: string; custo: string }[]; prazo: string; baixos: LinhaComValor[]
+  } | null>(null)
   const [entregando, setEntregando] = useState<number | null>(null)
 
   /**
@@ -279,9 +286,19 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
     e: Encomenda,
     linhas: { id: number; venda: string; custo: string }[],
     prazo: string,
+    valorConfirmado = false,
   ) {
     if (linhas.some((l) => !(Number(l.venda) > 0))) {
       notify.warn('Cada item precisa de um valor maior que zero')
+      return
+    }
+    // Abaixo da metade do preço do catálogo: pergunta antes de gravar, não bloqueia.
+    const baixos = abaixoDoCatalogo(linhas.map((l) => {
+      const item = e.itens.find((i) => i.id === l.id)
+      return { nome: item?.produto_nome ?? 'Item', valor: Number(l.venda) || 0, precoCatalogo: item?.preco_catalogo }
+    }))
+    if (!valorConfirmado && baixos.length > 0) {
+      setConfirmarValor({ e, linhas, prazo, baixos })
       return
     }
     setOcupado(e.id)
@@ -334,6 +351,20 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
 
   return (
     <div className="space-y-2.5">
+      <ConfirmDialog
+        open={confirmarValor != null}
+        onClose={() => setConfirmarValor(null)}
+        onConfirm={() => {
+          const c = confirmarValor
+          setConfirmarValor(null)
+          if (c) void salvarAjuste(c.e, c.linhas, c.prazo, true)
+        }}
+        title="Valor bem abaixo do catálogo"
+        description={confirmarValor ? descricaoConfirmeValor(confirmarValor.baixos) : ''}
+        confirmLabel="O valor está certo, salvar"
+        cancelLabel="Corrigir"
+        tone="danger"
+      />
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[12.5px] font-semibold tracking-[0.04em] text-ink-2">EM ABERTO</span>
         <span className="text-[12px] text-ink-3">{ordenadas.length}</span>

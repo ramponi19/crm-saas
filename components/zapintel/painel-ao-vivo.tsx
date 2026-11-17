@@ -195,10 +195,25 @@ export function PainelAoVivo({ filial, nomeDoRecorte, empresa }: {
         <Calor celulas={d.calor} />
         {/* Os produtos do catálogo da empresa citados pelos clientes (17/11/2026: o banco devolve o nome do
             produto; sem catálogo, o bloco não aparece). */}
+        {/* 17/11 (noite): o card do anúncio de clique para o WhatsApp e a mensagem pronta que vem com ele
+            contavam como pedido do cliente — 237 dos 287 do primeiro colocado da JM eram o próprio anúncio.
+            A barra separa quem escreveu o produto sozinho (cheia) de quem só chegou pelo anúncio (clara). */}
         {d.modelos.length > 0 && (
           <Bloco titulo="Produtos mais pedidos" nota="clientes que citaram o produto · 30 dias">
-            <Barras itens={d.modelos.map((m) => ({ nome: m.modelo, n: m.leads, chave: m.modelo }))} cor="var(--blue)"
+            <Barras
+              itens={d.modelos.map((m) => ({
+                nome: m.modelo, n: m.leads, chave: m.modelo,
+                anuncio: m.anuncio ?? 0,
+                dica: m.anuncio != null ? `${num(m.sozinho ?? 0)} escreveram sozinhos · ${num(m.anuncio)} vieram de anúncio` : undefined,
+              }))}
+              cor="var(--blue)"
               onClick={(_, chave) => abrir({ titulo: `Pediram ${chave}`, tipo: "modelo", valor: chave })} />
+            {d.modelos.some((m) => (m.anuncio ?? 0) > 0) && (
+              <p className="pv-legenda">
+                <span><i style={{ background: "var(--blue)" }} />escreveu sozinho</span>
+                <span><i style={{ background: "var(--blue)", opacity: 0.35 }} />veio de anúncio</span>
+              </p>
+            )}
           </Bloco>
         )}
         <Bloco titulo="Sem conversa há…" nota="leads ainda em negociação, pela última mensagem">
@@ -316,20 +331,28 @@ function Bloco({ titulo, nota, children, acao, style }: {
   );
 }
 
+/** `anuncio` (opcional): a parte de `n` que veio só do anúncio, desenhada clara no fim da barra. */
 function Barras({ itens, cor, onClick }: {
-  itens: { nome: string; n: number; chave?: string }[]; cor: string; onClick?: (nome: string, chave: string) => void;
+  itens: { nome: string; n: number; chave?: string; anuncio?: number; dica?: string }[]; cor: string; onClick?: (nome: string, chave: string) => void;
 }) {
   const max = Math.max(1, ...itens.map((i) => i.n));
   if (!itens.length) return <p className="pv-vazio">Nada ainda.</p>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      {itens.map((i) => (
-        <button key={i.chave ?? i.nome} className="pv-barra" onClick={() => onClick?.(i.nome, i.chave ?? i.nome)} disabled={!onClick}>
-          <span className="pv-barra-nome">{i.nome}</span>
-          <span className="pv-barra-trilho"><span style={{ width: `${(i.n / max) * 100}%`, background: cor }} /></span>
-          <span className="pv-barra-n">{num(i.n)}</span>
-        </button>
-      ))}
+      {itens.map((i) => {
+        const anuncio = Math.min(i.n, Math.max(0, i.anuncio ?? 0));
+        return (
+          <button key={i.chave ?? i.nome} className="pv-barra" onClick={() => onClick?.(i.nome, i.chave ?? i.nome)} disabled={!onClick}
+            title={i.dica} aria-label={i.dica ? `${i.nome}: ${num(i.n)} — ${i.dica}` : undefined}>
+            <span className="pv-barra-nome">{i.nome}</span>
+            <span className="pv-barra-trilho" style={{ display: "flex" }}>
+              <span style={{ width: `${((i.n - anuncio) / max) * 100}%`, background: cor, borderRadius: anuncio ? "3px 0 0 3px" : undefined }} />
+              {anuncio > 0 && <span data-parte="anuncio" style={{ width: `${(anuncio / max) * 100}%`, background: cor, opacity: 0.35, borderRadius: "0 3px 3px 0" }} />}
+            </span>
+            <span className="pv-barra-n">{num(i.n)}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -784,6 +807,9 @@ const CSS = `
 .pv-barra-trilho { height: 6px; background: var(--card2); border-radius: 3px; overflow: hidden; display: block; }
 .pv-barra-trilho span { display: block; height: 100%; border-radius: 3px; }
 .pv-barra-n { font-size: 12px; font-weight: 700; min-width: 28px; text-align: right; }
+.pv-legenda { display: flex; gap: 12px; margin: 8px 0 0; font-size: 11px; color: var(--muted); }
+.pv-legenda span { display: inline-flex; align-items: center; gap: 5px; }
+.pv-legenda i { display: inline-block; width: 10px; height: 6px; border-radius: 2px; }
 
 .pv-funil { display: flex; height: 22px; border-radius: 7px; overflow: hidden; gap: 2px; }
 .pv-funil button { border: none; cursor: pointer; min-width: 4px; transition: filter .15s; }

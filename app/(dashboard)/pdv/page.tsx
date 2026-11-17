@@ -17,7 +17,7 @@ export const metadata = { title: 'PDV' }
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
-const SELECT_RESERVA: string = 'id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, fotos_urls, observacoes, reservado_lead_id, reservado_por, reserva_expira_em, produtos:estoque_produtos!produto_id(nome, garantia_dias, foto_url, marcas_produtos:estoque_marcas!marca_id(nome)), '
+const SELECT_RESERVA: string = 'id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, fotos_urls, observacoes, reservado_lead_id, reservado_por, reserva_expira_em, produtos:estoque_produtos!produto_id(nome, preco, garantia_dias, foto_url, marcas_produtos:estoque_marcas!marca_id(nome)), '
   + embedLead('inventario_unidades_reservado_lead_id_fkey')
 
 export default async function PDVPage() {
@@ -47,7 +47,7 @@ export default async function PDVPage() {
       .from('estoque_unidades')
       // `quantidade` = saldo do lote (item sem série). `tipo_formulario` da
       // categoria diz se o item é vendido por peça ou por quantidade.
-      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, quantidade, fotos_urls, observacoes, produtos:estoque_produtos!produto_id(nome, garantia_dias, foto_url, marcas_produtos:estoque_marcas!marca_id(nome), categorias_produtos:estoque_categorias!categoria_id(tipo_formulario))')
+      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, quantidade, fotos_urls, observacoes, produtos:estoque_produtos!produto_id(nome, preco, garantia_dias, foto_url, marcas_produtos:estoque_marcas!marca_id(nome), categorias_produtos:estoque_categorias!categoria_id(tipo_formulario))')
       .eq('empresa_id', empresaId)
       .eq('ativo', true).eq('status', 'disponivel')
       .order('created_at', { ascending: false }),
@@ -82,7 +82,7 @@ export default async function PDVPage() {
      * `pedidos_compra`, se a peça chegou.
      */
     supabase.from('vendas_vendas')
-      .select('id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, grupo_pdv, cliente_id, clientes:contatos!cliente_id(nome, telefone), produtos:estoque_produtos!produto_id(nome), pedidos_compra:compras_pedidos!pedido_compra_id(id, status, fornecedor_id, solicitado_em), vendas_pagamentos(valor_pago)')
+      .select('id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, grupo_pdv, cliente_id, clientes:contatos!cliente_id(nome, telefone), produtos:estoque_produtos!produto_id(nome, preco), pedidos_compra:compras_pedidos!pedido_compra_id(id, status, fornecedor_id, solicitado_em), vendas_pagamentos(valor_pago)')
       .eq('empresa_id', empresaId)
       .in('status', ['encomenda', 'pendente_entrega'])
       .order('previsao_entrega', { ascending: true, nullsFirst: false }),
@@ -120,7 +120,7 @@ export default async function PDVPage() {
 
   type UnidadeRow = Tables<'estoque_unidades'> & {
     produtos: Embed<{
-      nome: string | null; garantia_dias: number | null; foto_url: string | null
+      nome: string | null; preco: number | null; garantia_dias: number | null; foto_url: string | null
       marcas_produtos: Embed<{ nome: string | null }>
       categorias_produtos: Embed<{ tipo_formulario: string | null }>
     }>
@@ -134,6 +134,7 @@ export default async function PDVPage() {
       produto_nome: prod?.nome ?? (u.observacoes?.split(' (cliente')[0]?.trim() || '—'),
       produto_garantia_dias: prod?.garantia_dias ?? null,
       produto_foto: prod?.foto_url ?? null,
+      produto_preco: prod?.preco ?? null,
       marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
       quantidade: u.quantidade ?? 1,
       tipo_formulario: one(prod?.categorias_produtos ?? null)?.tipo_formulario ?? null,
@@ -150,6 +151,7 @@ export default async function PDVPage() {
       produto_nome: prod?.nome ?? (u.observacoes?.split(' (cliente')[0]?.trim() || '—'),
       produto_garantia_dias: prod?.garantia_dias ?? null,
       produto_foto: prod?.foto_url ?? null,
+      produto_preco: prod?.preco ?? null,
       marca_nome: one(prod?.marcas_produtos ?? null)?.nome ?? '—',
       lead_nome: one(u.leads)?.nome ?? '—',
       reservado_lead_id: u.reservado_lead_id ?? 0,
@@ -174,7 +176,7 @@ export default async function PDVPage() {
     previsao_entrega: string | null; status: string | null; observacoes: string | null
     unidade_id: number | null; data_venda: string | null
     clientes: Embed<{ nome: string | null; telefone: string | null }>
-    produtos: Embed<{ nome: string | null }>
+    produtos: Embed<{ nome: string | null; preco: number | null }>
     pedidos_compra: Embed<{ id: number; status: string | null; fornecedor_id: number | null; solicitado_em: string | null }>
     vendas_pagamentos: { valor_pago: number | null }[] | null
   }
@@ -210,6 +212,7 @@ export default async function PDVPage() {
         ?? (v.observacoes?.replace(/^Encomenda:\s*/i, '').split('.')[0]?.trim() || 'Produto não identificado'),
       valor_venda: Number(v.valor_venda) || 0,
       valor_custo: Number(v.valor_custo) || 0,
+      preco_catalogo: one(v.produtos)?.preco ?? null,
       previsao_entrega: v.previsao_entrega,
       status: v.status ?? 'encomenda',
       unidade_id: v.unidade_id,
