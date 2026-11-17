@@ -12,6 +12,7 @@ import { formatCurrency } from '@/lib/utils'
 import { type Taxa } from '@/lib/pdv-pagamentos'
 import type { DocumentoDisponivel } from '@/lib/contrato-emitir'
 import { EncomendaFechar } from './encomenda-fechar'
+import { TEXTOS_ENTRADA_APARELHO } from '@/components/modules/celulares/encomenda-entrada'
 import { useFuso } from '@/components/fuso-provider'
 
 /**
@@ -133,8 +134,10 @@ const soDigitos = (t: string | null) => (t || '').replace(/\D/g, '')
 const dataBR = (iso: string | null) =>
   iso ? iso.slice(0, 10).split('-').reverse().join('/') : null
 
-export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, documentos = [] }: {
+export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, documentos = [], celulares = false }: {
   encomendas: EncomendaPDV[]; taxas?: Taxa[]; isAdmin?: boolean; documentos?: DocumentoDisponivel[]
+  /** Módulo Celulares ligado: o rótulo da entrada em aparelho e o acessório de celular. */
+  celulares?: boolean
 }) {
   const fuso = useFuso()
   const router = useRouter()
@@ -400,7 +403,7 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
                   */}
                 {e.trocas.length > 0 && (
                   <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11.5px]">
-                    <span className="font-semibold text-ok">Entrada em aparelho:</span>
+                    <span className="font-semibold text-ok">{celulares ? TEXTOS_ENTRADA_APARELHO.rotuloLista : 'Entrada em troca:'}</span>
                     {e.trocas.map((t, i) => (
                       <span key={i} className="text-ink-2">
                         {t.descricao}
@@ -482,6 +485,7 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
                 }}
                 taxas={taxas}
                 documentos={documentos}
+                celulares={celulares}
                 empresaId={empresaId}
                 vendedor={vendedor}
                 onCancelar={() => setEntregando(null)}

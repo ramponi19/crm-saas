@@ -8,7 +8,9 @@ import { cn, formatCurrency } from '@/lib/utils'
 import { exportarCSV, lerCSV, type LinhaImportada, type ErroImport } from '@/lib/tabela-precos-csv'
 import { createClient } from '@/lib/supabase/client'
 import { empresaAtualId } from '@/lib/empresa-atual'
-import { TIPOS_FORMULARIO } from '@/lib/estoque-campos'
+import { tiposFormulario } from '@/lib/estoque-campos'
+import { ESTOQUE_CELULAR, PRODUTO_CELULAR } from '@/components/modules/celulares/rotulos'
+import { CATEGORIA_VEICULO } from '@/components/modules/veiculos/rotulos'
 import { useEmpresa } from '@/lib/empresa-context'
 import { Topbar } from '@/components/layout/topbar'
 import ProdutoModal from '@/app/(dashboard)/estoque/components/produto-modal'
@@ -85,6 +87,19 @@ interface Props {
   categorias: Categoria[]
   marcas: Marca[]
   tabelaPrecos: TabelaPreco[]
+  /** Módulo Celulares ligado: tipos de aparelho, IMEI, seminovo, armazenamento. */
+  celulares?: boolean
+  /** Módulo Avaliações ligado + campo placa no item: o tipo "veículo". */
+  veiculos?: boolean
+}
+
+/** Os textos do catálogo sem módulo de segmento (com Celulares: PRODUTO_CELULAR). */
+const CATALOGO_GENERICO = {
+  buscaUnidades: 'Buscar por produto ou número de série…',
+  precoModeloPlaceholder: 'Ex: Produto X',
+  precoVariantePlaceholder: 'Ex: Tamanho M',
+  categoriaPlaceholder: 'Ex.: Acessórios, Perfumes',
+  variante: 'Variante',
 }
 
 type Tab = 'produtos' | 'estoque' | 'categorias' | 'marcas' | 'tabela'
@@ -108,7 +123,8 @@ const COND: Record<string, { label: string; tone: Tone }> = {
 
 const CONDICAO_PRECO: Record<string, { label: string; tone: Tone }> = {
   novo: { label: 'Novo', tone: 'ok' },
-  seminovo: { label: 'Seminovo', tone: 'acc' },
+  // O rótulo vem dos textos da tela (Seminovo só com o módulo Celulares).
+  seminovo: { label: 'Usado', tone: 'acc' },
   usado: { label: 'Usado', tone: 'warn' },
 }
 
@@ -118,8 +134,17 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase()
 }
 
-export default function CatalogoView({ produtos: produtosInit, unidades, categorias, marcas, tabelaPrecos: tabelaInit }: Props) {
+export default function CatalogoView({ produtos: produtosInit, unidades, categorias, marcas, tabelaPrecos: tabelaInit, celulares = false, veiculos = false }: Props) {
   const fuso = useFuso()
+  const tipos = tiposFormulario({ celulares, veiculos })
+  const idUnidade = celulares ? ESTOQUE_CELULAR : null
+  const T = celulares ? { ...PRODUTO_CELULAR, variante: 'Armazenamento' } : CATALOGO_GENERICO
+  /** Ajuda do "Tipo de item": cada módulo ligado diz o que o seu tipo pede. */
+  const ajudaTipo = [
+    celulares ? PRODUTO_CELULAR.tipoAjuda : null,
+    'acessório pede só código de barras',
+    veiculos ? CATEGORIA_VEICULO.tipoAjuda : null,
+  ].filter(Boolean).join(', ')
   const [tab, setTab] = useState<Tab>('produtos')
   const produtos = produtosInit
   const tabela = tabelaInit
@@ -334,8 +359,8 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
     },
     { key: 'produto', header: 'Produto', render: (u) => <span className="truncate font-semibold text-ink">{u.produto_nome}</span> },
     {
-      key: 'imei', header: 'IMEI', hideOnMobile: true, className: 'num',
-      render: (u) => <span className="text-ink-2">{u.imei ? u.imei.slice(0, 3) + ' ' + u.imei.slice(3, 5) + '•••• ' + u.imei.slice(-4) : u.numero_serie ?? '—'}</span>,
+      key: 'imei', header: idUnidade ? idUnidade.colunaId : 'Nº de série', hideOnMobile: true, className: 'num',
+      render: (u) => <span className="text-ink-2">{idUnidade ? idUnidade.idDaUnidade(u) : (u.numero_serie ?? u.imei ?? '—')}</span>,
     },
     { key: 'estado', header: 'Estado', render: (u) => { const c = COND[u.estado ?? 'lacrado'] ?? COND.lacrado; return <Badge tone={c.tone}>{c.label}</Badge> } },
     { key: 'tipo', header: 'Tipo', hideOnMobile: true, render: (u) => <span className="capitalize text-ink-2">{u.tipo ?? '—'}</span> },
@@ -349,8 +374,14 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
 
   const colsTabela: Column<TabelaPreco>[] = [
     { key: 'modelo', header: 'Modelo', render: (t) => <span className="font-semibold text-ink">{t.modelo}</span> },
-    { key: 'armazenamento', header: 'Armazenamento', hideOnMobile: true, render: (t) => <span className="text-ink-2">{t.armazenamento ?? '—'}</span> },
-    { key: 'condicao', header: 'Condição', render: (t) => { const c = CONDICAO_PRECO[t.condicao] ?? { label: t.condicao, tone: 'neutro' as Tone }; return <Badge tone={c.tone}>{c.label}</Badge> } },
+    { key: 'armazenamento', header: T.variante, hideOnMobile: true, render: (t) => <span className="text-ink-2">{t.armazenamento ?? '—'}</span> },
+    {
+      key: 'condicao', header: 'Condição',
+      render: (t) => {
+        const c = CONDICAO_PRECO[t.condicao] ?? { label: t.condicao, tone: 'neutro' as Tone }
+        return <Badge tone={c.tone}>{t.condicao === 'seminovo' && celulares ? ESTOQUE_CELULAR.condicaoSeminovo : c.label}</Badge>
+      },
+    },
     { key: 'preco', header: 'Preço de venda', align: 'right', className: 'num', render: (t) => <span className="font-semibold text-ink">{fmt(t.preco_sugerido)}</span> },
     { key: 'obs', header: 'Observações', hideOnMobile: true, render: (t) => <span className="text-ink-2">{t.observacoes ?? '—'}</span> },
     {
@@ -400,7 +431,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
                 icon={<Search size={15} strokeWidth={1.7} />}
                 value={searchEst}
                 onChange={(e) => setSearchEst(e.target.value)}
-                placeholder="Buscar por produto, IMEI ou número de série…"
+                placeholder={T.buscaUnidades}
               />
 
               <Card flush>
@@ -439,7 +470,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
                       <div className="mt-1 text-[12px] text-ink-3">{c.total_produtos} produtos</div>
                       <div className="mt-2">
                         {c.tipo_formulario ? (
-                          <Badge tone="neutro">{TIPOS_FORMULARIO.find(t => t.valor === c.tipo_formulario)?.label ?? c.tipo_formulario}</Badge>
+                          <Badge tone="neutro">{tipos.find(t => t.valor === c.tipo_formulario)?.label ?? 'Genérico'}</Badge>
                         ) : (
                           <Badge tone="warn">Sem tipo — entrada genérica</Badge>
                         )}
@@ -533,13 +564,13 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
             required
             value={precoForm.modelo}
             onChange={(e) => setPrecoForm((pf) => ({ ...pf, modelo: e.target.value }))}
-            placeholder="Ex: iPhone 15 Pro Max"
+            placeholder={T.precoModeloPlaceholder}
           />
           <Input
-            label="Armazenamento"
+            label={T.variante}
             value={precoForm.armazenamento}
             onChange={(e) => setPrecoForm((pf) => ({ ...pf, armazenamento: e.target.value }))}
-            placeholder="Ex: 256GB"
+            placeholder={T.precoVariantePlaceholder}
           />
           <Input
             label="Preço de venda (R$)"
@@ -555,7 +586,9 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
             onChange={(e) => setPrecoForm((pf) => ({ ...pf, condicao: e.target.value }))}
           >
             <option value="novo">Novo</option>
-            <option value="seminovo">Seminovo</option>
+            {(celulares || precoForm.condicao === 'seminovo') && (
+              <option value="seminovo">{celulares ? ESTOQUE_CELULAR.condicaoSeminovo : 'Usado'}</option>
+            )}
             <option value="usado">Usado</option>
           </Select>
           <Input
@@ -575,6 +608,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
           onClose={() => setEditProd(null)}
           onSaved={() => { setEditProd(null); router.refresh() }}
           onDeleted={() => { setEditProd(null); router.refresh() }}
+          celulares={celulares}
         />
       )}
 
@@ -690,7 +724,7 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
             required
             value={categForm.nome}
             onChange={(e) => setCategForm((f) => ({ ...f, nome: e.target.value }))}
-            placeholder="Ex.: Celular, Acessórios, Perfumes"
+            placeholder={T.categoriaPlaceholder}
           />
           <Select
             label="Tipo de item"
@@ -698,11 +732,14 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
             onChange={(e) => setCategForm((f) => ({ ...f, tipo_formulario: e.target.value }))}
           >
             <option value="">Genérico (número de série + cor)</option>
-            {TIPOS_FORMULARIO.map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
+            {tipos.map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
+            {/* Tipo de módulo desligado, já gravado: segue visível para não sumir do campo. */}
+            {categForm.tipo_formulario && !tipos.some((t) => t.valor === categForm.tipo_formulario) && (
+              <option value={categForm.tipo_formulario}>{categForm.tipo_formulario} (módulo desligado)</option>
+            )}
           </Select>
           <p className="text-[11.5px] text-ink-3">
-            O tipo define quais campos aparecem ao dar entrada no estoque: celular pede IMEI e bateria,
-            acessório pede só código de barras, veículo pede placa e chassi. Sem tipo, o formulário
+            O tipo define quais campos aparecem ao dar entrada no estoque: {ajudaTipo}. Sem tipo, o formulário
             mostra o genérico — nenhum campo obrigatório se perde, mas o operador vê campos a mais ou a menos.
           </p>
         </form>

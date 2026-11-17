@@ -1,3 +1,6 @@
+import { CAMPOS_CELULAR, TIPOS_CELULAR } from '@/components/modules/celulares/estoque-campos'
+import { CAMPOS_VEICULO, TIPOS_VEICULO } from '@/components/modules/veiculos/estoque-campos'
+
 /**
  * Quais campos de identificação a entrada de estoque mostra, por tipo de item.
  *
@@ -44,43 +47,56 @@ const BASE: CamposIdentificacao = {
   numeroModeloApple: false, veiculo: false, semSerie: false,
 }
 
+/** Os tipos do core: valem para qualquer empresa. */
 const POR_TIPO: Record<string, Partial<CamposIdentificacao>> = {
-  celular: {
-    titulo: 'Identificação do aparelho',
-    imei: true, imei2: true, bateria: true, armazenamento: true, numeroModeloApple: true,
-  },
-  // Tablet e notebook com celular também têm IMEI, mas a maioria não — deixo o
-  // campo fora e quem precisar usa a observação. Melhor faltar um campo raro do
-  // que pedir IMEI para todo MacBook que entra.
-  tablet:     { titulo: 'Identificação do tablet',   bateria: true, armazenamento: true, numeroModeloApple: true },
-  notebook:   { titulo: 'Identificação do notebook', bateria: true, armazenamento: true, numeroModeloApple: true },
-  smartwatch: { titulo: 'Identificação do relógio',  bateria: true, armazenamento: true, numeroModeloApple: true },
-
   acessorio: { titulo: 'Identificação', rotuloSerie: 'Código de barras / SKU', semSerie: true },
   perfume:   { titulo: 'Identificação', rotuloSerie: 'Código de barras / SKU', semSerie: true, cor: false },
   outro:     { titulo: 'Identificação', rotuloSerie: 'Código de barras / SKU', semSerie: true },
-
-  veiculo: { titulo: 'Identificação do veículo', numeroSerie: false, veiculo: true },
 }
 
 /**
- * Campos para um `tipo_formulario`. Tipo desconhecido ou categoria sem tipo cai
- * no genérico (série + cor) — nunca some campo por falta de configuração, que
- * seria pior: o operador não teria onde registrar o que tem em mãos.
+ * Os módulos que trazem tipos próprios. Celulares (celular, tablet, notebook,
+ * smartwatch — IMEI, bateria, armazenamento, número de modelo Apple) e Avaliações
+ * (veículo — placa, chassi). Desligado, o tipo do módulo não existe: categoria
+ * antiga com esse tipo cai no genérico.
  */
-export function camposDaCategoria(tipo: string | null | undefined): CamposIdentificacao {
-  const chave = (tipo ?? '').trim().toLowerCase()
-  return { ...BASE, ...(POR_TIPO[chave] ?? {}) }
+export interface ModulosDoEstoque {
+  /** Módulo Celulares (`/check-imei`) ligado. */
+  celulares?: boolean
+  /** Módulo Avaliações (`/avaliacoes`) ligado E a empresa usa placa no item. */
+  veiculos?: boolean
 }
 
-/** Tipos conhecidos, para o cadastro de categoria oferecer a lista certa. */
-export const TIPOS_FORMULARIO: { valor: string; label: string }[] = [
-  { valor: 'celular', label: 'Celular / Smartphone' },
-  { valor: 'tablet', label: 'Tablet' },
-  { valor: 'notebook', label: 'Notebook' },
-  { valor: 'smartwatch', label: 'Smartwatch' },
-  { valor: 'veiculo', label: 'Veículo' },
+function porTipo(modulos: ModulosDoEstoque): Record<string, Partial<CamposIdentificacao>> {
+  return {
+    ...(modulos.celulares ? CAMPOS_CELULAR : {}),
+    ...(modulos.veiculos ? CAMPOS_VEICULO : {}),
+    ...POR_TIPO,
+  }
+}
+
+/**
+ * Campos para um `tipo_formulario`. Tipo desconhecido, categoria sem tipo ou tipo
+ * de módulo desligado cai no genérico (série + cor) — nunca some campo por falta
+ * de configuração, que seria pior: o operador não teria onde registrar o que tem
+ * em mãos.
+ */
+export function camposDaCategoria(tipo: string | null | undefined, modulos: ModulosDoEstoque = {}): CamposIdentificacao {
+  const chave = (tipo ?? '').trim().toLowerCase()
+  return { ...BASE, ...(porTipo(modulos)[chave] ?? {}) }
+}
+
+const TIPOS_CORE: { valor: string; label: string }[] = [
   { valor: 'acessorio', label: 'Acessório' },
   { valor: 'perfume', label: 'Perfumaria / cosmético' },
   { valor: 'outro', label: 'Outro (sem número de série)' },
 ]
+
+/** Tipos conhecidos, para o cadastro de categoria oferecer a lista certa. */
+export function tiposFormulario(modulos: ModulosDoEstoque = {}): { valor: string; label: string }[] {
+  return [
+    ...(modulos.celulares ? TIPOS_CELULAR : []),
+    ...(modulos.veiculos ? TIPOS_VEICULO : []),
+    ...TIPOS_CORE,
+  ]
+}
