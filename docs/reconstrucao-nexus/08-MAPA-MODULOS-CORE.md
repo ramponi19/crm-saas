@@ -198,4 +198,6 @@ trava, de segmento ou de dono (o que falta está na coluna); **em preparação**
 | ZapIntel: "Produtos mais pedidos" pelo catálogo da empresa, sem regra de ramo no banco | sim (em produção 17/11, migração 0200) | — |
 | Rastreamento de origem (links, pixel) | em preparação (módulo) | relatórios de retorno por origem |
 | Tabelas com o prefixo do módulo dono (15 renomeadas) | sim (em produção 17/11, migração 0300 + app c8dcabcc; as menções a nomes antigos nas seções 1–3 são o retrato de antes) | — |
+| ZapIntel: produtos pedidos separam "veio de anúncio" de "escreveu sozinho" | pronto (app; migração 0400 preparada) | aplicar a 0400 (ok do Lucas) |
+| Aviso de valor abaixo de 50% do catálogo no PDV e na encomenda (sem bloquear) | pronto | — |
 
