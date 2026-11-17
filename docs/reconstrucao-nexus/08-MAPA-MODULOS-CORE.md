@@ -195,7 +195,7 @@ trava, de segmento ou de dono (o que falta está na coluna); **em preparação**
 | (b) Convite por e-mail e confirmação de e-mail | pronto | **provedor e domínio de e-mail** |
 | (c) Termos e privacidade com versão e registro de aceite | pronto | **o texto** |
 | Imóveis, Agenda, Cardápio, KDS, Avaliações, FIPE, Financiamento, Executivo, Metas e ranking | não | construir para servir a qualquer empresa (seguem em preparação) |
-| ZapIntel: "Produtos mais pedidos" pelo catálogo da empresa, sem regra de ramo no banco | pronto | aplicar a migração 0200 (loja fechada, ok do Lucas) |
+| ZapIntel: "Produtos mais pedidos" pelo catálogo da empresa, sem regra de ramo no banco | sim (em produção 17/11, migração 0200) | — |
 | Rastreamento de origem (links, pixel) | em preparação (módulo) | relatórios de retorno por origem |
-| Tabelas com o prefixo do módulo dono (15 renomeadas) | pronto | aplicar a migração 0300 junto do app (loja fechada, ok do Lucas) |
+| Tabelas com o prefixo do módulo dono (15 renomeadas) | sim (em produção 17/11, migração 0300 + app c8dcabcc; as menções a nomes antigos nas seções 1–3 são o retrato de antes) | — |
 
