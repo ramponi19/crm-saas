@@ -18,7 +18,7 @@ export interface VendaTermo {
   id: number
   venda_id: number
   tipo: string
-  /** Aparelhos recebidos em troca — preenchem o termo de entrega do usado. */
+  /** Itens recebidos em troca — preenchem o termo de entrega do usado. */
   trocas: TrocaDoTermo[]
   data_venda: string | null
   valor_venda: number
@@ -157,7 +157,7 @@ export function TermosView({ vendas, documentos, empresaId }: Props) {
           <div className="truncate text-[13px] font-semibold text-ink">{v.cliente_nome ?? '— sem cliente —'}</div>
           <div className="truncate text-[11px] text-ink-3">
             {v.tipo === 'troca' && v.trocas.length
-              ? `Recebido: ${v.trocas.map((t) => t.aparelho || 'aparelho').join(', ')}`
+              ? `Recebido: ${v.trocas.map((t) => t.aparelho || 'item').join(', ')}`
               : <>{(v.quantidade ?? 1) > 1 ? `${v.quantidade}× ` : ''}{v.produto_nome ?? '—'}{v.numero_serie ? ` · ··${v.numero_serie.slice(-4)}` : ''}</>}
           </div>
         </div>

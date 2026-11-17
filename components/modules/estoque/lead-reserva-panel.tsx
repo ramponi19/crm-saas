@@ -5,10 +5,16 @@ import { createClient } from '@/lib/supabase/client'
 import { Package, Search, Loader2, X, Clock } from 'lucide-react'
 import { Input, Badge, notify } from '@/components/ui'
 import { formatCurrency } from '@/lib/utils'
+import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { RESERVA_CELULAR } from '@/components/modules/celulares/card-reserva'
 
 // Reserva de unidade do estoque para o lead: busca o estoque disponível com
-// todos os descritivos (cor, armazenamento, bateria, condição) e trava a peça
-// por 48h. A venda é finalizada no PDV, na aba Reservas.
+// todos os descritivos (cor, armazenamento, condição) e trava a peça por 48h.
+// A venda é finalizada no PDV, na aba Reservas.
+//
+// Painel do módulo Estoque (core/modulos.ts → paineisDoLead 'reserva-estoque'):
+// o card do lead só o mostra com o Estoque ligado. O exemplo de busca e a bateria
+// da unidade são do módulo Celulares e aparelhos (components/modules/celulares/card-reserva.ts).
 
 interface UnidadeDisp {
   id: number
@@ -51,6 +57,7 @@ function horasRestantes(iso: string | null): string {
 
 export function LeadReservaPanel({ leadId, onReservado }: { leadId: number; onReservado?: (descricao: string) => void }) {
   const supabase = createClient()
+  const celular = !!useFerramenta('/check-imei')
   const [busca, setBusca] = useState('')
   const [resultados, setResultados] = useState<UnidadeDisp[]>([])
   const [buscando, setBuscando] = useState(false)
@@ -164,7 +171,7 @@ export function LeadReservaPanel({ leadId, onReservado }: { leadId: number; onRe
         icon={buscando ? <Loader2 size={14} strokeWidth={1.7} className="animate-spin" /> : <Search size={14} strokeWidth={1.7} />}
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
-        placeholder="Buscar no estoque… ex.: iPhone 14 Pro"
+        placeholder={celular ? RESERVA_CELULAR.buscaExemplo : 'Buscar no estoque…'}
       />
 
       {resultados.length > 0 && (
@@ -182,7 +189,7 @@ export function LeadReservaPanel({ leadId, onReservado }: { leadId: number; onRe
                   {u.produto_nome}{u.armazenamento ? ` · ${u.armazenamento}` : ''}
                 </div>
                 <div className="truncate text-[11px] text-ink-3">
-                  {[u.cor, u.bateria ? `bateria ${u.bateria}%` : null, u.estado].filter(Boolean).join(' · ') || u.marca_nome}
+                  {[u.cor, celular && u.bateria ? RESERVA_CELULAR.bateria(u.bateria) : null, u.estado].filter(Boolean).join(' · ') || u.marca_nome}
                 </div>
               </div>
               {u.condicao && <Badge tone={CONDICAO_TONE[u.condicao] ?? 'neutro'} className="shrink-0 capitalize">{u.condicao}</Badge>}

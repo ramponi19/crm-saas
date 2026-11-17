@@ -288,6 +288,9 @@ export interface PerfilDoLead {
 
 export type { PainelDoLead }
 
+/** Painéis cujo interesse do lead não cabe no catálogo (imóvel, veículo): o campo vira texto livre. */
+const PAINEIS_DE_TEXTO_LIVRE: ReadonlySet<PainelDoLead> = new Set<PainelDoLead>(['match-imoveis', 'negocio-imovel', 'interesse-veiculo', 'financiamento'])
+
 export function perfilDoLead(cfg: ConfigEmpresa): PerfilDoLead {
   const ligados = ligadosDaEmpresa(cfg)
   const paineis = paineisDosModulos(ligados)
@@ -295,7 +298,9 @@ export function perfilDoLead(cfg: ConfigEmpresa): PerfilDoLead {
     paineis,
     interesse: cfg.vocabulario.interesse ?? 'Produto interessado',
     agendaVisitas: !!capacidadesDosModulos(ligados).agendaVisitas,
-    textoLivre: paineis.length > 0,
+    // Só os painéis de vertical trocam o autocomplete do catálogo por texto livre: reservar do
+    // estoque e orçar (painéis desde 17/11/2026) são do varejo, que continua no catálogo.
+    textoLivre: paineis.some((p) => PAINEIS_DE_TEXTO_LIVRE.has(p)),
   }
 }
 

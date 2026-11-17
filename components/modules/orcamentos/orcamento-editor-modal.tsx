@@ -5,6 +5,8 @@ import { Button, Input, Select, Textarea, Modal, notify } from '@/components/ui'
 import { Plus, X } from 'lucide-react'
 import { ClienteAutocomplete } from '@/app/(dashboard)/orcamentos/cliente-autocomplete'
 import type { ItemOrc, Orcamento, UnidadeOpt, PrecoRef } from '@/app/(dashboard)/orcamentos/tipos'
+import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { rotulosOrcamento } from '@/components/modules/celulares/orcamento-rotulos'
 
 /**
  * Editor de orçamento — extraído da tela de Orçamentos para poder abrir também
@@ -50,10 +52,10 @@ export function editorDoOrcamento(o: Orcamento): EditorOrcamento {
 
 const brl = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const LABEL_DESC: Record<string, string> = {
-  assistencia: 'Defeito / diagnóstico', melhoria: 'Objetivo do upgrade', venda: 'Descrição do aparelho',
+  assistencia: 'Defeito / diagnóstico', melhoria: 'Objetivo do upgrade',
 }
 
-// Quando o aparelho que o cliente entrega vale MAIS que o que ele leva, sobra
+// Quando o que o cliente entrega vale MAIS que o que ele leva, sobra
 // saldo a favor dele. Como isso se acerta nao tem regra: depende da negociacao.
 const ACERTO: Record<string, { label: string; curto: string; nota: string }> = {
   dinheiro: { label: 'Devolver em dinheiro', curto: 'em dinheiro',
@@ -66,7 +68,7 @@ const ACERTO: Record<string, { label: string; curto: string; nota: string }> = {
     nota: 'O cliente concordou em não receber a diferença. Nada é gerado no Financeiro.' },
 }
 
-/** Casa um texto de modelo (ex.: "iPhone 14 128GB") com a tabela de preços. */
+/** Casa um texto de modelo (o que foi digitado em "novo") com a tabela de preços. */
 export function sugerirPreco(texto: string, tabela: PrecoRef[]): number | null {
   const t = texto.trim().toLowerCase()
   if (!t || tabela.length === 0) return null
@@ -90,6 +92,8 @@ export function OrcamentoEditorModal({
 }) {
   const [editor, setEditor] = useState<EditorOrcamento>(inicial)
   const [salvando, setSalvando] = useState(false)
+  // Aparelho e IMEI só com o módulo Celulares e aparelhos ligado; sem ele, item e nº de série.
+  const r = rotulosOrcamento(!!useFerramenta('/check-imei'))
 
   const base = typeof window !== 'undefined' ? window.location.origin : ''
   const isDowngrade = editor.tipo === 'downgrade'
@@ -199,7 +203,7 @@ export function OrcamentoEditorModal({
         {isDowngrade ? (
           <div className="space-y-3 rounded-control border border-line-soft p-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px]">
-              <Input label="Aparelho novo" value={editor.aparelho_novo} onChange={(e) => setEditor({ ...editor, aparelho_novo: e.target.value })} placeholder="Ex.: iPhone 14 128GB" />
+              <Input label={r.itemNovo} value={editor.aparelho_novo} onChange={(e) => setEditor({ ...editor, aparelho_novo: e.target.value })} placeholder={r.itemNovoExemplo} />
               <Input label="Valor (R$)" type="number" value={editor.valor_novo} onChange={(e) => setEditor({ ...editor, valor_novo: e.target.value })} />
             </div>
             {sugDowngrade != null && String(sugDowngrade) !== editor.valor_novo && (
@@ -210,7 +214,7 @@ export function OrcamentoEditorModal({
               </button>
             )}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px]">
-              <Input label="Aparelho do cliente (entrada)" value={editor.aparelho_usado} onChange={(e) => setEditor({ ...editor, aparelho_usado: e.target.value })} placeholder="Ex.: iPhone 12 64GB" />
+              <Input label={r.itemEntrada} value={editor.aparelho_usado} onChange={(e) => setEditor({ ...editor, aparelho_usado: e.target.value })} placeholder={r.itemEntradaExemplo} />
               <Input label="Vale (R$)" type="number" value={editor.valor_entrada} onChange={(e) => setEditor({ ...editor, valor_entrada: e.target.value })} />
             </div>
 
@@ -221,7 +225,7 @@ export function OrcamentoEditorModal({
             {devolver > 0 && (
               <div className="space-y-2 rounded-control border border-ok/30 bg-ok/[0.05] p-3">
                 <div className="text-[12.5px] text-ink-2">
-                  O aparelho do cliente vale <strong className="text-ink">{brl(devolver)}</strong> mais que o que ele leva.
+                  {r.entradaValeMais} <strong className="text-ink">{brl(devolver)}</strong> mais que o que ele leva.
                 </div>
                 <Select label="Acerto da diferença" value={editor.acerto} onChange={(e) => setEditor({ ...editor, acerto: e.target.value })}>
                   {Object.entries(ACERTO).map(([v, a]) => <option key={v} value={v}>{a.label}</option>)}
@@ -233,11 +237,11 @@ export function OrcamentoEditorModal({
         ) : (
           <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Input label="Aparelho" value={editor.aparelho} onChange={(e) => setEditor({ ...editor, aparelho: e.target.value })} placeholder="Modelo" />
-              <Input label="IMEI / série (opcional)" value={editor.imei} onChange={(e) => setEditor({ ...editor, imei: e.target.value })} />
+              <Input label={r.item} value={editor.aparelho} onChange={(e) => setEditor({ ...editor, aparelho: e.target.value })} placeholder="Modelo" />
+              <Input label={r.serie} value={editor.imei} onChange={(e) => setEditor({ ...editor, imei: e.target.value })} />
             </div>
             {editor.tipo === 'venda' && unidades.length > 0 && (
-              <Select label="Aparelho do estoque (baixa ao aprovar)" value={editor.unidade_id != null ? String(editor.unidade_id) : ''}
+              <Select label={r.itemDoEstoque} value={editor.unidade_id != null ? String(editor.unidade_id) : ''}
                 onChange={(e) => {
                   const uid = e.target.value ? Number(e.target.value) : null
                   const u = unidades.find((x) => x.id === uid)
@@ -247,7 +251,7 @@ export function OrcamentoEditorModal({
                 {unidades.map((u) => <option key={u.id} value={u.id}>{u.label} — {brl(u.preco)}</option>)}
               </Select>
             )}
-            <Textarea label={LABEL_DESC[editor.tipo] ?? 'Descrição'} rows={2} value={editor.defeito} onChange={(e) => setEditor({ ...editor, defeito: e.target.value })} />
+            <Textarea label={editor.tipo === 'venda' ? r.descricaoVenda : LABEL_DESC[editor.tipo] ?? 'Descrição'} rows={2} value={editor.defeito} onChange={(e) => setEditor({ ...editor, defeito: e.target.value })} />
 
             {blocoItens('Itens (peças + mão de obra)')}
 

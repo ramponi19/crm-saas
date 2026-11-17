@@ -20,8 +20,8 @@ import { PaineisDaVertical } from './paineis-vertical'
 import type { PerfilDoLead } from '@/lib/empresa-config'
 import { LeadChamadasPanel } from './lead-chamadas-panel'
 import { LeadCadenciaPanel } from './lead-cadencia-panel'
-import { LeadOrcamentoPanel } from './lead-orcamento-panel'
-import { LeadReservaPanel } from './lead-reserva-panel'
+import { LeadOrcamentoPanel } from '@/components/modules/orcamentos/lead-orcamento-panel'
+import { LeadReservaPanel } from '@/components/modules/estoque/lead-reserva-panel'
 import { ProdutoAutocomplete } from './produto-autocomplete'
 import { formatarTextoChat } from '@/lib/texto-whatsapp'
 import { AvisoPagamentoMeta, type AvisoPagamento } from '@/components/modules/canais/aviso-pagamento-meta'
@@ -124,7 +124,7 @@ interface ChatMsg {
 }
 
 const ROTULO_ENTREGA: Record<string, string> = {
-  enviada: 'Enviada', entregue: 'Entregue no aparelho', lida: 'Lida pelo cliente', falhou: 'Não enviada',
+  enviada: 'Enviada', entregue: 'Entregue no celular', lida: 'Lida pelo cliente', falhou: 'Não enviada',
   falha_envio: 'A Meta não respondeu a tempo — pode ter chegado; confira antes de tentar de novo',
 }
 
@@ -1564,9 +1564,15 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
             {/* Painéis próprios, na ordem que o perfil declara. Acrescentar um
                 painel não abre mais este arquivo. */}
             <PaineisDaVertical nomes={perfil.paineis} leadId={lead.id} />
-            <LeadReservaPanel leadId={lead.id} onReservado={(descricao) => set('produto', descricao)} />
+            {/* Reservar do estoque e Orçamentos também são painéis de módulo (Estoque, Orçamentos),
+                mas pedem mais que o leadId: ficam no lugar de sempre, só com o módulo ligado. */}
+            {perfil.paineis.includes('reserva-estoque') && (
+              <LeadReservaPanel leadId={lead.id} onReservado={(descricao) => set('produto', descricao)} />
+            )}
             <LeadChamadasPanel leadId={lead.id} />
-            <LeadOrcamentoPanel leadId={lead.id} leadNome={lead.nome} leadTelefone={lead.telefone} onSalvo={moverParaOrcamento} />
+            {perfil.paineis.includes('orcamento') && (
+              <LeadOrcamentoPanel leadId={lead.id} leadNome={lead.nome} leadTelefone={lead.telefone} onSalvo={moverParaOrcamento} />
+            )}
             <LeadCadenciaPanel leadId={lead.id} />
             {/* Continua existindo para quem já rolou até aqui, mas agora reflete o
                 estado: sem alteração pendente não há o que salvar. */}

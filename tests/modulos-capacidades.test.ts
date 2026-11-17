@@ -30,8 +30,11 @@ test('Cardápio traz a comanda no PDV', () => {
   assert.deepEqual(paineisDosModulos(new Set(['/cardapio'])), [])
 })
 
-test('sem módulo de vertical ligado, nada a mais', () => {
+test('sem módulo de vertical ligado, nada a mais (só os painéis do varejo: reservar e orçar)', () => {
   const varejo = new Set(['/dashboard', '/leads', '/pdv', '/estoque', '/catalogo', '/agenda'])
   assert.deepEqual(capacidadesDosModulos(varejo), {})
-  assert.deepEqual(paineisDosModulos(varejo), [])
+  // Reservar do estoque é painel do Estoque (17/11/2026); sem Orçamentos ligado, não há o de orçar.
+  assert.deepEqual(paineisDosModulos(varejo), ['reserva-estoque'])
+  assert.deepEqual(paineisDosModulos(new Set([...varejo, '/orcamentos'])), ['orcamento', 'reserva-estoque'])
+  assert.deepEqual(paineisDosModulos(new Set(['/dashboard', '/leads'])), [])
 })

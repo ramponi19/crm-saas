@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { moduloEstaLigado } from '@/lib/modulo-ligado'
+import { rotulosOrcamento } from '@/components/modules/celulares/orcamento-rotulos'
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }
 export async function OPTIONS() { return new NextResponse(null, { status: 204, headers: CORS }) }
@@ -40,11 +41,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     // Assistência/melhoria aprovada → abre uma OS (reusa garantias_assistencias).
     let osId = orc.os_id
     if (!osId && (orc.tipo === 'assistencia' || orc.tipo === 'melhoria')) {
+      // Melhoria sem descrição: o defeito da OS diz "do aparelho" só com o módulo de celular ligado.
+      const melhoria = !orc.defeito && orc.tipo === 'melhoria'
+        ? rotulosOrcamento(await moduloEstaLigado(orc.empresa_id, 'check_imei')).melhoria
+        : null
       const { data: os } = await svc.from('assistencia_garantias').insert({
         empresa_id: orc.empresa_id,
         tipo: 'assistencia',
         cliente_id: orc.cliente_id ?? null,
-        defeito_relatado: orc.defeito ?? (orc.tipo === 'melhoria' ? 'Upgrade/melhoria do aparelho' : null),
+        defeito_relatado: orc.defeito ?? melhoria,
         orcamento_valor: orc.total,
         imei_serial: orc.imei,
         status: 'aprovado',

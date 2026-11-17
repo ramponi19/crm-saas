@@ -11,6 +11,7 @@ import type { ContratoItem, ContratoComprador, ContratoLoja } from './contrato-t
 import { renderizarModelo, type ModeloContrato, type PaginaModelo, type DadosMescla } from './contrato-modelo'
 import { camposFaltantesContrato } from './cliente-contrato'
 import { lerCliente } from './clientes'
+import { carregarConfigEmpresa, ligadosDaEmpresa } from './empresa-config'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Client = SupabaseClient<any>
@@ -72,7 +73,7 @@ export interface EmitirContratoInput {
   /** Todas as linhas de `vendas` desta venda — é o que amarra o contrato a ela. */
   vendaIds: number[]
   itens: ContratoItem[]
-  /** Aparelhos recebidos em troca — alimentam os marcadores {{trocas}}. */
+  /** Itens recebidos em troca — alimentam os marcadores {{trocas}} (módulo de celular). */
   trocas?: { aparelho: string; imei?: string | null; valor: number }[]
   total: number
   desconto?: number
@@ -182,7 +183,7 @@ function camposFaltantesLoja(loja: ContratoLoja, modelo: ModeloContrato): string
  * poder avisar que a 2ª via não vai existir.
  */
 export async function emitirContrato(supabase: Client, input: EmitirContratoInput): Promise<ContratoEmitido> {
-  const [empRes, cliRes, garantiaLoja, modelo] = await Promise.all([
+  const [empRes, cliRes, garantiaLoja, modelo, cfg] = await Promise.all([
     supabase.from('empresas')
       .select('nome, cnpj, telefone, ...empresa_branding(wl_logo_url:logo_url), email, cep, endereco, numero, complemento, bairro, cidade, estado, ...empresa_dados_contrato(representante_nome, representante_cpf, representante_nacionalidade, representante_estado_civil, representante_profissao, banco_nome, banco_agencia, banco_conta, banco_pix)')
       .eq('id', input.empresaId).maybeSingle(),
@@ -191,6 +192,8 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
       : Promise.resolve(null),
     garantiaPadraoLoja(supabase, input.empresaId),
     modeloAtivo(supabase, input.documentoId),
+    // O módulo Celulares e aparelhos muda a coluna de série ("IMEI / Nº série") e traz a troca.
+    carregarConfigEmpresa(supabase, input.empresaId),
   ])
 
   // Sem modelo não há contrato. Sai antes de montar dado nenhum.
@@ -273,7 +276,7 @@ export async function emitirContrato(supabase: Client, input: EmitirContratoInpu
   const impedimento = lojaIdentificada(dados.loja, modelo)
   if (impedimento) return { html: null, salvo: false, semModelo: false, bloqueado: impedimento }
 
-  const html = renderizarModelo(modelo, dados)
+  const html = renderizarModelo(modelo, dados, { celular: ligadosDaEmpresa(cfg).has('/check-imei') })
 
   const { error } = await supabase.from('vendas_contratos').insert({
     empresa_id: input.empresaId,

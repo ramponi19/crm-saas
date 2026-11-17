@@ -24,7 +24,8 @@ import { CardapioCard } from './cardapio-card'
 import { AgendamentoCard } from './agendamento-card'
 import { VeiculosPortalCard } from './veiculos-portal-card'
 import { ContratoCard } from './contrato-card'
-import { TrocaCard } from './troca-card'
+// A seção Troca é do módulo Celulares e aparelhos (check_imei): só existe com ele ligado.
+import { TrocaCard } from '@/components/modules/celulares/config-troca-card'
 import type { Json } from '@/types/database'
 
 interface Props {

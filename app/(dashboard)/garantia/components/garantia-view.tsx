@@ -7,6 +7,8 @@ import { Card, Table, Button, Badge, StatCard, Tabs, EmptyState, type Column } f
 import GarantiaModal from './garantia-modal'
 import { TermosView, type VendaTermo } from './termos-view'
 import type { DocumentoDisponivel } from '@/lib/contrato-emitir'
+import { useFerramenta } from '@/components/layout/ferramentas-context'
+import { rotulosGarantia } from '../rotulos'
 
 interface Garantia {
   id: number
@@ -67,6 +69,8 @@ export default function GarantiaView({ garantias, termos = [], documentos = [], 
   // com defeito; o TERMO é o papel que sai junto com a venda. Abas separadas
   // para a fila de assinatura não se perder no meio dos reparos.
   const [aba, setAba] = useState<'protocolos' | 'termos'>('protocolos')
+  // "IMEI" na lista só com o módulo Celulares e aparelhos ligado; sem ele, "Série".
+  const r = rotulosGarantia(!!useFerramenta('/check-imei'))
   const termosPendentes = termos.filter((t) => t.status === 'pendente').length
   const [filtro, setFiltro] = useState('todas')
   const [modalOpen, setModalOpen] = useState(false)
@@ -109,7 +113,7 @@ export default function GarantiaView({ garantias, termos = [], documentos = [], 
         <div className="min-w-0">
           <div className="truncate text-[13px] font-semibold text-ink">{g.clientes?.nome ?? '—'}</div>
           <div className="truncate text-[11px] text-ink-3">
-            {g.produtos?.nome ?? '—'}{g.imei_serial ? ` · IMEI ··${g.imei_serial.slice(-4)}` : ''}
+            {g.produtos?.nome ?? '—'}{g.imei_serial ? ` · ${r.serieNaLista} ··${g.imei_serial.slice(-4)}` : ''}
           </div>
         </div>
       ),
