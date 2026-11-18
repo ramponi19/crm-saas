@@ -16,6 +16,7 @@ type Acao =
   | { tipo: 'trocar_plano'; plano: string }
   | { tipo: 'alterar_status'; status: string }
   | { tipo: 'estender_trial'; dias: number }
+  | { tipo: 'situacao'; situacao: string }
 
 export async function POST(
   req: NextRequest,
@@ -65,6 +66,24 @@ export async function POST(
       update = { trial_ends_at: novoFim.toISOString() }
       logAcao = 'estender_trial'
       logDetalhes = { dias, trial_ends_at: novoFim.toISOString() }
+      break
+    }
+    case 'situacao': {
+      // SITUAÇÃO EM UM CLIQUE (18/11/2026, piloto): cada uma define as três colunas juntas e reativa (status
+      // 'ativo'). Piloto e cortesia: sem fim de teste (o job expirar-trials não toca); teste: 14 dias a partir
+      // de agora; pagante: nem teste, nem piloto, nem cortesia (entra no faturamento estimado).
+      const agoraMs = Date.now()
+      const SITUACOES: Record<string, EmpresaUpdate> = {
+        piloto: { piloto: true, cortesia: false, trial_ends_at: null, status: 'ativo' },
+        teste: { piloto: false, cortesia: false, trial_ends_at: new Date(agoraMs + 14 * 86_400_000).toISOString(), status: 'ativo' },
+        pagante: { piloto: false, cortesia: false, trial_ends_at: null, status: 'ativo' },
+        cortesia: { piloto: false, cortesia: true, trial_ends_at: null, status: 'ativo' },
+      }
+      const alvo = SITUACOES[acao.situacao]
+      if (!alvo) return NextResponse.json({ error: 'Situação inválida' }, { status: 400 })
+      update = alvo
+      logAcao = 'trocar_situacao'
+      logDetalhes = { situacao: acao.situacao, ...alvo }
       break
     }
     default:

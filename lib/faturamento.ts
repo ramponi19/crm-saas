@@ -2,7 +2,7 @@
  * QUEM PAGA E QUANTO (17/11/2026) — uma regra só para o painel e as métricas do superadmin.
  *
  *   em teste   o teste ainda corre (`trial_ends_at` no futuro) e não há assinatura ativa;
- *   pagante    status 'ativo', fora do teste, não é de demonstração nem cortesia, plano com preço;
+ *   pagante    status 'ativo', fora do teste, não é de demonstração, cortesia nem piloto, plano com preço;
  *   só leitura status ≠ 'ativo' (teste vencido, assinatura encerrada, suspensa) — não conta receita.
  *
  * O preço é o de `planos_config.preco_centavos` (o mesmo que a vitrine e o checkout mostram). O
@@ -17,6 +17,25 @@ export interface EmpresaFaturamento {
   demo?: boolean | null
   /** Não paga por acordo (a JM, 18/11/2026): fica fora do faturamento. */
   cortesia?: boolean | null
+  /** Empresa em piloto (18/11/2026): sem cobrança, sem vencimento de teste, fora do faturamento. */
+  piloto?: boolean | null
+}
+
+/**
+ * A SITUAÇÃO da empresa no superadmin (18/11/2026), uma palavra só. A ordem decide: demonstração e piloto e
+ * cortesia vêm antes do teste (não vencem); suspensa = só leitura (status ≠ 'ativo').
+ */
+export type Situacao = 'demonstracao' | 'piloto' | 'cortesia' | 'teste' | 'suspensa' | 'pagante'
+export const NOME_SITUACAO: Record<Situacao, string> = {
+  demonstracao: 'Demonstração', piloto: 'Piloto', cortesia: 'Cortesia', teste: 'Em teste', suspensa: 'Só leitura', pagante: 'Pagante',
+}
+export function situacaoDaEmpresa(e: EmpresaFaturamento, agora: Date): Situacao {
+  if (e.demo) return 'demonstracao'
+  if (e.status !== 'ativo') return 'suspensa'
+  if (e.piloto) return 'piloto'
+  if (e.cortesia) return 'cortesia'
+  if (emTeste(e, agora)) return 'teste'
+  return 'pagante'
 }
 
 export function emTeste(e: EmpresaFaturamento, agora: Date): boolean {
@@ -25,7 +44,7 @@ export function emTeste(e: EmpresaFaturamento, agora: Date): boolean {
 }
 
 export function pagante(e: EmpresaFaturamento, agora: Date, precoPorPlano: Record<string, number>): boolean {
-  return e.status === 'ativo' && !e.demo && !e.cortesia && !emTeste(e, agora) && (precoPorPlano[e.plano ?? ''] ?? 0) > 0
+  return e.status === 'ativo' && !e.demo && !e.cortesia && !e.piloto && !emTeste(e, agora) && (precoPorPlano[e.plano ?? ''] ?? 0) > 0
 }
 
 /** Preço mensal em reais por plano, de `planos_config` (id, preco_centavos). */

@@ -125,7 +125,7 @@ try {
   const emp = sql(`select e.id from empresas e join empresa_usuarios eu on eu.empresa_id=e.id where eu.usuario_id='${uid}'`)
   criadas.push(emp)
   const linha = sql(`select nome||'|'||plano||'|'||status||'|'||coalesce(cnpj,'')||'|'||coalesce(telefone,'')||'|'||coalesce(preset_onboarding,'')||'|'||limite_usuarios||'|'||limite_leads||'|'||cortesia||'|'||coalesce(demo,false) from empresas where id=${emp}`)
-  confere(linha === 'Empresa Cadastro e2e|base|ativo|11.222.333/0001-81|(11) 98888-7777|geral|3|0|false|false', `empresa: plano base, CRM geral, CNPJ/telefone, 3 usuários, leads sem limite (${linha})`)
+  confere(linha === 'Empresa Cadastro e2e|base|ativo|11.222.333/0001-81|(11) 98888-7777|geral|3|99999|false|false', `empresa: plano base, CRM geral, CNPJ/telefone, 3 usuários, leads 99999 — nunca 0, que o gatilho lê como teto zero (${linha})`)
   const dias = Number(sql(`select round(extract(epoch from (trial_ends_at - now())) / 86400, 2) from empresas where id=${emp}`))
   confere(dias > 13.9 && dias <= 14, `teste de 14 dias (${dias} dias)`)
   const loja = sql(`select f.nome||'|'||f.matriz||'|'||f.ativo||'|'||coalesce(f.cnpj,'') from filiais f where f.empresa_id=${emp}`)

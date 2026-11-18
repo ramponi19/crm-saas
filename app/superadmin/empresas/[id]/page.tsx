@@ -1,4 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
+import { SituacaoEmpresa } from '@/components/superadmin/situacao-empresa'
+import { AcompanhamentoEmpresa, type Acompanhamento } from '@/components/superadmin/acompanhamento-empresa'
+import { situacaoDaEmpresa } from '@/lib/faturamento'
 import { createServiceClient } from '@/lib/supabase/service'
 import { AcoesEmpresa } from '@/components/superadmin/acoes-empresa'
 import { ControleEmpresa } from '@/components/superadmin/controle-empresa'
@@ -13,7 +16,7 @@ import { carregarConfigEmpresa, moduloLigado, MODULO_INTELIGENCIA } from '@/lib/
 import { moduloPorHref } from '@/core/modulos'
 import { PedidosModulo } from '@/components/superadmin/pedidos-modulo'
 import { consultaClientes } from '@/lib/clientes'
-import { formatarData, FUSO_PADRAO } from '@/lib/datas'
+import { agora, formatarData, FUSO_PADRAO } from '@/lib/datas'
 
 // Roxo da plataforma (superadmin) — único toque de accent permitido aqui.
 const PLATFORM = '#6D28D9'
@@ -120,6 +123,12 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
     : ss === 'canceled' || ss === 'cancelado' ? { label: 'Cancelada', tone: 'bad' }
     : { label: empresa.stripe_status ?? 'Sem assinatura', tone: 'neutro' }
 
+  // Acompanhamento (18/11/2026, piloto): 14 dias de mensagens, usuários, canais e falhas.
+  const { data: acompRaw, error: acompErr } = await svc.rpc('acompanhamento_empresa', { p_empresa: empresaId, p_dias: 14 })
+  if (acompErr) console.error('[superadmin/empresa] acompanhamento:', acompErr.message)
+  const acompanhamento = (acompRaw ?? null) as unknown as Acompanhamento | null
+  const situacao = situacaoDaEmpresa(empresa, agora())
+
   const ultAtividade = ultimoLead?.created_at ? new Date(ultimoLead.created_at) : null
   const diasInativo = ultAtividade ? Math.floor((Date.now() - ultAtividade.getTime()) / 86_400_000) : null
 
@@ -193,6 +202,16 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
             }
           })} />
         </Card>
+      )}
+
+      <div className="mb-5">
+        <SituacaoEmpresa empresaId={empresaId} atual={situacao} demo={!!empresa.demo} />
+      </div>
+
+      {acompanhamento && (
+        <div className="mb-5">
+          <AcompanhamentoEmpresa dados={acompanhamento} empresaNome={empresa.nome} />
+        </div>
       )}
 
       {/* Saúde da conta */}

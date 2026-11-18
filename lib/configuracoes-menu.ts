@@ -91,6 +91,7 @@ export function secoesDeConfiguracoes({ isAdmin, abasDosModulos, zapintel }: {
         ...(tem('contrato') ? [{ href: '/configuracoes/contrato', label: 'Contrato' }] : []),
         ...(tem('documentos') ? [{ href: '/configuracoes/documentos', label: 'Documentos' }] : []),
         ...(tem('cardapio') ? [{ href: '/configuracoes/cardapio', label: 'Cardápio' }] : []),
+        { href: '/configuracoes/importar', label: 'Importar contatos' },
         { href: '/configuracoes/dados', label: 'Exportar dados' },
       ] },
       { label: 'Faturamento', itens: [{ href: '/configuracoes/faturamento', label: 'Plano' }] },

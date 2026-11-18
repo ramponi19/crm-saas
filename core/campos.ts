@@ -33,4 +33,7 @@ export const CAMPOS_DO_CORE: CampoPadrao[] = [
     opcoes: ['Novo', 'Ativo', 'VIP', 'Recorrente', 'Inativo'], ordem: 50 },
   // Texto, não opção: o varejo e a imobiliária usam listas diferentes ("Loja física" × "Portais").
   { entidade: 'contato', chave: 'origem_cliente', rotulo: 'Origem do cliente', tipo: 'texto', ordem: 60 },
+  // O "Produto de interesse" do lead (novo lead, card, funil, importação). Até 18/11/2026 só existia nas
+  // empresas do corte (21/10): empresa nova recusava o lead com interesse ("campo personalizado desconhecido").
+  { entidade: 'negocio', chave: 'produto_interessado', rotulo: 'Produto de interesse', tipo: 'texto', ordem: 10 },
 ]

@@ -16,7 +16,7 @@ export default async function SuperAdminDashboard() {
   const supabase = await createClient()
 
   const [{ data: empresas }, { data: planos }] = await Promise.all([
-    supabase.from('empresas').select('id, nome, plano, status, stripe_status, trial_ends_at, created_at, demo, cortesia'),
+    supabase.from('empresas').select('id, nome, plano, status, stripe_status, trial_ends_at, created_at, demo, cortesia, piloto'),
     supabase.from('planos_config').select('id, preco_centavos'),
   ])
   const precos = precosDosPlanos(planos as Array<{ id: string; preco_centavos: number | null }> | null)
@@ -43,7 +43,8 @@ export default async function SuperAdminDashboard() {
 
   // Plano único desde 18/11/2026: quem está nele, quem é cortesia e quem é demonstração.
   const porPlano = {
-    nexus: lista.filter(e => !e.cortesia && !e.demo).length,
+    nexus: lista.filter(e => !e.cortesia && !e.demo && !e.piloto).length,
+    piloto: lista.filter(e => e.piloto && !e.demo).length,
     cortesia: lista.filter(e => e.cortesia && !e.demo).length,
     demo: lista.filter(e => e.demo).length,
   }
@@ -84,10 +85,14 @@ export default async function SuperAdminDashboard() {
             </p>
 
             {/* Distribuição por plano */}
-            <div className="mt-5 grid grid-cols-3 gap-3 border-t border-line-soft pt-5">
+            <div className="mt-5 grid grid-cols-4 gap-3 border-t border-line-soft pt-5">
               <div>
                 <div className="text-[11px] font-medium text-ink-3">Plano Nexus</div>
                 <div className="num mt-0.5 text-[20px] font-bold text-ink">{porPlano.nexus}</div>
+              </div>
+              <div>
+                <div className="text-[11px] font-medium text-ink-3">Piloto</div>
+                <div className="num mt-0.5 text-[20px] font-bold text-ink">{porPlano.piloto}</div>
               </div>
               <div>
                 <div className="text-[11px] font-medium text-ink-3">Cortesia</div>

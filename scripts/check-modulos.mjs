@@ -74,7 +74,7 @@ const DONOS = {
   '/api/acesso': CORE, '/api/admin/filiais': CORE, '/api/aparencia': CORE, '/api/ausencia': CORE,
   '/api/automatize': CORE, '/api/cadencias': CORE, '/api/canais': CORE, '/api/clientes': CORE,
   '/api/comunicacao': CORE, '/api/contatos': CORE, '/api/distribuicao': CORE, '/api/empresa': CORE,
-  '/api/equipe': CORE, '/api/exportar': CORE, '/api/filial': CORE, '/api/funil': CORE, '/api/funis': CORE,
+  '/api/equipe': CORE, '/api/exportar': CORE, '/api/importacao': CORE, '/api/filial': CORE, '/api/funil': CORE, '/api/funis': CORE,
   '/api/leads': CORE, '/api/menu-config': CORE, '/api/metas': CORE, '/api/midia': CORE, '/api/modelos': CORE,
   '/api/modulos': CORE, '/api/permissoes': CORE, '/api/push': CORE, '/api/reativacao': CORE,
   '/api/scoring': CORE, '/api/whatsapp': CORE,

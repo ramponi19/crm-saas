@@ -1157,14 +1157,14 @@ isOneToOne: false
                   ]
                 },"empresas": {
                   Row: {
-                    "cortesia": boolean,"bairro": string | null,"cep": string | null,"cidade": string | null,"cnpj": string | null,"complemento": string | null,"created_at": string | null,"demo": boolean | null,"email": string | null,"endereco": string | null,"estado": string | null,"id": number,"limite_leads": number | null,"limite_usuarios": number | null,"nome": string,"numero": string | null,"permissoes": Json | null,"plano": string,"preset_onboarding": string | null,"slug": string,"status": string,"stripe_customer_id": string | null,"stripe_price_id": string | null,"stripe_status": string | null,"stripe_subscription_id": string | null,"telefone": string | null,"trial_ends_at": string | null,"updated_at": string | null
+                    "cortesia": boolean,"piloto": boolean,"bairro": string | null,"cep": string | null,"cidade": string | null,"cnpj": string | null,"complemento": string | null,"created_at": string | null,"demo": boolean | null,"email": string | null,"endereco": string | null,"estado": string | null,"id": number,"limite_leads": number | null,"limite_usuarios": number | null,"nome": string,"numero": string | null,"permissoes": Json | null,"plano": string,"preset_onboarding": string | null,"slug": string,"status": string,"stripe_customer_id": string | null,"stripe_price_id": string | null,"stripe_status": string | null,"stripe_subscription_id": string | null,"telefone": string | null,"trial_ends_at": string | null,"updated_at": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "cortesia"?: boolean,"bairro"?: string | null,"cep"?: string | null,"cidade"?: string | null,"cnpj"?: string | null,"complemento"?: string | null,"created_at"?: string | null,"demo"?: boolean | null,"email"?: string | null,"endereco"?: string | null,"estado"?: string | null,"id"?: number,"limite_leads"?: number | null,"limite_usuarios"?: number | null,"nome": string,"numero"?: string | null,"permissoes"?: Json | null,"plano"?: string,"preset_onboarding"?: string | null,"slug": string,"status"?: string,"stripe_customer_id"?: string | null,"stripe_price_id"?: string | null,"stripe_status"?: string | null,"stripe_subscription_id"?: string | null,"telefone"?: string | null,"trial_ends_at"?: string | null,"updated_at"?: string | null
+                    "cortesia"?: boolean,"piloto"?: boolean,"bairro"?: string | null,"cep"?: string | null,"cidade"?: string | null,"cnpj"?: string | null,"complemento"?: string | null,"created_at"?: string | null,"demo"?: boolean | null,"email"?: string | null,"endereco"?: string | null,"estado"?: string | null,"id"?: number,"limite_leads"?: number | null,"limite_usuarios"?: number | null,"nome": string,"numero"?: string | null,"permissoes"?: Json | null,"plano"?: string,"preset_onboarding"?: string | null,"slug": string,"status"?: string,"stripe_customer_id"?: string | null,"stripe_price_id"?: string | null,"stripe_status"?: string | null,"stripe_subscription_id"?: string | null,"telefone"?: string | null,"trial_ends_at"?: string | null,"updated_at"?: string | null
                   }
                   Update: {
-                    "cortesia"?: boolean,"bairro"?: string | null,"cep"?: string | null,"cidade"?: string | null,"cnpj"?: string | null,"complemento"?: string | null,"created_at"?: string | null,"demo"?: boolean | null,"email"?: string | null,"endereco"?: string | null,"estado"?: string | null,"id"?: number,"limite_leads"?: number | null,"limite_usuarios"?: number | null,"nome"?: string,"numero"?: string | null,"permissoes"?: Json | null,"plano"?: string,"preset_onboarding"?: string | null,"slug"?: string,"status"?: string,"stripe_customer_id"?: string | null,"stripe_price_id"?: string | null,"stripe_status"?: string | null,"stripe_subscription_id"?: string | null,"telefone"?: string | null,"trial_ends_at"?: string | null,"updated_at"?: string | null
+                    "cortesia"?: boolean,"piloto"?: boolean,"bairro"?: string | null,"cep"?: string | null,"cidade"?: string | null,"cnpj"?: string | null,"complemento"?: string | null,"created_at"?: string | null,"demo"?: boolean | null,"email"?: string | null,"endereco"?: string | null,"estado"?: string | null,"id"?: number,"limite_leads"?: number | null,"limite_usuarios"?: number | null,"nome"?: string,"numero"?: string | null,"permissoes"?: Json | null,"plano"?: string,"preset_onboarding"?: string | null,"slug"?: string,"status"?: string,"stripe_customer_id"?: string | null,"stripe_price_id"?: string | null,"stripe_status"?: string | null,"stripe_subscription_id"?: string | null,"telefone"?: string | null,"trial_ends_at"?: string | null,"updated_at"?: string | null
                   }
                   Relationships: [
                     {
@@ -2243,6 +2243,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"importacoes": {
+                  Row: {
+                    "arquivo": string | null,"contatos_existentes": number,"contatos_novos": number,"created_at": string,"empresa_id": number,"filial_id": number | null,"id": number,"leads_criados": number,"recusadas": NonNullable<Json>,"total": number,"usuario_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "arquivo"?: string | null,"contatos_existentes"?: number,"contatos_novos"?: number,"created_at"?: string,"empresa_id": number,"filial_id"?: number | null,"id"?: never,"leads_criados"?: number,"recusadas"?: NonNullable<Json>,"total": number,"usuario_id"?: string | null
+                  }
+                  Update: {
+                    "arquivo"?: string | null,"contatos_existentes"?: number,"contatos_novos"?: number,"created_at"?: string,"empresa_id"?: number,"filial_id"?: number | null,"id"?: never,"leads_criados"?: number,"recusadas"?: NonNullable<Json>,"total"?: number,"usuario_id"?: string | null
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"planos_config": {
                   Row: {
                     "ativo": boolean,"cor": string,"descricao": string | null,"destaque": boolean,"features": NonNullable<Json>,"id": string,"limite_leads": number,"limite_usuarios": number,"nome": string,"ordem": number,"preco_centavos": number,"stripe_price_id": string | null,"updated_at": string
@@ -3247,7 +3261,10 @@ isOneToOne: true
                 }
           }
           Functions: {
-            "assistente_leads_visiveis":
+            "acompanhamento_empresa":
+{ Args: { "p_dias"?: number,"p_empresa": number }; Returns: Json
+                           },
+"assistente_leads_visiveis":
 { Args: { "p_empresa": number,"p_filial"?: number,"p_responsavel"?: string }; Returns: Json
                            },
 "assistente_status_leads":
