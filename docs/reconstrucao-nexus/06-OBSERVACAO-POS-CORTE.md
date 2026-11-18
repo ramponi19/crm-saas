@@ -1757,7 +1757,25 @@ mensagem recebida: uma leitura por índice parcial (`transmissao_envios_resposta
   - Superadmin na sessão do Lucas: "Piloto" em um clique (sem fim de teste, log `trocar_situacao`); visão geral "Piloto 1", MRR R$ 0,00; Acompanhamento da JM com 12.620 recebidas / 15.585 enviadas em 14 dias e 9 de 9 usuários.
   - Empresa de teste excluída pela tela do superadmin (sobram 1 e 5; 0 logins de teste; 0 importações). JM continuou criando negócios durante o smoke. Aba fechada.
 
-## 56. 18/11: mensagem recebida sempre gravada + alerta de entrada parada — PREPARADO (05, mesma seção)
+## 56. 18/11: mensagem recebida sempre gravada + alerta de entrada parada — EM PRODUÇÃO (aprovado pelo Lucas)
 
-- Migração `20261118000300_entrada_sempre_gravada`, Edge `259f3933` (volta = v82 = `c679d4df`) e app `0d2ddf31`. Prova local completa no 05. **Espera a aprovação da 0300; a Edge só depois dela.**
+Registro pedido "na seção 55"; fica aqui, ao lado do piloto, para a 55 continuar sendo só o piloto.
+
+- **Migração `20261118000300_entrada_sempre_gravada`** aplicada 17:49 UTC (IOwait 0,10% na leitura de 65 s; push do SQL `9b1c2deb` antes).
+  - Conferido: job `entrada-parada` (*/5) ativo; `alertas_entrada` sem acesso de anon; 0 canais pendentes.
+  - Corpos em produção com os acentos íntegros. O banco LOCAL ficou com os comentários mal codificados, porque o psql do Windows leu o arquivo em Windows-1252: só comentários e mensagens de erro, sem efeito; o md5 local difere por isso.
+- **Edge `webhook-leads` v83** às 17:50:49 UTC (`tools/deploy-edge.sh 259f3933`, conferida com o deno). **Volta = v82 = `c679d4df`** (`bash tools/deploy-edge.sh c679d4df`).
+- **Mensagens do Lucas nas quatro entradas** (logo depois da Edge), todas gravadas no card da loja certa:
+  - WhatsApp Jaguariúna 17:51:50 (canal 28, card 3548);
+  - WhatsApp Mogi 17:53:08 (canal 15, card 3598);
+  - Instagram @jmstore_jaguariuna 17:53:24 (canal 25);
+  - Instagram @jmstore_importados 17:53:28 (canal 26).
+  - Marca `entrada_pendente_desde` nula nos 5 canais da JM logo depois (a Edge marca, a gravação limpa).
+  - Cliente novo às 17:52 (contato 4857) virou o negócio 7728: a JM segue criando negócio.
+- **Vigilância de 15 min (17:50:49–18:02 nos logs):** 109 respostas da Edge, **todas 200, nenhum 500/503**. Nenhum log de "mensagem não gravada" nem de "marcar entrada pendente". 18 mensagens recebidas na JM no período. Não houve volta.
+- **App `b8994a92`** READY (`dpl_3kS2YiLu5vYtyg5q5eVBrs23b2BK`; volta = `dpl_5oUHRNFg1jBf5oXPqg35GUtK6aF9` / `1de9e48f`), push com IOwait 0,19%.
+- **Alerta de teste:**
+  - Alerta #1 (JM, sem canal, detalhe "TESTE pedido pelo Lucas") inserido 18:02:57. O cron das 18:05 chamou a rota (200, "avisados 1") e o Sentry abriu o issue **NEXUS-CRM-E** às 18:05:01, com o título do alerta e as tags `alerta`/`empresa`.
+  - Resolvido à mão às 18:06: alerta sem canal não se resolve sozinho, porque a rota só resolve pelo canal; todo alerta real tem canal.
+  - **E-mail do Sentry chegou ao Lucas** (confirmado por ele às ~18h10 UTC) pela regra que já existia ("Send a notification for high priority issues"). Nada a ajustar no Sentry. O e-mail direto (`ALERTA_EMAIL`) segue desligado até o Resend ser configurado.
 
