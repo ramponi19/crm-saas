@@ -7,8 +7,8 @@
  * os efeitos globais (grain, auroras, marquee, spotlight) em `landing.css`.
  *
  * Dramaturgia: abre dark cinematográfico (hero + produto 3D + narrativa do
- * lead + módulos + números), a luz "acende" nas verticais e seções de
- * decisão (planos, FAQ), e fecha dark no CTA final. Rolagem suave via Lenis,
+ * lead + módulos), a luz "acende" no como-funciona e nas seções de
+ * decisão (comparativo, plano, FAQ), e fecha dark no CTA final. Rolagem suave via Lenis,
  * animações GSAP com ScrollTrigger — tudo respeitando prefers-reduced-motion.
  *
  * A nav é fixa e troca de tema sozinha: fica clara enquanto a zona clara
@@ -27,8 +27,7 @@ import type { PlanData } from './data'
 import Hero from './sections/Hero'
 import LeadStory from './sections/LeadStory'
 import Modules from './sections/Modules'
-import Segments from './sections/Segments'
-import Testimonial from './sections/Testimonial'
+import ComoFunciona from './sections/ComoFunciona'
 import Compare from './sections/Compare'
 import Plans from './sections/Plans'
 import Faq from './sections/Faq'
@@ -47,8 +46,7 @@ export default function Landing({ plans }: { plans?: PlanData[] }) {
         <Modules />
         {/* zona clara — a nav observa este wrapper para trocar de tema */}
         <div data-nav-light>
-          <Segments />
-          <Testimonial />
+          <ComoFunciona />
           <Compare />
           <Plans plans={plans} />
           <Faq />
@@ -64,9 +62,9 @@ export default function Landing({ plans }: { plans?: PlanData[] }) {
 /* ------------------------------------------------------------------ */
 
 const NAV_LINKS: [string, string][] = [
-  ['#segmentos', 'Produto'],
+  ['#produto', 'Produto'],
   ['#modulos', 'Módulos'],
-  ['#planos', 'Planos'],
+  ['#planos', 'Plano'],
   ['#faq', 'FAQ'],
 ]
 

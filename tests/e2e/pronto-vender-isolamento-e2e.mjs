@@ -61,15 +61,15 @@ const api = (page, url, method = 'GET', body) => page.evaluate(async ([u, m, b])
 
 try {
   // ── Cadastro: validação, preset padrão, loja principal ─────────────────────
-  let r = await register({ email: EMAIL_B, password: SENHA, nomeUsuario: 'Dono Iso', nomeEmpresa: 'Empresa Iso e2e', plano: 'starter', cnpj: '11.222.333/0001-80' })
+  let r = await register({ email: EMAIL_B, password: SENHA, nomeUsuario: 'Dono Iso', nomeEmpresa: 'Empresa Iso e2e', telefone: '11999998888', aceite: true, cnpj: '11.222.333/0001-80' })
   confere(r.status === 400 && /CNPJ inválido/.test((await r.json()).error ?? ''), `cadastro recusa CNPJ inválido (${r.status})`)
-  r = await register({ email: EMAIL_B, password: SENHA, nomeUsuario: 'Dono Iso', nomeEmpresa: 'Empresa Iso e2e', plano: 'unlimited', cnpj: '11222333000181', telefone: '11999998888' })
+  r = await register({ email: EMAIL_B, password: SENHA, nomeUsuario: 'Dono Iso', nomeEmpresa: 'Empresa Iso e2e', aceite: true, cnpj: '11222333000181', telefone: '11999998888' })
   const rj = await r.json().catch(() => ({}))
   empresaB = rj.empresaId ?? null
-  confere(r.status === 200 && empresaB, `cadastro no plano Unlimited: ${r.status} ${JSON.stringify(rj)}`)
+  confere(r.status === 200 && empresaB, `cadastro no plano base: ${r.status} ${JSON.stringify(rj)}`)
   if (!empresaB) throw new Error('sem empresa B')
   const linhaB = sql(`select plano||'|'||coalesce(cnpj,'')||'|'||coalesce(telefone,'')||'|'||coalesce(preset_onboarding,'')||'|'||limite_usuarios from empresas where id=${empresaB}`)
-  confere(linhaB === 'unlimited|11.222.333/0001-81|(11) 99999-8888|geral|999', `B: Unlimited, CNPJ e telefone formatados, preset CRM geral, limite 999 (${linhaB})`)
+  confere(linhaB === 'base|11.222.333/0001-81|(11) 99999-8888|geral|3', `B: plano base, CNPJ e telefone formatados, preset CRM geral, limite 3 (${linhaB})`)
   const loja = sql(`select f.id||'|'||f.matriz||'|'||(eu.filial_id = f.id) from filiais f join empresa_usuarios eu on eu.empresa_id=f.empresa_id where f.empresa_id=${empresaB}`)
   confere(/^\d+\|(t|true)\|(t|true)$/.test(loja), `B nasce com a loja principal e o dono vinculado a ela (${loja})`)
   const modsB = sql(`select coalesce(string_agg(modulo, ','), '') from empresa_modulos where empresa_id=${empresaB} and ativo`)
@@ -167,7 +167,7 @@ try {
   confere(restoStorage === 0, `arquivos de B apagados do Storage (${restoStorage})`)
   if (sobra === '0/0') empresaB = null
   sql(`delete from rate_limit where chave like 'register%'`)
-  r = await register({ email: EMAIL_B, password: SENHA, nomeUsuario: 'Dono Iso', nomeEmpresa: 'Empresa Iso e2e', plano: 'starter' })
+  r = await register({ email: EMAIL_B, password: SENHA, nomeUsuario: 'Dono Iso', nomeEmpresa: 'Empresa Iso e2e', telefone: '11999998888', aceite: true })
   const re = await r.json().catch(() => ({}))
   confere(r.status === 200, `o mesmo e-mail se cadastra de novo (${r.status} ${re.error ?? ''})`)
   empresaB = re.empresaId ?? null

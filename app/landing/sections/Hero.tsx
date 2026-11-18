@@ -79,7 +79,7 @@ export default function Hero() {
         {/* eyebrow */}
         <div data-hero className="mb-7 inline-flex items-center gap-2.5 rounded-full border border-[color:var(--lp-border)] bg-white/[0.04] px-4 py-2 text-[12px] font-semibold text-[color:var(--lp-dim)] backdrop-blur-sm">
           <span className="lp-live-dot h-[7px] w-[7px] rounded-full bg-ok" />
-          WhatsApp oficial Meta · Pix nativo · feito no Brasil
+          WhatsApp oficial Meta · Instagram · Messenger
         </div>
 
         {/* headline — opacity 0 até o SplitText montar (evita salto de linha visível) */}
@@ -93,7 +93,7 @@ export default function Hero() {
         </h1>
 
         <p data-hero className="mx-auto mt-6 max-w-[580px] text-[17px] leading-relaxed text-[color:var(--lp-dim)] sm:text-[18.5px]">
-          Leads do WhatsApp, vendas com Pix, estoque, agenda e financeiro num sistema só — que fala a língua do seu segmento.
+          CRM com WhatsApp, Instagram e automações para vender mais. Cada conversa vira lead com dono, etapa e próximo passo.
         </p>
 
         {/* CTA */}

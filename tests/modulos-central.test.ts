@@ -37,7 +37,7 @@ test('estado: preparação, pago, instalado e disponível', () => {
   assert.deepEqual(estadoDoModulo(m('pdv'), entrada()), { tipo: 'instalado', podeDesinstalar: false, usadoPor: ['Histórico de vendas'] })
   assert.deepEqual(estadoDoModulo(m('gestao_leads'), entrada()), { tipo: 'disponivel' })
   // Relatórios é recurso 'bi': fora no plano free, dentro no starter/pro, e o forçado do superadmin vale.
-  assert.deepEqual(estadoDoModulo(m('relatorios'), entrada({ plano: 'free' })), { tipo: 'pago', onde: 'no plano Starter' })
+  assert.deepEqual(estadoDoModulo(m('relatorios'), entrada({ plano: 'free' })), { tipo: 'pago', onde: 'no plano Nexus' })
   assert.deepEqual(estadoDoModulo(m('relatorios'), entrada({ plano: 'free', forcados: { bi: true } })), { tipo: 'instalado', podeDesinstalar: true })
   // ZapIntel: contratado à parte, não se desinstala pela Central.
   assert.deepEqual(estadoDoModulo(m('inteligencia'), entrada()), { tipo: 'pago', onde: 'contratado à parte' })
@@ -127,7 +127,7 @@ test('dependências: requisito pago ou em preparação bloqueia com o motivo', (
   // Manifesto de mentira por cima do real: um módulo que requer Relatórios (bi) e outro que requer a Agenda.
   const fakeRel = { ...m('fila'), requer: ['relatorios'] }
   const e = entrada({ plano: 'free', ligados: new Set(['/dashboard']) })
-  assert.deepEqual(estadoDoModulo(fakeRel, e), { tipo: 'disponivel', junto: ['Relatórios'], bloqueio: 'Precisa de Relatórios, que é no plano Starter: peça Relatórios primeiro.' })
+  assert.deepEqual(estadoDoModulo(fakeRel, e), { tipo: 'disponivel', junto: ['Relatórios'], bloqueio: 'Precisa de Relatórios, que é no plano Nexus: peça Relatórios primeiro.' })
   const fakeAgenda = { ...m('fila'), requer: ['agenda'] }
   assert.deepEqual(estadoDoModulo(fakeAgenda, e), { tipo: 'disponivel', junto: ['Agenda'], bloqueio: 'Precisa de Agenda, que ainda está em preparação.' })
 })

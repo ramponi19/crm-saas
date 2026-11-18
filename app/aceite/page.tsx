@@ -12,5 +12,5 @@ export default async function AceitePage() {
   if (!user) redirect('/login')
   const v = versoesVigentes()
   if (!v || await aceitouVigentes(supabase, user.id)) redirect('/entrar')
-  return <AceiteForm versaoTermos={v.termos} versaoPrivacidade={v.privacidade} />
+  return <AceiteForm versaoTermos={v.termos} versaoPrivacidade={v.privacidade} versaoDpa={v.dpa} />
 }

@@ -1,6 +1,6 @@
 // Bloco 2 da frente "pronto para vender" (17/11/2026): texto de ramo só com o módulo dono ligado.
 //   A = empresa 1 (JM): Estoque + "Celulares e aparelhos" (celulares) ligados — tem de ver tudo de celular.
-//   B = empresa nova pelo /api/register (preset Serviços), com Estoque instalado pela Central e SEM o módulo
+//   B = empresa nova pelo /api/register (CRM geral), com Estoque instalado pela Central e SEM o módulo
 //       de celular — tem de ver o Estoque genérico. Apagada no fim.
 // Rodar: node tests/e2e/pronto-vender-b2-e2e.mjs (app LOCAL :3010, Supabase LOCAL; ver LEIA-ME.md)
 import { E } from './_usuarios.mjs'
@@ -45,10 +45,10 @@ const CELULAR = /\bIMEI\b|iPhone|semi-?novo|Bateria/i
 
 try {
   const reg = await fetch(BASE + '/api/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
-    email: EMAIL_B, password: SENHA, nomeUsuario: 'Dono B2', nomeEmpresa: 'Empresa B2 e2e', plano: 'starter', segmento: 'servicos',
+    email: EMAIL_B, password: SENHA, nomeUsuario: 'Dono B2', nomeEmpresa: 'Empresa B2 e2e', telefone: '11999998888', aceite: true,
   }) })
   empresaB = (await reg.json().catch(() => ({}))).empresaId ?? null
-  confere(reg.status === 200 && empresaB, `cadastro da empresa B (Serviços): ${reg.status}`)
+  confere(reg.status === 200 && empresaB, `cadastro da empresa B: ${reg.status}`)
   if (!empresaB) throw new Error('sem empresa B')
 
   const pA = await entrar(E.dono)

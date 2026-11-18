@@ -6,7 +6,8 @@ import { excedeuLimite } from '@/lib/rate-limit'
 import { slugValido } from '@/lib/slug-publico'
 import { soDigitos } from '@/lib/documento'
 import { erroCnpj, erroTelefone, mascaraCnpj, mascaraTelefone } from '@/lib/mascaras'
-import { origemDaRequisicao, registrarAceite, versoesVigentes } from '@/lib/termos'
+import { origemDaRequisicao, registrarAceite, versoesDoCadastro } from '@/lib/termos'
+import { PLANO_BASE } from '@/lib/plano'
 
 /**
  * Bootstrap de cadastro (self-service), 100% no servidor via service client.
@@ -17,6 +18,11 @@ import { origemDaRequisicao, registrarAceite, versoesVigentes } from '@/lib/term
  * na criação da empresa, faz rollback do usuário de auth (evita órfãos).
  *
  * O cliente, após o sucesso, faz signInWithPassword para obter a sessão.
+ *
+ * PLANO ÚNICO (18/11/2026): sem escolha de plano nem de ramo. Toda empresa nasce no plano base
+ * (planos_config 'base', teste de 14 dias) com o preset "CRM geral"; a loja principal leva o nome que a
+ * pessoa deu (padrão: o da empresa); o aceite dos termos, da privacidade e do DPA é obrigatório e fica em
+ * termos_aceites com versão, data, IP e usuário — sem ele gravado, o cadastro desfaz tudo.
  */
 
 // local@dominio.tld, sem espaço; o Auth recusa o resto.
@@ -59,8 +65,7 @@ export async function POST(req: Request) {
 
   let body: {
     email?: string; password?: string; nomeUsuario?: string
-    nomeEmpresa?: string; cnpj?: string; telefone?: string; plano?: string
-    segmento?: string; aceite?: boolean
+    nomeEmpresa?: string; nomeLoja?: string; cnpj?: string; telefone?: string; aceite?: boolean
   }
   try {
     body = await req.json()
@@ -72,16 +77,19 @@ export async function POST(req: Request) {
   const password = body.password || ''
   const nomeUsuario = (body.nomeUsuario || '').trim()
   const nomeEmpresa = (body.nomeEmpresa || '').trim()
+  const nomeLoja = (body.nomeLoja || '').trim() || nomeEmpresa
 
   if (email.length > 254 || !EMAIL.test(email)) return NextResponse.json({ error: 'E-mail inválido' }, { status: 400 })
   if (password.length < 8) return NextResponse.json({ error: 'Senha deve ter ao menos 8 caracteres' }, { status: 400 })
   if (!nomeUsuario) return NextResponse.json({ error: 'Informe seu nome' }, { status: 400 })
-  if (!nomeEmpresa) return NextResponse.json({ error: 'Informe o nome da loja' }, { status: 400 })
-  // CNPJ e telefone são opcionais; preenchidos, têm de valer (17/11/2026 — a tela já confere, aqui é a regra).
-  const erroDoc = erroCnpj(body.cnpj) ?? erroTelefone(body.telefone)
+  if (!nomeEmpresa) return NextResponse.json({ error: 'Informe o nome da empresa' }, { status: 400 })
+  if (nomeEmpresa.length > 120 || nomeLoja.length > 120) return NextResponse.json({ error: 'Nome longo demais' }, { status: 400 })
+  // Telefone obrigatório (é o contato da conta); CNPJ opcional, mas, preenchido, tem de valer.
+  if (!soDigitos(body.telefone)) return NextResponse.json({ error: 'Informe seu telefone' }, { status: 400 })
+  const erroDoc = erroTelefone(body.telefone) ?? erroCnpj(body.cnpj)
   if (erroDoc) return NextResponse.json({ error: erroDoc }, { status: 400 })
-  // Termos e privacidade com versão definida (lib/termos.ts): o cadastro só segue com o aceite.
-  if (versoesVigentes() && body.aceite !== true) return NextResponse.json({ error: 'Aceite os termos de uso e a política de privacidade para continuar.' }, { status: 400 })
+  // Termos, privacidade e DPA: o cadastro só segue com o aceite (versão "minuta" até o texto final).
+  if (body.aceite !== true) return NextResponse.json({ error: 'Aceite os termos de uso, a política de privacidade e o acordo de tratamento de dados para continuar.' }, { status: 400 })
   const cnpj = soDigitos(body.cnpj) ? mascaraCnpj(body.cnpj ?? '') : null
   const telefone = soDigitos(body.telefone) ? mascaraTelefone(body.telefone ?? '') : null
 
@@ -106,20 +114,20 @@ export async function POST(req: Request) {
   }
   const userId = created.user.id
 
-  // valida plano (fallback: free)
+  // O plano base: os limites da empresa nova saem dele (0 = sem limite).
   const { data: planoRow } = await svc
     .from('planos_config')
     .select('id, limite_usuarios, limite_leads')
-    .eq('id', body.plano || '')
+    .eq('id', PLANO_BASE)
     .maybeSingle()
-  const planoId = planoRow?.id ?? 'free'
+  const planoId = PLANO_BASE
 
   const slug = slugDaEmpresa(nomeEmpresa, userId)
   const trialEnds = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
 
-  // O preset escolhido (presets_onboarding): a ficha de partida da empresa. É o
-  // único lugar do app, fora das ferramentas do superadmin, que o lê.
-  const preset = await lerPreset(svc, body.segmento)
+  // O preset é sempre o "CRM geral" (presets_onboarding 'geral'): sem pergunta de ramo desde 18/11/2026.
+  // Módulos de ramo a empresa liga depois, na Central.
+  const preset = await lerPreset(svc, 'geral')
   if (!preset) {
     await svc.auth.admin.deleteUser(userId)
     console.error('[register] nenhum preset ativo no banco')
@@ -181,7 +189,7 @@ export async function POST(req: Request) {
   //    (empresa_usuarios não tem trigger de bloqueio). Sem a loja, o cadastro desfaz tudo.
   const { data: loja, error: lojaErr } = await svc
     .from('filiais')
-    .insert({ empresa_id: empresa.id, nome: nomeEmpresa, matriz: true, ativo: true, cnpj, telefone })
+    .insert({ empresa_id: empresa.id, nome: nomeLoja, matriz: true, ativo: true, cnpj, telefone })
     .select('id')
     .single()
   if (lojaErr || !loja) {
@@ -198,9 +206,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Não foi possível concluir o cadastro. Tente novamente.' }, { status: 500 })
   }
 
-  // 4b) o aceite dos termos (só com as versões definidas): grava versão, quando, IP e navegador.
-  const { error: aceiteErr } = await registrarAceite(svc, { usuarioId: userId, empresaId: empresa.id, ...origemDaRequisicao(req) })
-  if (aceiteErr) console.error('[register] aceite dos termos:', aceiteErr)
+  // 4b) o aceite dos termos, da privacidade e do DPA: versão, quando, IP e navegador. Obrigatório: sem ele, desfaz.
+  const { error: aceiteErr } = await registrarAceite(svc, { usuarioId: userId, empresaId: empresa.id, ...origemDaRequisicao(req) }, versoesDoCadastro())
+  if (aceiteErr) {
+    await rollback()
+    console.error('[register] aceite dos termos:', aceiteErr)
+    return NextResponse.json({ error: 'Não foi possível registrar o aceite. Tente novamente.' }, { status: 500 })
+  }
 
   /**
    * 5) o preset vira da empresa: base do menu (tela inicial e vocabulário juntos),

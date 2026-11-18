@@ -11,8 +11,9 @@ export default async function Home() {
   const { data: { user } } = await supabase.auth.getUser()
   if (user) redirect('/entrar')
 
-  // Planos da vitrine vêm da MESMA fonte do checkout (planos_config),
-  // então preço/nome/features nunca divergem do que é cobrado.
+  // O plano da vitrine vem da MESMA fonte do checkout (planos_config),
+  // então preço/nome/features nunca divergem do que é cobrado. Plano único
+  // (18/11/2026): a landing mostra o primeiro ativo com preço.
   // Leitura no servidor via service client (nunca exposto ao browser).
   let plans: PlanData[] = []
   try {
@@ -34,7 +35,7 @@ export default async function Home() {
       }))
     }
   } catch {
-    plans = [] // Sections cai no fallback embutido
+    plans = [] // Plans cai no fallback embutido (data.ts → FALLBACK_PLAN)
   }
 
   return <Landing plans={plans} />

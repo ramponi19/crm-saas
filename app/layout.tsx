@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     default: 'Nexus',
     template: '%s | Nexus',
   },
-  description: 'Nexus — CRM por segmento: venda com processo, cresça com controle.',
+  description: 'Nexus — CRM com WhatsApp, Instagram e automações para vender mais.',
   applicationName: 'Nexus',
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Nexus' },
   icons: {

@@ -1,54 +1,6 @@
 {
-  "_leia": "ZERO-SEGMENTO (22/10/2026). Arquivos que ainda podem citar \"segmento\" e quantas vezes. A lista só encolhe: o build reprova arquivo novo, teto que sobe e arquivo que limpou mas continua aqui. Ver scripts/check-segmento.mjs. Desde 03/11/2026 sobram só presets_onboarding (tela /superadmin/presets), register (/register) e texto_publico (landing e descrição do site, que o cliente lê; decisão do Lucas).",
+  "_leia": "ZERO-SEGMENTO (22/10/2026). Arquivos que ainda podem citar \"segmento\" e quantas vezes. A lista só encolhe: o build reprova arquivo novo, teto que sobe e arquivo que limpou mas continua aqui. Ver scripts/check-segmento.mjs. Desde 18/11/2026 sobra só presets_onboarding (tela /superadmin/presets): o texto público (landing e descrição do site) e o /register zeraram com o plano único.",
   "arquivos": {
-    "app/api/register/route.ts": {
-      "motivo": "register",
-      "teto": 2
-    },
-    "app/landing/data.ts": {
-      "motivo": "texto_publico",
-      "teto": 3
-    },
-    "app/landing/Landing.tsx": {
-      "motivo": "texto_publico",
-      "teto": 1
-    },
-    "app/landing/Sections.tsx": {
-      "motivo": "texto_publico",
-      "teto": 4
-    },
-    "app/landing/sections/FinalCta.tsx": {
-      "motivo": "texto_publico",
-      "teto": 3
-    },
-    "app/landing/sections/Hero.tsx": {
-      "motivo": "texto_publico",
-      "teto": 1
-    },
-    "app/landing/sections/Modules.tsx": {
-      "motivo": "texto_publico",
-      "teto": 1
-    },
-    "app/landing/sections/ProductStage.tsx": {
-      "motivo": "texto_publico",
-      "teto": 2
-    },
-    "app/landing/sections/Segments.tsx": {
-      "motivo": "texto_publico",
-      "teto": 1
-    },
-    "app/layout.tsx": {
-      "motivo": "texto_publico",
-      "teto": 1
-    },
-    "app/manifest.ts": {
-      "motivo": "texto_publico",
-      "teto": 1
-    },
-    "app/register/register-form.tsx": {
-      "motivo": "register",
-      "teto": 6
-    },
     "app/superadmin/presets/page.tsx": {
       "motivo": "presets_onboarding",
       "teto": 1

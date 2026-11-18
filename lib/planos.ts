@@ -8,15 +8,15 @@
  * de UI.
  */
 
-export type Plano = 'free' | 'starter' | 'pro' | 'unlimited'
+export type Plano = 'base' | 'free' | 'starter' | 'pro' | 'unlimited'
 
 export type ModuloPago = 'bi' | 'multi_usuario' | 'api' | 'white_label'
 
 const MATRIZ: Record<ModuloPago, Plano[]> = {
-  bi:            ['starter', 'pro', 'unlimited'],
-  multi_usuario: ['starter', 'pro', 'unlimited'],
+  bi:            ['base', 'starter', 'pro', 'unlimited'],
+  multi_usuario: ['base', 'starter', 'pro', 'unlimited'],
   api:           ['pro', 'unlimited'],
-  white_label:   ['pro', 'unlimited'],
+  white_label:   ['base', 'pro', 'unlimited'],
 }
 
 export function temAcesso(plano: Plano | undefined | null, modulo: ModuloPago): boolean {

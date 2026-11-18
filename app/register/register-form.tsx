@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -10,122 +10,110 @@ import { Check, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import { Input, Button } from '@/components/ui'
 import { erroCnpj, erroTelefone, mascaraCnpj, mascaraTelefone } from '@/lib/mascaras'
 
-type Step = 'plano' | 'loja' | 'conta'
+type Step = 'conta' | 'empresa' | 'aceite'
 
-type PlanoCard = {
-  id: string
+/** O plano base (planos_config), lido pela página no servidor. */
+export interface ResumoPlano {
   nome: string
-  preco_centavos: number
+  precoCentavos: number
   descricao: string
-  features: string[]
-  destaque: boolean
+  inclui: string[]
 }
 
-// Fallback caso a API não responda — mantém o cadastro sempre utilizável.
-const FALLBACK_PLANOS: PlanoCard[] = [
-  { id: 'starter', nome: 'Starter', preco_centavos: 19700, descricao: 'Para pequenas equipes', features: ['3 usuários', '500 leads', 'PDV completo', 'Relatórios', 'Integrações básicas'], destaque: false },
-  { id: 'pro', nome: 'Pro', preco_centavos: 39700, descricao: 'Para negócios em crescimento', features: ['10 usuários', 'Leads ilimitados', 'Tudo do Starter', 'White-label', 'Suporte prioritário'], destaque: true },
-  { id: 'unlimited', nome: 'Unlimited', preco_centavos: 69700, descricao: 'Sem limites', features: ['Usuários ilimitados', 'Leads ilimitados', 'Tudo do Pro', 'API dedicada', 'SLA garantido'], destaque: false },
-]
-
 const fmtPreco = (c: number) =>
-  'R$ ' + (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + '/mês'
+  'R$ ' + (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 
 const STEPS: { id: Step; label: string }[] = [
-  { id: 'plano', label: 'Plano' },
-  { id: 'loja',  label: 'Sua loja' },
   { id: 'conta', label: 'Sua conta' },
+  { id: 'empresa', label: 'Sua empresa' },
+  { id: 'aceite', label: 'Termos' },
 ]
 
-/** Os presets ativos (presets_onboarding), lidos pela página no servidor. */
-export function RegisterForm({ presets, pedirAceite = false }: { presets: { chave: string; nome: string }[]; pedirAceite?: boolean }) {
+// local@dominio.tld; a rota confere de novo.
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** A chave da tela de primeiros passos (components/modules/dashboard/onboarding-card.tsx). */
+const PRIMEIROS_PASSOS_DISPENSADO = 'nexus_onboarding_dismissed'
+
+/**
+ * Cadastro em 3 passos (18/11/2026, plano único): sua conta → sua empresa → aceite dos termos, da privacidade
+ * e do DPA. Sem plano para escolher (o resumo ao lado é o plano base) e sem pergunta de ramo (preset "CRM geral").
+ * Ao concluir, entra direto no painel com os primeiros passos.
+ */
+export function RegisterForm({ resumo, documentos }: {
+  resumo: ResumoPlano
+  documentos: { nome: string; href: string; versao: string }[]
+}) {
   const router = useRouter()
-  const [step, setStep] = useState<Step>('plano')
+  const [step, setStep] = useState<Step>('conta')
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [showPw, setShowPw] = useState(false)
   const [confirmar, setConfirmar] = useState<string | null>(null)
   const [aceite, setAceite] = useState(false)
-  const [planos, setPlanos] = useState<PlanoCard[]>(FALLBACK_PLANOS)
+  // A loja principal segue o nome da empresa até a pessoa mexer nela.
+  const [lojaEditada, setLojaEditada] = useState(false)
 
   const [form, setForm] = useState({
-    plano: 'pro',
-    // O primeiro preset da lista (o CRM geral, ordem -1) é o padrão; os de ramo só ligam módulos.
-    segmento: presets[0]?.chave ?? 'geral',
-    nomeEmpresa: '',
-    cnpj: '',
-    telefone: '',
     nomeUsuario: '',
     email: '',
+    telefone: '',
     senha: '',
     confirmaSenha: '',
+    nomeEmpresa: '',
+    cnpj: '',
+    nomeLoja: '',
   })
+  const nomeLoja = lojaEditada ? form.nomeLoja : form.nomeEmpresa
 
-  // planos vêm da mesma fonte da vitrine/checkout (planos_config, via API pública)
-  useEffect(() => {
-    let active = true
-    fetch('/api/planos-publicos')
-      .then((r) => r.json())
-      .then((d) => {
-        if (!active || !Array.isArray(d?.plans) || d.plans.length === 0) return
-        const mapped: PlanoCard[] = d.plans.map((p: PlanoCard) => ({
-          id: p.id,
-          nome: p.nome,
-          preco_centavos: p.preco_centavos,
-          descricao: p.descricao ?? '',
-          features: Array.isArray(p.features) ? p.features : [],
-          destaque: !!p.destaque,
-        }))
-        setPlanos(mapped)
-        // garante que o plano selecionado exista na lista carregada
-        setForm((f) => {
-          if (mapped.some((m) => m.id === f.plano)) return f
-          const def = mapped.find((m) => m.destaque) ?? mapped[0]
-          return def ? { ...f, plano: def.id } : f
-        })
-      })
-      .catch(() => {})
-    return () => { active = false }
-  }, [])
-
-  function set(campo: string, valor: string) {
+  function set(campo: keyof typeof form, valor: string) {
     setForm(f => ({ ...f, [campo]: valor }))
     setErro(null)
   }
 
   const stepIdx = STEPS.findIndex(s => s.id === step)
 
-  function avancar() {
-    setErro(null)
-    if (step === 'plano') {
-      setStep('loja')
-    } else if (step === 'loja') {
-      if (!form.nomeEmpresa.trim()) { setErro('Informe o nome da loja'); return }
-      const e = erroCnpj(form.cnpj) ?? erroTelefone(form.telefone)
-      if (e) { setErro(e); return }
-      setStep('conta')
-    } else {
-      criarConta()
+  function erroDoPasso(): string | null {
+    if (step === 'conta') {
+      if (!form.nomeUsuario.trim()) return 'Informe seu nome'
+      if (!EMAIL.test(form.email.trim())) return 'E-mail inválido'
+      if (!form.telefone.trim()) return 'Informe seu telefone'
+      const eTel = erroTelefone(form.telefone)
+      if (eTel) return eTel
+      if (form.senha.length < 8) return 'Senha deve ter ao menos 8 caracteres'
+      if (form.senha !== form.confirmaSenha) return 'Senhas não conferem'
     }
+    if (step === 'empresa') {
+      if (!form.nomeEmpresa.trim()) return 'Informe o nome da empresa'
+      const eCnpj = erroCnpj(form.cnpj)
+      if (eCnpj) return eCnpj
+      if (!nomeLoja.trim()) return 'Informe o nome da loja principal'
+    }
+    if (step === 'aceite' && !aceite) return 'Aceite os termos de uso, a política de privacidade e o acordo de tratamento de dados para continuar.'
+    return null
+  }
+
+  function avancar() {
+    const e = erroDoPasso()
+    if (e) { setErro(e); return }
+    setErro(null)
+    if (step === 'conta') setStep('empresa')
+    else if (step === 'empresa') setStep('aceite')
+    else criarConta()
   }
 
   function voltar() {
-    if (step === 'loja') setStep('plano')
-    if (step === 'conta') setStep('loja')
+    setErro(null)
+    if (step === 'empresa') setStep('conta')
+    if (step === 'aceite') setStep('empresa')
   }
 
   async function criarConta() {
-    if (!form.nomeUsuario.trim()) { setErro('Informe seu nome'); return }
-    if (!form.email.includes('@')) { setErro('E-mail inválido'); return }
-    if (form.senha.length < 8) { setErro('Senha deve ter ao menos 8 caracteres'); return }
-    if (form.senha !== form.confirmaSenha) { setErro('Senhas não conferem'); return }
-
     setLoading(true)
     const supabase = createClient()
 
     try {
-      // 1) cria usuário + empresa + vínculo (owner) no servidor via Admin API
-      //    (sem envio de e-mail e sem o rate limit do signUp público)
+      // 1) cria usuário + empresa + loja + vínculo (owner) + aceite no servidor via Admin API
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -133,11 +121,10 @@ export function RegisterForm({ presets, pedirAceite = false }: { presets: { chav
           email: form.email,
           password: form.senha,
           nomeUsuario: form.nomeUsuario,
+          telefone: form.telefone,
           nomeEmpresa: form.nomeEmpresa,
           cnpj: form.cnpj,
-          telefone: form.telefone,
-          plano: form.plano,
-          segmento: form.segmento,
+          nomeLoja,
           aceite,
         }),
       })
@@ -158,8 +145,10 @@ export function RegisterForm({ presets, pedirAceite = false }: { presets: { chav
       if (signErr) throw new Error(signErr.message)
 
       markSessionActive()
-      // Novo cadastro cria o dono (owner) → abre direto na Visão geral.
-      router.push('/visao-geral')
+      // 3) primeiro acesso guiado: o painel com os primeiros passos (mesmo que outro login neste navegador
+      //    os tenha dispensado).
+      try { localStorage.removeItem(PRIMEIROS_PASSOS_DISPENSADO) } catch { /* sem localStorage */ }
+      router.push('/dashboard')
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro desconhecido')
     } finally {
@@ -169,7 +158,7 @@ export function RegisterForm({ presets, pedirAceite = false }: { presets: { chav
 
   return (
     <div className="flex min-h-screen items-center justify-center overflow-auto bg-bg px-6 py-12">
-      <div className="flex w-full max-w-[480px] flex-col items-center">
+      <div className="flex w-full max-w-[480px] flex-col items-center lg:max-w-[820px]">
 
         {/* Logo */}
         <Image src="/nexus-logo.png" alt="Nexus" width={426} height={285} priority className="h-24 w-auto" />
@@ -195,112 +184,11 @@ export function RegisterForm({ presets, pedirAceite = false }: { presets: { chav
           ))}
         </div>
 
+        <div className="mt-6 grid w-full gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
         {/* Card */}
-        <div className="mt-6 w-full rounded-card border border-line bg-card p-7">
+        <div className="w-full rounded-card border border-line bg-card p-7">
 
-          {/* Step 1 — Plano */}
-          {step === 'plano' && (
-            <div className="space-y-5">
-              <div>
-                <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-ink">Escolha seu plano</h2>
-                <p className="mt-1 text-[13px] text-ink-2">14 dias grátis em qualquer plano. Sem cartão agora.</p>
-              </div>
-              <div className="space-y-2.5">
-                {planos.map(p => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => set('plano', p.id)}
-                    className={`w-full rounded-card border p-4 text-left transition-colors ${
-                      form.plano === p.id
-                        ? 'border-accent bg-accent-soft'
-                        : 'border-line bg-card hover:border-line-soft hover:bg-bg'
-                    }`}
-                  >
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 transition-colors ${
-                          form.plano === p.id ? 'border-accent' : 'border-line'
-                        }`}>
-                          {form.plano === p.id && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
-                        </span>
-                        <span className="text-[14px] font-semibold text-ink">{p.nome}</span>
-                        {p.destaque && (
-                          <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-accent">
-                            Popular
-                          </span>
-                        )}
-                      </div>
-                      <span className="num text-[13px] font-semibold text-ink">{fmtPreco(p.preco_centavos)}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 pl-[22px]">
-                      {p.features.map(f => (
-                        <span key={f} className="flex items-center gap-1 text-[11px] text-ink-2">
-                          <Check size={11} strokeWidth={1.7} className="text-ok" /> {f}
-                        </span>
-                      ))}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Step 2 — Loja */}
-          {step === 'loja' && (
-            <div className="space-y-5">
-              <div>
-                <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-ink">Sobre sua loja</h2>
-                <p className="mt-1 text-[13px] text-ink-2">Configure seu sistema em menos de 2 minutos.</p>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-[12px] font-medium text-ink-2">Segmento do negócio <span className="text-bad">*</span></label>
-                <div className="grid grid-cols-2 gap-2">
-                  {presets.map(({ chave, nome }) => (
-                    <button
-                      key={chave}
-                      type="button"
-                      onClick={() => set('segmento', chave)}
-                      className={`rounded-control border p-3 text-left transition-colors ${
-                        form.segmento === chave
-                          ? 'border-accent bg-accent-soft'
-                          : 'border-line hover:border-line-soft hover:bg-bg'
-                      }`}
-                    >
-                      <span className="text-[13px] font-semibold text-ink">{nome}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3.5">
-                <Input
-                  label="Nome da loja"
-                  required
-                  value={form.nomeEmpresa}
-                  onChange={e => set('nomeEmpresa', e.target.value)}
-                  placeholder="Ex: Loja Central, Casa & Cia..."
-                />
-                <Input
-                  label="CNPJ"
-                  value={form.cnpj}
-                  inputMode="numeric"
-                  onChange={e => set('cnpj', mascaraCnpj(e.target.value))}
-                  placeholder="00.000.000/0000-00"
-                />
-                <Input
-                  label="Telefone / WhatsApp"
-                  value={form.telefone}
-                  inputMode="tel"
-                  onChange={e => set('telefone', mascaraTelefone(e.target.value))}
-                  placeholder="(11) 99999-9999"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Step 3 — Conta */}
+          {/* Passo 1 — Conta */}
           {step === 'conta' && (
             <div className="space-y-5">
               <div>
@@ -314,6 +202,7 @@ export function RegisterForm({ presets, pedirAceite = false }: { presets: { chav
                   value={form.nomeUsuario}
                   onChange={e => set('nomeUsuario', e.target.value)}
                   placeholder="Nome completo"
+                  autoComplete="name"
                 />
                 <Input
                   label="E-mail"
@@ -323,6 +212,15 @@ export function RegisterForm({ presets, pedirAceite = false }: { presets: { chav
                   onChange={e => set('email', e.target.value)}
                   placeholder="voce@suaempresa.com.br"
                   autoComplete="username"
+                />
+                <Input
+                  label="Telefone / WhatsApp"
+                  required
+                  value={form.telefone}
+                  inputMode="tel"
+                  onChange={e => set('telefone', mascaraTelefone(e.target.value))}
+                  placeholder="(11) 99999-9999"
+                  autoComplete="tel"
                 />
                 <div>
                   <label htmlFor="reg-senha" className="mb-1.5 block text-[12px] font-medium text-ink-2">Senha <span className="text-bad">*</span></label>
@@ -359,11 +257,61 @@ export function RegisterForm({ presets, pedirAceite = false }: { presets: { chav
             </div>
           )}
 
-          {pedirAceite && step === 'conta' && (
-            <label className="mt-4 flex items-start gap-2 text-[12.5px] text-ink-2">
-              <input type="checkbox" checked={aceite} onChange={(e) => setAceite(e.target.checked)} className="mt-0.5" />
-              <span>Li e aceito os <a href="/termos" target="_blank" className="underline">termos de uso</a> e a <a href="/privacy" target="_blank" className="underline">política de privacidade</a>.</span>
-            </label>
+          {/* Passo 2 — Empresa */}
+          {step === 'empresa' && (
+            <div className="space-y-5">
+              <div>
+                <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-ink">Sua empresa</h2>
+                <p className="mt-1 text-[13px] text-ink-2">Dá para mudar tudo isso depois, em Configurações.</p>
+              </div>
+              <div className="space-y-3.5">
+                <Input
+                  label="Nome da empresa"
+                  required
+                  value={form.nomeEmpresa}
+                  onChange={e => set('nomeEmpresa', e.target.value)}
+                  placeholder="Como seus clientes conhecem você"
+                  autoComplete="organization"
+                />
+                <Input
+                  label="CNPJ (opcional)"
+                  value={form.cnpj}
+                  inputMode="numeric"
+                  onChange={e => set('cnpj', mascaraCnpj(e.target.value))}
+                  placeholder="00.000.000/0000-00"
+                />
+                <Input
+                  label="Nome da loja principal"
+                  required
+                  value={nomeLoja}
+                  onChange={e => { setLojaEditada(true); set('nomeLoja', e.target.value) }}
+                  placeholder="Igual ao nome da empresa"
+                  hint="A primeira loja da empresa; outras você cria depois."
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Passo 3 — Aceite */}
+          {step === 'aceite' && (
+            <div className="space-y-5">
+              <div>
+                <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-ink">Termos e privacidade</h2>
+                <p className="mt-1 text-[13px] text-ink-2">Leia os documentos antes de criar a conta.</p>
+              </div>
+              <ul className="space-y-2">
+                {documentos.map(d => (
+                  <li key={d.href} className="flex items-center justify-between gap-3 rounded-control border border-line px-3 py-2.5">
+                    <a href={d.href} target="_blank" rel="noopener" className="text-[13px] font-medium text-ink underline underline-offset-2">{d.nome}</a>
+                    <span className="text-[11px] text-ink-3">versão {d.versao}</span>
+                  </li>
+                ))}
+              </ul>
+              <label className="flex items-start gap-2 text-[12.5px] text-ink-2">
+                <input type="checkbox" checked={aceite} onChange={(e) => { setAceite(e.target.checked); setErro(null) }} className="mt-0.5" />
+                <span>Li e aceito os termos de uso, a política de privacidade e o acordo de tratamento de dados (DPA).</span>
+              </label>
+            </div>
           )}
 
           {confirmar && (
@@ -391,17 +339,18 @@ export function RegisterForm({ presets, pedirAceite = false }: { presets: { chav
               size="lg"
               onClick={avancar}
               loading={loading}
+              disabled={step === 'aceite' && !aceite}
               className="flex-1"
             >
               {loading
                 ? 'Criando conta…'
-                : step === 'conta'
+                : step === 'aceite'
                 ? <><Check size={16} strokeWidth={1.7} /> Criar conta grátis</>
                 : <>Continuar <ChevronRight size={16} strokeWidth={1.7} /></>}
             </Button>
           </div>
 
-          {step === 'plano' && (
+          {step === 'conta' && (
             <p className="mt-4 text-center text-[13px] text-ink-2">
               Já tem conta?{' '}
               <Link href="/login" className="font-medium text-accent transition-colors hover:text-ink">
@@ -409,6 +358,26 @@ export function RegisterForm({ presets, pedirAceite = false }: { presets: { chav
               </Link>
             </p>
           )}
+        </div>
+
+        {/* Resumo do plano (planos_config 'base', editável no superadmin) */}
+        <aside aria-label="Resumo do plano" className="w-full rounded-card border border-line bg-card p-5">
+          <p className="text-[11px] font-medium text-ink-3">Plano</p>
+          <div className="mt-0.5 flex items-baseline justify-between gap-2">
+            <span className="text-[15px] font-semibold text-ink">{resumo.nome}</span>
+            <span className="num text-[15px] font-semibold text-ink">{fmtPreco(resumo.precoCentavos)}<span className="text-[12px] font-normal text-ink-3">/mês</span></span>
+          </div>
+          <ul className="mt-3 space-y-1.5">
+            {resumo.inclui.map(f => (
+              <li key={f} className="flex items-start gap-1.5 text-[12.5px] text-ink-2">
+                <Check size={13} strokeWidth={1.7} className="mt-0.5 flex-none text-ok" /> {f}
+              </li>
+            ))}
+          </ul>
+          {resumo.descricao && (
+            <p className="mt-3 border-t border-line-soft pt-3 text-[12.5px] text-ink-2">{resumo.descricao}</p>
+          )}
+        </aside>
         </div>
       </div>
     </div>

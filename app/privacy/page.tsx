@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
+import { VersaoDocumento } from '@/components/legal/versao-documento'
 
 export const metadata: Metadata = {
   title: 'Política de Privacidade | Nexus CRM',
@@ -114,6 +115,7 @@ export default function PrivacyPage() {
     <main style={S.main}>
       <h1 style={S.h1}>Política de Privacidade</h1>
       <p style={S.data}>{ATUALIZADO_PT}</p>
+      <VersaoDocumento documento="privacidade" />
 
       <Secao titulo="1. Quem somos">
         <p>

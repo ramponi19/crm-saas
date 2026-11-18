@@ -16,7 +16,7 @@ export default async function SuperAdminDashboard() {
   const supabase = await createClient()
 
   const [{ data: empresas }, { data: planos }] = await Promise.all([
-    supabase.from('empresas').select('id, nome, plano, status, stripe_status, trial_ends_at, created_at, demo'),
+    supabase.from('empresas').select('id, nome, plano, status, stripe_status, trial_ends_at, created_at, demo, cortesia'),
     supabase.from('planos_config').select('id, preco_centavos'),
   ])
   const precos = precosDosPlanos(planos as Array<{ id: string; preco_centavos: number | null }> | null)
@@ -41,11 +41,11 @@ export default async function SuperAdminDashboard() {
     e => e.created_at && new Date(e.created_at) >= trintaDiasAtras
   ).length
 
-  // Distribuição por plano
+  // Plano único desde 18/11/2026: quem está nele, quem é cortesia e quem é demonstração.
   const porPlano = {
-    free: lista.filter(e => e.plano === 'free').length,
-    starter: lista.filter(e => e.plano === 'starter').length,
-    pro: lista.filter(e => e.plano === 'pro').length,
+    nexus: lista.filter(e => !e.cortesia && !e.demo).length,
+    cortesia: lista.filter(e => e.cortesia && !e.demo).length,
+    demo: lista.filter(e => e.demo).length,
   }
 
   return (
@@ -86,16 +86,16 @@ export default async function SuperAdminDashboard() {
             {/* Distribuição por plano */}
             <div className="mt-5 grid grid-cols-3 gap-3 border-t border-line-soft pt-5">
               <div>
-                <div className="text-[11px] font-medium text-ink-3">Free</div>
-                <div className="num mt-0.5 text-[20px] font-bold text-ink">{porPlano.free}</div>
+                <div className="text-[11px] font-medium text-ink-3">Plano Nexus</div>
+                <div className="num mt-0.5 text-[20px] font-bold text-ink">{porPlano.nexus}</div>
               </div>
               <div>
-                <div className="text-[11px] font-medium text-ink-3">Starter</div>
-                <div className="num mt-0.5 text-[20px] font-bold text-ink">{porPlano.starter}</div>
+                <div className="text-[11px] font-medium text-ink-3">Cortesia</div>
+                <div className="num mt-0.5 text-[20px] font-bold text-ink">{porPlano.cortesia}</div>
               </div>
               <div>
-                <div className="text-[11px] font-medium text-ink-3">Pro</div>
-                <div className="num mt-0.5 text-[20px] font-bold text-ink">{porPlano.pro}</div>
+                <div className="text-[11px] font-medium text-ink-3">Demonstração</div>
+                <div className="num mt-0.5 text-[20px] font-bold text-ink">{porPlano.demo}</div>
               </div>
             </div>
           </div>

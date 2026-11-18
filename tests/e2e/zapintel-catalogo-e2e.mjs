@@ -47,7 +47,7 @@ function apagarB() {
 const browser = await chromium.launch({ channel: 'msedge', headless: true })
 try {
   const reg = await fetch(BASE + '/api/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
-    email: EMAIL_B, password: SENHA, nomeUsuario: 'Dono Zap', nomeEmpresa: 'Moveis Lyon e2e', plano: 'pro' }) })
+    email: EMAIL_B, password: SENHA, nomeUsuario: 'Dono Zap', nomeEmpresa: 'Moveis Lyon e2e', telefone: '11999998888', aceite: true }) })
   empresaB = (await reg.json().catch(() => ({}))).empresaId ?? null
   confere(reg.status === 200 && empresaB, `cadastro da empresa B: ${reg.status}`)
   if (!empresaB) throw new Error('sem empresa B')

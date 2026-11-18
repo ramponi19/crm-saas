@@ -7,10 +7,9 @@
  * exceções (scripts/segmento-excecoes.json), com o motivo e um teto de ocorrências:
  *
  *   presets_onboarding  a tela de presets do superadmin (/superadmin/presets);
- *   register            o cadastro (/register), que escolhe o preset;
- *   texto_publico       o que o cliente lê: landing e descrição do site
- *                       (decisão do Lucas, 03/11/2026). O inventário herdado
- *                       zerou em 03/11/2026.
+ *   register            o cadastro (/register), que escolhe o preset.
+ *   (texto_publico — landing e descrição do site — zerou em 18/11/2026, com o
+ *   plano único; o inventário herdado zerou em 03/11/2026.)
  *
  * O build reprova quando:
  *   - um arquivo FORA da lista passa a citar a palavra (a lista não cresce);

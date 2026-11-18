@@ -4,8 +4,9 @@
  * Modules — bento grid dark dos módulos do Nexus.
  *
  * Cada card tem um spotlight que segue o cursor (CSS vars --mx/--my) e um
- * micro-visual próprio — mini-chat, mini-kanban, recibo Pix, agenda, barras
- * de relatório que crescem no hover. Entrada em stagger via ScrollTrigger.
+ * micro-visual próprio — mini-chat, mini-kanban, gatilho de automação, tarefas,
+ * barras que crescem no hover. Entrada em stagger via ScrollTrigger.
+ * Card com `extra` é módulo da Central (fora do plano) e diz isso no selo.
  */
 
 import { useEffect, useRef, type MouseEvent, type ReactNode } from 'react'
@@ -41,8 +42,8 @@ export default function Modules() {
   const visuals: Record<string, ReactNode> = {
     atendimento: <VisualAtendimento />,
     funil: <VisualFunil />,
-    pix: <VisualPix />,
-    agenda: <VisualAgenda />,
+    automacao: <VisualAutomacao />,
+    tarefas: <VisualTarefas />,
     estoque: <VisualEstoque />,
     relatorios: <VisualRelatorios />,
     financeiro: <VisualFinanceiro />,
@@ -53,13 +54,13 @@ export default function Modules() {
       <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
         <div className="mb-14 max-w-[640px]">
           <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[color:var(--lp-cobalt-bright)]">
-            Um núcleo, toda a operação
+            O plano e os módulos
           </div>
           <h2 className="mt-4 text-[clamp(30px,4vw,44px)] font-extrabold leading-[1.04] tracking-[-0.04em]">
-            Os módulos que o seu segmento precisa. E só eles.
+            O essencial no plano. O resto, quando precisar.
           </h2>
           <p className="mt-4 text-[16px] leading-relaxed text-[color:var(--lp-dim)]">
-            Do primeiro contato ao pós-venda, sem planilha solta nem sistema paralelo. O menu do seu Nexus nasce no vocabulário da sua operação.
+            Funil, Comunicação, tarefas e automações vêm no plano. PDV, estoque, financeiro e os outros módulos você liga na Central, como extras.
           </p>
         </div>
 
@@ -71,7 +72,12 @@ export default function Modules() {
               onMouseMove={spot}
               className={`lp-spot flex flex-col rounded-[16px] border border-[color:var(--lp-border)] bg-[color:var(--lp-panel)] p-6 transition-colors duration-300 hover:border-white/[0.16] ${m.span}`}
             >
-              <h3 className="text-[16.5px] font-bold tracking-[-0.02em]">{m.title}</h3>
+              <h3 className="flex items-center gap-2 text-[16.5px] font-bold tracking-[-0.02em]">
+                {m.title}
+                {m.extra && (
+                  <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] font-bold tracking-normal text-[color:var(--lp-dim)]">Módulo extra</span>
+                )}
+              </h3>
               <p className="mt-1.5 max-w-[420px] text-[13.5px] leading-relaxed text-[color:var(--lp-dim)]">{m.desc}</p>
               <div className="mt-auto pt-6">{visuals[m.key]}</div>
             </div>
@@ -98,7 +104,7 @@ function VisualAtendimento() {
       <div className="ml-auto mt-2 max-w-[75%] rounded-[10px_10px_3px_10px] bg-[color:var(--lp-cobalt)] px-3 py-2 text-[12px] text-white">Chega amanhã até 12h</div>
       <div className="mt-3 flex items-center justify-between border-t border-[color:var(--lp-border-soft)] pt-2.5 text-[10.5px] text-[color:var(--lp-faint)]">
         <span>distribuído para <b className="text-[color:var(--lp-dim)]">Rafael</b></span>
-        <span className="font-bold text-[#3ECF8E]">SLA 2min ✓</span>
+        <span className="font-bold text-[#3ECF8E]">respondido em 2min ✓</span>
       </div>
     </div>
   )
@@ -123,17 +129,17 @@ function VisualFunil() {
   )
 }
 
-function VisualPix() {
+function VisualAutomacao() {
   return (
     <div className="rounded-[12px] border border-dashed border-[color:var(--lp-cobalt-bright)]/45 bg-[color:var(--lp-cobalt)]/[0.08] p-4 text-center">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lp-faint)]">Pix copia-e-cola</div>
-      <div className="mt-1 text-[22px] font-extrabold tabular-nums tracking-[-0.03em]">R$ 4.299</div>
-      <div className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-bold text-[#3ECF8E]"><span className="h-1.5 w-1.5 rounded-full bg-[#3ECF8E]" />pago em 3 min</div>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lp-faint)]">Gatilho · entrou na etapa</div>
+      <div className="mt-1 text-[22px] font-extrabold tracking-[-0.03em]">Proposta</div>
+      <div className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-bold text-[#3ECF8E]"><span className="h-1.5 w-1.5 rounded-full bg-[#3ECF8E]" />modelo enviado no WhatsApp</div>
     </div>
   )
 }
 
-function VisualAgenda() {
+function VisualTarefas() {
   const dias = ['S', 'T', 'Q', 'Q', 'S', 'S']
   return (
     <div className="rounded-[12px] border border-[color:var(--lp-border-soft)] bg-black/20 p-4">
@@ -145,7 +151,7 @@ function VisualAgenda() {
         ))}
       </div>
       <div className="mt-2.5 text-[10.5px] text-[color:var(--lp-faint)]">
-        <b className="text-[color:var(--lp-dim)]">qui 10h</b> · visita Ed. Solar · lembrete D-1 enviado ✓
+        <b className="text-[color:var(--lp-dim)]">qui 10h</b> · retorno Larissa M. · tarefa de Rafael ✓
       </div>
     </div>
   )
@@ -154,7 +160,7 @@ function VisualAgenda() {
 function VisualEstoque() {
   return (
     <div className="space-y-2 rounded-[12px] border border-[color:var(--lp-border-soft)] bg-black/20 p-4">
-      {[['iPhone 15 128GB', 78, false], ['Fone JBL Tune', 42, false], ['Capa MagSafe', 12, true]].map(([nome, pct, low]) => (
+      {[['Camiseta básica M', 78, false], ['Kit presente', 42, false], ['Caneca 300 ml', 12, true]].map(([nome, pct, low]) => (
         <div key={nome as string}>
           <div className="mb-1 flex justify-between text-[10.5px]">
             <span className="text-[color:var(--lp-dim)]">{nome as string}</span>
@@ -174,7 +180,7 @@ function VisualRelatorios() {
   return (
     <div className="group rounded-[12px] border border-[color:var(--lp-border-soft)] bg-black/20 p-4">
       <div className="mb-3 flex items-baseline justify-between">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lp-faint)]">Receita · últimas 7 semanas</span>
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lp-faint)]">Conversão · últimas 7 semanas</span>
         <span className="inline-flex items-center gap-1 text-[12px] font-extrabold text-[#3ECF8E]"><TrendingUp size={12} strokeWidth={2.5} />23%</span>
       </div>
       <div className="flex h-[72px] items-end gap-2">

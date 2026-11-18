@@ -25,12 +25,12 @@ const STATUS_LABEL: Record<string, string> = {
   ativo: 'Ativo', suspenso: 'Suspenso', cancelado: 'Cancelado',
 }
 const PLANO_LABEL: Record<string, string> = {
-  free: 'Free', starter: 'Starter', pro: 'Pro',
+  base: 'Nexus', free: 'Free', starter: 'Starter', pro: 'Pro', unlimited: 'Unlimited',
 }
 
 function planoBadge(plano: string) {
   const label = PLANO_LABEL[plano] ?? 'Free'
-  if (plano === 'pro') return <Badge className="bg-[#6D28D9]/10 text-[#6D28D9]">{label}</Badge>
+  if (plano === 'base' || plano === 'pro') return <Badge className="bg-[#6D28D9]/10 text-[#6D28D9]">{label}</Badge>
   return <Badge tone="neutro">{label}</Badge>
 }
 

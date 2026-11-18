@@ -67,8 +67,6 @@ const AREA_DE_VERTICAL = [
   'app/(dashboard)/kds/',
   'app/(dashboard)/avaliacoes/',
   'app/imob/',
-  'app/landing/',
-  'app/para/',
 ]
 
 /**

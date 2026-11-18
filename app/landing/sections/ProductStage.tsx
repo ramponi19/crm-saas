@@ -5,37 +5,22 @@
  *
  * A captura de tela do CRM (mock claro, fiel ao produto) entra inclinada em
  * perspectiva 3D e "endireita" conforme o scroll (scrub). Em ponteiro fino,
- * um tilt sutil segue o mouse. Acima, o seletor de vertical roda em autoplay
- * com barra de progresso — clicar numa vertical assume o controle e para o
- * autoplay. A troca de vertical anima os dados internos em stagger.
+ * um tilt sutil segue o mouse. Um exemplo só, genérico (data.ts → MOCK):
+ * desde 18/11/2026 o Nexus é um plano único com módulos, sem palco por ramo.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { usePrefereMenosMovimento } from '@/lib/navegador'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { SEGS, SEG_KEYS, type Tone } from '../data'
+import { MOCK, type Tone } from '../data'
 
-const AUTOPLAY_MS = 5600
 const toneClass: Record<Tone, string> = { ok: 'text-ok', warn: 'text-warn', ink3: 'text-ink-3' }
 
 export default function ProductStage() {
   const stageRef = useRef<HTMLDivElement>(null)
   const tiltRef = useRef<HTMLDivElement>(null)
   const mockRef = useRef<HTMLDivElement>(null)
-  const [seg, setSeg] = useState('varejo')
-  const [locked, setLocked] = useState(false) // usuário clicou → autoplay desliga
-  const reduced = usePrefereMenosMovimento()
-  const s = SEGS[seg]
-
-  // autoplay do seletor — um timeout por vertical exibida
-  useEffect(() => {
-    if (locked || reduced) return
-    const t = setTimeout(() => {
-      setSeg((cur) => SEG_KEYS[(SEG_KEYS.indexOf(cur) + 1) % SEG_KEYS.length])
-    }, AUTOPLAY_MS)
-    return () => clearTimeout(t)
-  }, [seg, locked, reduced])
+  const s = MOCK
 
   // perspectiva 3D no scroll + tilt por mouse
   useEffect(() => {
@@ -85,22 +70,8 @@ export default function ProductStage() {
     return () => { cleanupTilt?.(); ctx.revert() }
   }, [])
 
-  // troca de vertical — dados internos entram em stagger
-  const firstRender = useRef(true)
-  useLayoutEffect(() => {
-    if (firstRender.current) { firstRender.current = false; return }
-    const mock = mockRef.current
-    if (!mock) return
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    gsap.fromTo(
-      mock.querySelectorAll('[data-mock-anim]'),
-      { opacity: 0, y: 10 },
-      { opacity: 1, y: 0, duration: 0.5, stagger: 0.05, ease: 'power3.out', overwrite: 'auto' },
-    )
-  }, [seg])
-
   return (
-    <div ref={stageRef} id="segmentos" className="relative mx-auto max-w-[1120px] scroll-mt-28 px-5 sm:px-6">
+    <div ref={stageRef} id="produto" className="relative mx-auto max-w-[1120px] scroll-mt-28 px-5 sm:px-6">
       {/* glow cobalto atrás do mock */}
       <div
         aria-hidden
@@ -114,37 +85,11 @@ export default function ProductStage() {
         style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgba(0,0,0,.55), transparent 72%)', filter: 'blur(30px)' }}
       />
 
-      {/* seletor de vertical */}
+      {/* rótulo do palco */}
       <div className="mb-5 flex flex-col items-center gap-3">
         <div className="flex items-center gap-2 text-[11.5px] font-semibold uppercase tracking-[0.1em] text-[color:var(--lp-faint)]">
           <span className="lp-live-dot h-[7px] w-[7px] rounded-full bg-ok" />
-          Um CRM que fala a língua de cada segmento
-        </div>
-        <div className="inline-flex max-w-full flex-wrap justify-center gap-1 rounded-[12px] border border-[color:var(--lp-border)] bg-white/[0.04] p-1 backdrop-blur-sm">
-          {SEG_KEYS.map((k) => {
-            const on = k === seg
-            return (
-              <button
-                key={k}
-                type="button"
-                onClick={() => { setSeg(k); setLocked(true) }}
-                aria-pressed={on}
-                className={
-                  'relative overflow-hidden rounded-[9px] px-3.5 py-[8px] text-[12.5px] font-semibold transition-colors ' +
-                  (on ? 'bg-white/[0.97] text-ink' : 'text-[color:var(--lp-dim)] hover:bg-white/[0.06] hover:text-white')
-                }
-              >
-                {SEGS[k].label}
-                {on && !locked && !reduced && (
-                  <span
-                    key={seg}
-                    className="lp-progress absolute inset-x-0 bottom-0 h-[2.5px] bg-accent"
-                    style={{ ['--lp-progress-dur' as string]: `${AUTOPLAY_MS}ms` }}
-                  />
-                )}
-              </button>
-            )
-          })}
+          Funil, conversas e tarefas numa tela só
         </div>
       </div>
 
@@ -177,18 +122,18 @@ export default function ProductStage() {
               <MiniGroup>Hoje</MiniGroup>
               <MiniItem active>Dashboard</MiniItem>
               <MiniItem count="9">Tarefas</MiniItem>
+              <MiniItem count="6">Comunicação</MiniItem>
               <MiniGroup>Comercial</MiniGroup>
               <MiniItem count="14">Leads</MiniItem>
-              <MiniItem><span data-mock-anim>{s.nav[2]}</span></MiniItem>
-              <MiniGroup>Operação</MiniGroup>
-              <MiniItem><span data-mock-anim>{s.nav[0]}</span></MiniItem>
-              <MiniItem><span data-mock-anim>{s.nav[1]}</span></MiniItem>
+              <MiniItem>Clientes</MiniItem>
+              <MiniGroup>Automações</MiniGroup>
+              <MiniItem>Gatilhos</MiniItem>
             </div>
 
             {/* conteúdo */}
             <div className="bg-bg px-6 py-5">
               <div className="mb-3.5 flex items-baseline justify-between">
-                <span className="text-[17px] font-bold tracking-[-0.025em]">Bom dia, Matheus</span>
+                <span className="text-[17px] font-bold tracking-[-0.025em]">Bom dia, {s.usuario}</span>
                 <span className="text-[11px] font-medium tabular-nums text-ink-3">qui · 09 jul</span>
               </div>
 

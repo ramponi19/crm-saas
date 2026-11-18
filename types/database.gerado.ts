@@ -1157,14 +1157,14 @@ isOneToOne: false
                   ]
                 },"empresas": {
                   Row: {
-                    "bairro": string | null,"cep": string | null,"cidade": string | null,"cnpj": string | null,"complemento": string | null,"created_at": string | null,"demo": boolean | null,"email": string | null,"endereco": string | null,"estado": string | null,"id": number,"limite_leads": number | null,"limite_usuarios": number | null,"nome": string,"numero": string | null,"permissoes": Json | null,"plano": string,"preset_onboarding": string | null,"slug": string,"status": string,"stripe_customer_id": string | null,"stripe_price_id": string | null,"stripe_status": string | null,"stripe_subscription_id": string | null,"telefone": string | null,"trial_ends_at": string | null,"updated_at": string | null
+                    "cortesia": boolean,"bairro": string | null,"cep": string | null,"cidade": string | null,"cnpj": string | null,"complemento": string | null,"created_at": string | null,"demo": boolean | null,"email": string | null,"endereco": string | null,"estado": string | null,"id": number,"limite_leads": number | null,"limite_usuarios": number | null,"nome": string,"numero": string | null,"permissoes": Json | null,"plano": string,"preset_onboarding": string | null,"slug": string,"status": string,"stripe_customer_id": string | null,"stripe_price_id": string | null,"stripe_status": string | null,"stripe_subscription_id": string | null,"telefone": string | null,"trial_ends_at": string | null,"updated_at": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "bairro"?: string | null,"cep"?: string | null,"cidade"?: string | null,"cnpj"?: string | null,"complemento"?: string | null,"created_at"?: string | null,"demo"?: boolean | null,"email"?: string | null,"endereco"?: string | null,"estado"?: string | null,"id"?: number,"limite_leads"?: number | null,"limite_usuarios"?: number | null,"nome": string,"numero"?: string | null,"permissoes"?: Json | null,"plano"?: string,"preset_onboarding"?: string | null,"slug": string,"status"?: string,"stripe_customer_id"?: string | null,"stripe_price_id"?: string | null,"stripe_status"?: string | null,"stripe_subscription_id"?: string | null,"telefone"?: string | null,"trial_ends_at"?: string | null,"updated_at"?: string | null
+                    "cortesia"?: boolean,"bairro"?: string | null,"cep"?: string | null,"cidade"?: string | null,"cnpj"?: string | null,"complemento"?: string | null,"created_at"?: string | null,"demo"?: boolean | null,"email"?: string | null,"endereco"?: string | null,"estado"?: string | null,"id"?: number,"limite_leads"?: number | null,"limite_usuarios"?: number | null,"nome": string,"numero"?: string | null,"permissoes"?: Json | null,"plano"?: string,"preset_onboarding"?: string | null,"slug": string,"status"?: string,"stripe_customer_id"?: string | null,"stripe_price_id"?: string | null,"stripe_status"?: string | null,"stripe_subscription_id"?: string | null,"telefone"?: string | null,"trial_ends_at"?: string | null,"updated_at"?: string | null
                   }
                   Update: {
-                    "bairro"?: string | null,"cep"?: string | null,"cidade"?: string | null,"cnpj"?: string | null,"complemento"?: string | null,"created_at"?: string | null,"demo"?: boolean | null,"email"?: string | null,"endereco"?: string | null,"estado"?: string | null,"id"?: number,"limite_leads"?: number | null,"limite_usuarios"?: number | null,"nome"?: string,"numero"?: string | null,"permissoes"?: Json | null,"plano"?: string,"preset_onboarding"?: string | null,"slug"?: string,"status"?: string,"stripe_customer_id"?: string | null,"stripe_price_id"?: string | null,"stripe_status"?: string | null,"stripe_subscription_id"?: string | null,"telefone"?: string | null,"trial_ends_at"?: string | null,"updated_at"?: string | null
+                    "cortesia"?: boolean,"bairro"?: string | null,"cep"?: string | null,"cidade"?: string | null,"cnpj"?: string | null,"complemento"?: string | null,"created_at"?: string | null,"demo"?: boolean | null,"email"?: string | null,"endereco"?: string | null,"estado"?: string | null,"id"?: number,"limite_leads"?: number | null,"limite_usuarios"?: number | null,"nome"?: string,"numero"?: string | null,"permissoes"?: Json | null,"plano"?: string,"preset_onboarding"?: string | null,"slug"?: string,"status"?: string,"stripe_customer_id"?: string | null,"stripe_price_id"?: string | null,"stripe_status"?: string | null,"stripe_subscription_id"?: string | null,"telefone"?: string | null,"trial_ends_at"?: string | null,"updated_at"?: string | null
                   }
                   Relationships: [
                     {
@@ -2253,6 +2253,20 @@ isOneToOne: false
                   }
                   Update: {
                     "ativo"?: boolean,"cor"?: string,"descricao"?: string | null,"destaque"?: boolean,"features"?: NonNullable<Json>,"id"?: string,"limite_leads"?: number,"limite_usuarios"?: number,"nome"?: string,"ordem"?: number,"preco_centavos"?: number,"stripe_price_id"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"precos_adicionais": {
+                  Row: {
+                    "ativo": boolean,"chave": string,"nome": string,"ordem": number,"preco_centavos": number | null,"tipo": string,"unidade": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "ativo"?: boolean,"chave": string,"nome": string,"ordem"?: number,"preco_centavos"?: number | null,"tipo": string,"unidade"?: string,"updated_at"?: string
+                  }
+                  Update: {
+                    "ativo"?: boolean,"chave"?: string,"nome"?: string,"ordem"?: number,"preco_centavos"?: number | null,"tipo"?: string,"unidade"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     

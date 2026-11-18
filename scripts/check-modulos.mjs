@@ -84,7 +84,7 @@ const DONOS = {
   '/api/assistente': CORE,
 
   // plataforma
-  '/termos': PLAT, '/aceite': PLAT, '/api/termos': PLAT,
+  '/termos': PLAT, '/dpa': PLAT, '/aceite': PLAT, '/api/termos': PLAT,
   '/login': PLAT, '/register': PLAT, '/entrar': PLAT, '/reset-senha': PLAT, '/offline': PLAT, '/privacy': PLAT,
   '/superadmin': PLAT, '/vitrine': PLAT, '/design': PLAT, '/para': PLAT, '/landing': PLAT,
   // o arquivo do pixel é da plataforma; os endpoints e o link são do módulo Rastreamento (abaixo)

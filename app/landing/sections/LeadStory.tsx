@@ -14,9 +14,9 @@ import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
 const STEPS = [
-  { title: 'O lead entra sozinho', desc: 'Instagram, WhatsApp ou portal — todo contato vira um card com origem e dono.' },
-  { title: 'A equipe responde em minutos', desc: 'SLA cronometrado por conversa. O gestor vê quem demora e quem converte.' },
-  { title: 'A cobrança acontece na conversa', desc: 'Pix ou cartão gerado sem sair do chat, conciliado sozinho.' },
+  { title: 'O lead entra sozinho', desc: 'WhatsApp, Instagram ou Messenger — todo contato vira um card com origem e dono.' },
+  { title: 'A equipe responde em minutos', desc: 'Prazo de resposta em cada card. O gestor vê quem demora no 1º contato e quem converte.' },
+  { title: 'A automação cuida do próximo passo', desc: 'Mudou de etapa: o modelo sai no WhatsApp e a tarefa de retorno nasce com dono e prazo.' },
   { title: 'O funil registra a venda', desc: 'O card atravessa as etapas até Convertido — com histórico completo.' },
 ]
 
@@ -54,7 +54,7 @@ export default function LeadStory() {
         {/* ---- coluna de copy: passos que acendem ---- */}
         <div>
           <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[color:var(--lp-cobalt-bright)]">
-            Do primeiro oi ao Pix pago
+            Do primeiro oi à venda fechada
           </div>
           <h2 className="mt-4 text-[clamp(30px,4vw,44px)] font-extrabold leading-[1.04] tracking-[-0.04em]">
             O lead chega.<br />O sistema já sabe o que fazer.
@@ -87,23 +87,23 @@ export default function LeadStory() {
             </div>
 
             <div data-beat="msg-in" className="max-w-[86%] rounded-[12px_12px_12px_4px] bg-white/[0.07] px-4 py-2.5 text-[13.5px]">
-              Oi! Vocês têm o iPhone 15 de 128?
+              Oi! Vocês fazem orçamento pelo direct?
               <span className="mt-1 block text-[10.5px] text-[color:var(--lp-faint)]">09:14</span>
             </div>
 
             <div data-beat="reply" className="ml-auto mt-2.5 max-w-[86%] rounded-[12px_12px_4px_12px] bg-[color:var(--lp-cobalt)] px-4 py-2.5 text-[13.5px] text-white">
-              Tenho sim, Larissa! Azul e preto em estoque. Te mando o Pix com frete grátis pra hoje?
+              Fazemos sim, Larissa! Me conta o que você precisa que eu já te mando o orçamento.
               <span className="mt-1 block text-right text-[10.5px] text-white/60">09:16 · Rafael</span>
             </div>
 
             <div data-beat="sla" className="mt-3 flex justify-end">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-ok/30 bg-ok/10 px-3 py-1.5 text-[11px] font-bold text-[#3ECF8E]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#3ECF8E]" />respondido em 1min 52s — dentro do SLA
+                <span className="h-1.5 w-1.5 rounded-full bg-[#3ECF8E]" />respondido em 1min 52s — dentro do prazo
               </span>
             </div>
 
-            <div data-beat="pix" className="mt-3 rounded-[10px] border border-dashed border-[color:var(--lp-cobalt-bright)]/50 bg-[color:var(--lp-cobalt)]/10 px-4 py-3 text-center text-[12.5px] font-semibold text-[color:var(--lp-cobalt-bright)]">
-              Cobrança Pix de R$ 4.299 gerada na conversa
+            <div data-beat="auto" className="mt-3 rounded-[10px] border border-dashed border-[color:var(--lp-cobalt-bright)]/50 bg-[color:var(--lp-cobalt)]/10 px-4 py-3 text-center text-[12.5px] font-semibold text-[color:var(--lp-cobalt-bright)]">
+              Automação: tarefa de retorno criada para Rafael
             </div>
           </div>
 
@@ -112,7 +112,7 @@ export default function LeadStory() {
             <div className="mb-3 flex items-center justify-between text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lp-faint)]">
               Funil de vendas
               <span data-beat="done" className="rounded-full bg-ok/15 px-2.5 py-1 text-[10px] font-bold normal-case tracking-normal text-[#3ECF8E]">
-                Venda registrada · R$ 4.299
+                Venda registrada · R$ 1.250
               </span>
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -126,7 +126,7 @@ export default function LeadStory() {
                     {i === 2 && (
                       <div className="absolute inset-0 z-10 rounded-[9px] border border-white/15 bg-white/[0.1] px-3 py-2 backdrop-blur-sm">
                         <div className="text-[11.5px] font-bold">Larissa M.</div>
-                        <div className="text-[10px] text-[color:var(--lp-dim)]">iPhone 15 · R$ 4.299</div>
+                        <div className="text-[10px] text-[color:var(--lp-dim)]">Pedido · R$ 1.250</div>
                       </div>
                     )}
                   </div>

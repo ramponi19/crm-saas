@@ -150,8 +150,8 @@ export function AcoesEmpresa({ empresaId, empresaNome, planoAtual, statusAtual }
 
         {modal === 'plano' && (
           <Select label="Plano" value={novoPlano} onChange={e => setNovoPlano(e.target.value)}>
-            {['free', 'starter', 'pro', 'unlimited'].map(p => (
-              <option key={p} value={p} className="capitalize">{p}</option>
+            {['base', 'free', 'starter', 'pro', 'unlimited'].map(p => (
+              <option key={p} value={p} className="capitalize">{p === 'base' ? 'Nexus (plano base)' : `${p} (antigo)`}</option>
             ))}
           </Select>
         )}

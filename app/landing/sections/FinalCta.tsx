@@ -2,13 +2,12 @@
 
 /**
  * FinalCta — fechamento dark: tipografia gigante, glow cobalto e botão
- * magnético XL. Abaixo, o footer completo (produto, verticais, conta, legal).
+ * magnético XL. Abaixo, o footer completo (produto, conta, legal).
  */
 
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
-import { SEG_CARDS, SEGS } from '../data'
 import { useMagnetic } from '../hooks/useMagnetic'
 import { useReveal } from '../hooks/useReveal'
 
@@ -26,7 +25,7 @@ export default function FinalCta() {
           Pronto para aposentar <span className="lp-text-glow">a planilha?</span>
         </h2>
         <p data-rise className="mx-auto mt-6 max-w-[460px] text-[16.5px] leading-relaxed text-[color:var(--lp-dim)]">
-          Escolha o seu segmento, conecte o WhatsApp e venda com processo ainda esta semana.
+          Crie a conta, conecte o WhatsApp e o Instagram e venda com processo ainda esta semana.
         </p>
         <div data-rise className="mt-10 flex flex-wrap items-center justify-center gap-3">
           <Link
@@ -56,25 +55,28 @@ export default function FinalCta() {
                 className="h-[40px] w-auto brightness-0 invert"
               />
               <p className="mt-4 max-w-[220px] text-[12.5px] leading-relaxed text-[color:var(--lp-faint)]">
-                CRM + operação para o comércio brasileiro. Feito no Brasil, em conformidade com a LGPD.
+                CRM com WhatsApp, Instagram e automações para vender mais. Feito no Brasil, em conformidade com a LGPD.
               </p>
             </div>
             <FooterCol title="Produto" links={[
-              ['#segmentos', 'Ver o produto'],
+              ['#produto', 'Ver o produto'],
               ['#modulos', 'Módulos'],
-              ['#planos', 'Planos'],
+              ['#planos', 'Plano'],
               ['#faq', 'Perguntas frequentes'],
             ]} />
-            <FooterCol title="Segmentos" links={SEG_CARDS.map((c) => [`/para/${SEGS[c.key].para}`, c.title] as [string, string])} />
             <FooterCol title="Conta" links={[
               ['/register', 'Criar minha conta'],
               ['/login', 'Entrar'],
+            ]} />
+            <FooterCol title="Legal" links={[
+              ['/termos', 'Termos de uso'],
               ['/privacy', 'Privacidade'],
+              ['/dpa', 'Tratamento de dados (DPA)'],
             ]} />
           </div>
           <div className="mt-14 flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--lp-border-soft)] pt-7 text-[12px] text-[color:var(--lp-faint)]">
             <span>© 2026 Nexus · todos os direitos reservados</span>
-            <span>WhatsApp oficial Meta · Pix nativo · LGPD</span>
+            <span>WhatsApp oficial Meta · Instagram · Messenger · LGPD</span>
           </div>
         </div>
       </footer>

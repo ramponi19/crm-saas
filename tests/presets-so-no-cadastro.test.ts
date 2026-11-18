@@ -42,7 +42,7 @@ test('só o cadastro e as ferramentas de preset do superadmin usam lib/presets',
     'app/api/register/route.ts',
     'app/api/superadmin/presets/[chave]/preview/route.ts',
     'app/api/superadmin/presets/route.ts',
-    'app/register/page.tsx',
+    // app/register/page.tsx saiu em 18/11/2026: o cadastro não pergunta segmento (preset sempre 'geral').
     'app/superadmin/laboratorio/page.tsx',
     'app/superadmin/metricas/page.tsx',
     'app/superadmin/presets/page.tsx',

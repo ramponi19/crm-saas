@@ -66,13 +66,6 @@ const ARQUIVOS = {
   cardapio: ['app/menu/', 'app/api/menu/', 'components/modules/cardapio/'],
 }
 
-/**
- * TEXTO PÚBLICO DA PLATAFORMA (decisão do Lucas, 03/11/2026): a landing e as páginas de venda por ramo
- * falam com quem ainda não é cliente — não são tela de empresa nenhuma. Não é exceção de módulo: é o
- * dono "plataforma, texto público". Nada aqui roda dentro do CRM de uma empresa.
- */
-const TEXTO_PUBLICO = ['app/landing/', 'app/para/', 'app/page.tsx', 'app/layout.tsx', 'app/manifest.ts']
-
 // ── O manifesto, lido do código ──────────────────────────────────────────────
 const manifesto = ler('core/modulos.ts')
 const ini = manifesto.indexOf('export const MODULOS')
@@ -188,7 +181,6 @@ const erros = []
 const todos = [...['app', 'components', 'lib', 'hooks', 'core'].flatMap((d) => arquivos(join(RAIZ, d))), join(RAIZ, 'proxy.ts')]
 for (const abs of todos) {
   const arq = relative(RAIZ, abs).split('\\').join('/')
-  if (TEXTO_PUBLICO.some((p) => casa(arq, p))) continue
   const fonte = readFileSync(abs, 'utf8')
   const unidades = REGISTROS.has(arq) ? unidadesDoRegistro(arq, semComentarios(fonte)) : [[fonte, donosDoArquivo(arq)]]
   const achados = new Map()
@@ -218,7 +210,7 @@ const CORE = new Set([
   'configuracoes_sistema', 'notificacao_prefs', 'push_subscriptions', 'metas', 'metas_comissoes', 'eventos', 'integracao_eventos',
   'assistente_config', 'assistente_uso', 'financeiro_taxas',
   // plataforma
-  'planos_config', 'stripe_eventos', 'avisos_plataforma', 'superadmin_logs', 'rate_limit', 'presets_onboarding', 'termos_aceites',
+  'planos_config', 'precos_adicionais', 'stripe_eventos', 'avisos_plataforma', 'superadmin_logs', 'rate_limit', 'presets_onboarding', 'termos_aceites',
   'empresa_convites',
 ])
 // As tabelas que EXISTEM: o tipo gerado do banco (types/database.gerado.ts, `npx supabase gen types --local`),

@@ -97,7 +97,7 @@ export default function PlanosView({ empresa, planos }: Props) {
         <div className="mb-8 text-center">
           <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-ink">Planos e preços</h1>
           <p className="mt-2 text-[13px] text-ink-2">
-            14 dias grátis em qualquer plano pago. Cancele quando quiser.
+            Um plano para todos, com 14 dias grátis; módulos extras na Central. Cancele quando quiser.
           </p>
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">

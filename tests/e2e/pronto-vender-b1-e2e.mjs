@@ -56,7 +56,7 @@ const menu = (page) => page.evaluate(() => [...document.querySelectorAll('aside 
 try {
   // ── Empresa B pelo cadastro de verdade ──────────────────────────────────────
   const reg = await fetch(BASE + '/api/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
-    email: EMAIL_B, password: SENHA, nomeUsuario: 'Dono B', nomeEmpresa: 'Empresa B e2e', plano: 'starter', segmento: 'imobiliaria', // inativo desde 20261117000100: cai no padrão
+    email: EMAIL_B, password: SENHA, nomeUsuario: 'Dono B', nomeEmpresa: 'Empresa B e2e', telefone: '11999998888', aceite: true, // plano base e CRM geral desde 18/11/2026
   }) })
   const regJ = await reg.json().catch(() => ({}))
   empresaB = regJ.empresaId ?? null

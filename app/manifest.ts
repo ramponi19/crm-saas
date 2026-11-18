@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Nexus CRM',
     short_name: 'Nexus',
-    description: 'Nexus — CRM por segmento: venda com processo, cresça com controle.',
+    description: 'Nexus — CRM com WhatsApp, Instagram e automações para vender mais.',
     start_url: '/entrar',
     scope: '/',
     display: 'standalone',

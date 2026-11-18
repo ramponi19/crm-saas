@@ -8,7 +8,8 @@ type EmpresaUpdate = Database['public']['Tables']['empresas']['Update']
 
 // 'unlimited' desde 17/11/2026 (o CHECK de empresas.plano passou a aceitar). Os limites seguem o plano pelo
 // gatilho empresas_limites_do_plano (migração 20261117000100).
-const PLANOS_VALIDOS = ['free', 'starter', 'pro', 'unlimited'] as const
+// 'base' (plano único) desde 18/11/2026; os antigos seguem válidos para o histórico.
+const PLANOS_VALIDOS = ['base', 'free', 'starter', 'pro', 'unlimited'] as const
 const STATUS_VALIDOS = ['ativo', 'suspenso', 'cancelado'] as const
 
 type Acao =
