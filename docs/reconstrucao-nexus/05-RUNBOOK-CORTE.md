@@ -573,7 +573,7 @@ branches abertas antes de numerar).
 - **App:**
   - `lib/alertas-entrada.ts`: 30 min pendente, só no horário de atendimento da empresa. Abre o alerta, avisa (Sentry com um issue por alerta; e-mail para `ALERTA_EMAIL` quando o Resend estiver configurado) e resolve quando o canal volta a gravar.
   - Alertas na visão geral do superadmin e no Acompanhamento da empresa; aviso de limite no card.
-- **Ordem:** 0200 e 0300 (IOwait < 10%, leitura de 65 s separada) → Edge (guardar a versão de antes como volta) → push do app → smoke. A Edge nova convive com o banco sem a 0300 (a marca de pendente falha e só loga), mas a ordem acima evita isso.
+- **Ordem (obrigatória):** 0200 e 0300 (IOwait < 10%, leitura de 65 s separada) → Edge (`tools/deploy-edge.sh <commit>`; volta = v82 = `c679d4df`) → push do app → smoke. **A Edge nova NUNCA antes da 0300:** sem a coluna `entrada_pendente_desde`, o PostgREST responde "schema cache", que a Edge lê como banco fora, e TODA mensagem viraria 500.
 - **Prova local:** `tests/e2e/entrada-sempre-gravada-e2e.mjs` com a Edge servida localmente:
   - limite estourado: card com aviso, e o cadastro à mão continua barrado;
   - empresa suspensa grava;
