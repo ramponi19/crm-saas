@@ -13,9 +13,13 @@
 -- Volta: supabase/scripts/volta/volta-plano-unico.sql
 
 -- ── 1. O plano base ───────────────────────────────────────────────────────────
+-- limite_leads 99999, NUNCA 0 (incidente de 18/11/2026, 06 s.54): o gatilho core_limite_negocios lê
+-- coalesce(nullif(empresa.limite_leads, 0), plano.limite_leads); com a empresa em 0 e o plano em 0 o teto
+-- vira ZERO e nenhum negócio aberto novo nasce. Em produção esta linha foi aplicada com 0 às 13:22 UTC e
+-- corrigida para 99999 às 15:35 UTC; o arquivo agora traz o valor certo.
 insert into public.planos_config (id, nome, descricao, preco_centavos, limite_usuarios, limite_leads, features, destaque, ativo, ordem, cor)
 values (
-  'base', 'Nexus', '14 dias grátis, sem cartão. Módulos extras na Central.', 19700, 3, 0,
+  'base', 'Nexus', '14 dias grátis, sem cartão. Módulos extras na Central.', 19700, 3, 99999,
   '["3 usuários", "1 número de WhatsApp, com Instagram e Messenger", "2 lojas", "Funil de vendas", "Comunicação", "Tarefas", "Automatize", "Etiquetas"]'::jsonb,
   true, true, 0, '#2E5CE6'
 )
