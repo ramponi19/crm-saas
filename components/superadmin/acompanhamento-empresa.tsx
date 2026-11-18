@@ -1,5 +1,6 @@
 import { Card, Badge } from '@/components/ui'
 import { formatarData, formatarDataHora, FUSO_PADRAO } from '@/lib/datas'
+import { AlertasEntrada, type AlertaEntrada } from '@/components/superadmin/alertas-entrada'
 
 export interface Acompanhamento {
   dias: { dia: string; recebidas: number; enviadas: number; pelo_crm: number; com_erro: number; usuarios: number }[]
@@ -17,7 +18,7 @@ const SENTRY_ORG = 'ramponi19'
  * erros da empresa no Sentry (tag `empresa` = nome, components/layout/sentry-usuario.tsx). Dia de Brasília.
  * Dados de `acompanhamento_empresa` (só o serviço executa).
  */
-export function AcompanhamentoEmpresa({ dados, empresaNome }: { dados: Acompanhamento; empresaNome: string }) {
+export function AcompanhamentoEmpresa({ dados, empresaNome, alertas = [] }: { dados: Acompanhamento; empresaNome: string; alertas?: AlertaEntrada[] }) {
   const tot = dados.dias.reduce((s, d) => ({
     recebidas: s.recebidas + d.recebidas, enviadas: s.enviadas + d.enviadas, pelo_crm: s.pelo_crm + d.pelo_crm, com_erro: s.com_erro + d.com_erro,
   }), { recebidas: 0, enviadas: 0, pelo_crm: 0, com_erro: 0 })
@@ -98,6 +99,9 @@ export function AcompanhamentoEmpresa({ dados, empresaNome }: { dados: Acompanha
         </ul>
       )}
       <a href={sentry} target="_blank" rel="noopener" className="text-[12.5px] font-medium underline underline-offset-2">Erros da empresa no Sentry (14 dias)</a>
+
+      <h4 className="mb-1.5 mt-5 text-[12.5px] font-semibold text-ink">Alertas de recebimento</h4>
+      <AlertasEntrada alertas={alertas} />
     </Card>
   )
 }

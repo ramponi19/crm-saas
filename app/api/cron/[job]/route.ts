@@ -12,6 +12,7 @@ import { processarFila } from '@/lib/automacoes'
 import { processarTransmissoes } from '@/lib/transmissao/motor'
 import { processarPublicos } from '@/lib/publicos/rodada'
 import { limparExportacoes } from '@/lib/lgpd/exportacao'
+import { verificarEntradaParada } from '@/lib/alertas-entrada'
 
 // ============================================================
 // Cron jobs de manutenção. Protegidos por CRON_SECRET.
@@ -198,6 +199,12 @@ export async function GET(
       case 'lgpd-limpar': {
         const removidos = await limparExportacoes(supabase as unknown as SupabaseClient)
         return NextResponse.json({ ok: true, job, removidos })
+      }
+
+      case 'entrada-parada': {
+        // pg_cron de 5 em 5 min, só quando há o que fazer (migração 20261118000300). lib/alertas-entrada.ts.
+        const r = await verificarEntradaParada(supabase as unknown as SupabaseClient)
+        return NextResponse.json({ ok: true, job, ...r })
       }
 
       default:

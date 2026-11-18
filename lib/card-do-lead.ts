@@ -43,6 +43,11 @@ export interface CardDoLead {
   campos: CampoDoCard[]
   /** Respondeu a uma transmissão (módulo Transmissão): a marca que o gatilho põe em dados._transmissao. */
   transmissao: { id: number; nome: string; respondeu_em: string } | null
+  /**
+   * O negócio nasceu (ou reabriu) por mensagem do cliente com a empresa acima do limite de leads do plano
+   * (18/11/2026: a mensagem nunca é barrada — o card nasce com este aviso para o dono). dados._lead.aviso_limite.
+   */
+  avisoLimite: { limite: number; abertos: number; em: string } | null
 }
 
 /** Campos que o card já tem em campo próprio — não aparecem de novo na lista de personalizados. */
@@ -166,7 +171,9 @@ export async function carregarCardDoLead(
 
   const tx = ((n.dados ?? {})._transmissao ?? null) as { id?: unknown; nome?: unknown; respondeu_em?: unknown } | null
   const transmissao = tx && Number(tx.id) ? { id: Number(tx.id), nome: String(tx.nome ?? ''), respondeu_em: String(tx.respondeu_em ?? '') } : null
-  return { lead, contatoId: c.id, filialId: n.filial_id, outrasLojas: [...porLoja.values()], campos: camposDoCard, transmissao }
+  const av = (l.aviso_limite ?? null) as { limite?: unknown; abertos?: unknown; em?: unknown } | null
+  const avisoLimite = av && Number(av.limite) > 0 ? { limite: Number(av.limite), abertos: Number(av.abertos ?? 0), em: String(av.em ?? '') } : null
+  return { lead, contatoId: c.id, filialId: n.filial_id, outrasLojas: [...porLoja.values()], campos: camposDoCard, transmissao, avisoLimite }
 }
 
 /** O que o card grava (cada chave ausente fica como está). */

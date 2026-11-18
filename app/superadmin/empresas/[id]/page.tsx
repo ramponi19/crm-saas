@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { SituacaoEmpresa } from '@/components/superadmin/situacao-empresa'
 import { AcompanhamentoEmpresa, type Acompanhamento } from '@/components/superadmin/acompanhamento-empresa'
+import type { AlertaEntrada } from '@/components/superadmin/alertas-entrada'
 import { situacaoDaEmpresa } from '@/lib/faturamento'
 import { createServiceClient } from '@/lib/supabase/service'
 import { AcoesEmpresa } from '@/components/superadmin/acoes-empresa'
@@ -127,6 +128,12 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
   const { data: acompRaw, error: acompErr } = await svc.rpc('acompanhamento_empresa', { p_empresa: empresaId, p_dias: 14 })
   if (acompErr) console.error('[superadmin/empresa] acompanhamento:', acompErr.message)
   const acompanhamento = (acompRaw ?? null) as unknown as Acompanhamento | null
+  // Alertas de recebimento da empresa (18/11/2026, migração 0300): os abertos e os de 30 dias.
+  const { data: alertasRaw } = await svc.from('alertas_entrada')
+    .select('id, empresa_id, canal_id, tipo, desde, detalhe, notificado_em, resolvido_em')
+    .eq('empresa_id', empresaId).gte('created_at', new Date(agora().getTime() - 30 * 86_400_000).toISOString())
+    .order('created_at', { ascending: false }).limit(20)
+  const alertas = (alertasRaw ?? []) as AlertaEntrada[]
   const situacao = situacaoDaEmpresa(empresa, agora())
 
   const ultAtividade = ultimoLead?.created_at ? new Date(ultimoLead.created_at) : null
@@ -210,7 +217,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
 
       {acompanhamento && (
         <div className="mb-5">
-          <AcompanhamentoEmpresa dados={acompanhamento} empresaNome={empresa.nome} />
+          <AcompanhamentoEmpresa dados={acompanhamento} empresaNome={empresa.nome} alertas={alertas} />
         </div>
       )}
 

@@ -99,6 +99,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"alertas_entrada": {
+                  Row: {
+                    "canal_id": number | null,"created_at": string,"desde": string,"detalhe": string | null,"empresa_id": number,"id": number,"notificado_em": string | null,"resolvido_em": string | null,"tipo": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "canal_id"?: number | null,"created_at"?: string,"desde"?: string,"detalhe"?: string | null,"empresa_id": number,"id"?: never,"notificado_em"?: string | null,"resolvido_em"?: string | null,"tipo": string
+                  }
+                  Update: {
+                    "canal_id"?: number | null,"created_at"?: string,"desde"?: string,"detalhe"?: string | null,"empresa_id"?: number,"id"?: never,"notificado_em"?: string | null,"resolvido_em"?: string | null,"tipo"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "alertas_entrada_canal_id_fkey"
+      columns: ["canal_id"]
+isOneToOne: false
+      referencedRelation: "canais"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "alertas_entrada_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"assistencia_garantias": {
                   Row: {
                     "aprovado_em": string | null,"celular_reserva_fornecido": boolean | null,"cliente_id": number | null,"created_at": string | null,"data_entrada": string | null,"defeito_relatado": string | null,"dentro_garantia": boolean | null,"dias_garantia_restantes": number | null,"empresa_id": number,"estado_entrada": string | null,"filial_id": number | null,"id": number,"imei_serial": string | null,"modelo_reserva": string | null,"observacoes": string | null,"orcamento_valor": number | null,"parecer_tecnico": string | null,"produto_id": number | null,"protocolo": string | null,"recusado_em": string | null,"responsavel_tecnico_id": string | null,"status": string | null,"tipo": string | null,"token": string | null,"usuario_id": string | null
@@ -513,14 +539,14 @@ isOneToOne: false
                   ]
                 },"canais": {
                   Row: {
-                    "access_token_enc": string | null,"coexistencia": boolean,"conectado_em": string,"created_at": string,"criado_por": string | null,"data_access_expira_em": string | null,"empresa_id": number,"external_id": string,"filial_id": number | null,"id": number,"ig_user_id": string | null,"nome_exibicao": string | null,"status": string,"sync_contatos_em": string | null,"sync_historico_em": string | null,"sync_historico_pct": number | null,"sync_request_ids": NonNullable<Json>,"tipo": string,"token_expira_em": string | null,"ultima_msg_em": string | null,"ultimo_erro": string | null,"ultimo_erro_em": string | null,"updated_at": string,"via": string,"waba_id": string | null
+                    "access_token_enc": string | null,"coexistencia": boolean,"conectado_em": string,"created_at": string,"criado_por": string | null,"data_access_expira_em": string | null,"empresa_id": number,"entrada_pendente_desde": string | null,"external_id": string,"filial_id": number | null,"id": number,"ig_user_id": string | null,"nome_exibicao": string | null,"status": string,"sync_contatos_em": string | null,"sync_historico_em": string | null,"sync_historico_pct": number | null,"sync_request_ids": NonNullable<Json>,"tipo": string,"token_expira_em": string | null,"ultima_msg_em": string | null,"ultimo_erro": string | null,"ultimo_erro_em": string | null,"updated_at": string,"via": string,"waba_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "access_token_enc"?: string | null,"coexistencia"?: boolean,"conectado_em"?: string,"created_at"?: string,"criado_por"?: string | null,"data_access_expira_em"?: string | null,"empresa_id": number,"external_id": string,"filial_id"?: number | null,"id"?: number,"ig_user_id"?: string | null,"nome_exibicao"?: string | null,"status"?: string,"sync_contatos_em"?: string | null,"sync_historico_em"?: string | null,"sync_historico_pct"?: number | null,"sync_request_ids"?: NonNullable<Json>,"tipo": string,"token_expira_em"?: string | null,"ultima_msg_em"?: string | null,"ultimo_erro"?: string | null,"ultimo_erro_em"?: string | null,"updated_at"?: string,"via"?: string,"waba_id"?: string | null
+                    "access_token_enc"?: string | null,"coexistencia"?: boolean,"conectado_em"?: string,"created_at"?: string,"criado_por"?: string | null,"data_access_expira_em"?: string | null,"empresa_id": number,"entrada_pendente_desde"?: string | null,"external_id": string,"filial_id"?: number | null,"id"?: number,"ig_user_id"?: string | null,"nome_exibicao"?: string | null,"status"?: string,"sync_contatos_em"?: string | null,"sync_historico_em"?: string | null,"sync_historico_pct"?: number | null,"sync_request_ids"?: NonNullable<Json>,"tipo": string,"token_expira_em"?: string | null,"ultima_msg_em"?: string | null,"ultimo_erro"?: string | null,"ultimo_erro_em"?: string | null,"updated_at"?: string,"via"?: string,"waba_id"?: string | null
                   }
                   Update: {
-                    "access_token_enc"?: string | null,"coexistencia"?: boolean,"conectado_em"?: string,"created_at"?: string,"criado_por"?: string | null,"data_access_expira_em"?: string | null,"empresa_id"?: number,"external_id"?: string,"filial_id"?: number | null,"id"?: number,"ig_user_id"?: string | null,"nome_exibicao"?: string | null,"status"?: string,"sync_contatos_em"?: string | null,"sync_historico_em"?: string | null,"sync_historico_pct"?: number | null,"sync_request_ids"?: NonNullable<Json>,"tipo"?: string,"token_expira_em"?: string | null,"ultima_msg_em"?: string | null,"ultimo_erro"?: string | null,"ultimo_erro_em"?: string | null,"updated_at"?: string,"via"?: string,"waba_id"?: string | null
+                    "access_token_enc"?: string | null,"coexistencia"?: boolean,"conectado_em"?: string,"created_at"?: string,"criado_por"?: string | null,"data_access_expira_em"?: string | null,"empresa_id"?: number,"entrada_pendente_desde"?: string | null,"external_id"?: string,"filial_id"?: number | null,"id"?: number,"ig_user_id"?: string | null,"nome_exibicao"?: string | null,"status"?: string,"sync_contatos_em"?: string | null,"sync_historico_em"?: string | null,"sync_historico_pct"?: number | null,"sync_request_ids"?: NonNullable<Json>,"tipo"?: string,"token_expira_em"?: string | null,"ultima_msg_em"?: string | null,"ultimo_erro"?: string | null,"ultimo_erro_em"?: string | null,"updated_at"?: string,"via"?: string,"waba_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -1157,14 +1183,14 @@ isOneToOne: false
                   ]
                 },"empresas": {
                   Row: {
-                    "cortesia": boolean,"piloto": boolean,"bairro": string | null,"cep": string | null,"cidade": string | null,"cnpj": string | null,"complemento": string | null,"created_at": string | null,"demo": boolean | null,"email": string | null,"endereco": string | null,"estado": string | null,"id": number,"limite_leads": number | null,"limite_usuarios": number | null,"nome": string,"numero": string | null,"permissoes": Json | null,"plano": string,"preset_onboarding": string | null,"slug": string,"status": string,"stripe_customer_id": string | null,"stripe_price_id": string | null,"stripe_status": string | null,"stripe_subscription_id": string | null,"telefone": string | null,"trial_ends_at": string | null,"updated_at": string | null
+                    "bairro": string | null,"cep": string | null,"cidade": string | null,"cnpj": string | null,"complemento": string | null,"cortesia": boolean,"created_at": string | null,"demo": boolean | null,"email": string | null,"endereco": string | null,"estado": string | null,"id": number,"limite_leads": number | null,"limite_usuarios": number | null,"nome": string,"numero": string | null,"permissoes": Json | null,"piloto": boolean,"plano": string,"preset_onboarding": string | null,"slug": string,"status": string,"stripe_customer_id": string | null,"stripe_price_id": string | null,"stripe_status": string | null,"stripe_subscription_id": string | null,"telefone": string | null,"trial_ends_at": string | null,"updated_at": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "cortesia"?: boolean,"piloto"?: boolean,"bairro"?: string | null,"cep"?: string | null,"cidade"?: string | null,"cnpj"?: string | null,"complemento"?: string | null,"created_at"?: string | null,"demo"?: boolean | null,"email"?: string | null,"endereco"?: string | null,"estado"?: string | null,"id"?: number,"limite_leads"?: number | null,"limite_usuarios"?: number | null,"nome": string,"numero"?: string | null,"permissoes"?: Json | null,"plano"?: string,"preset_onboarding"?: string | null,"slug": string,"status"?: string,"stripe_customer_id"?: string | null,"stripe_price_id"?: string | null,"stripe_status"?: string | null,"stripe_subscription_id"?: string | null,"telefone"?: string | null,"trial_ends_at"?: string | null,"updated_at"?: string | null
+                    "bairro"?: string | null,"cep"?: string | null,"cidade"?: string | null,"cnpj"?: string | null,"complemento"?: string | null,"cortesia"?: boolean,"created_at"?: string | null,"demo"?: boolean | null,"email"?: string | null,"endereco"?: string | null,"estado"?: string | null,"id"?: number,"limite_leads"?: number | null,"limite_usuarios"?: number | null,"nome": string,"numero"?: string | null,"permissoes"?: Json | null,"piloto"?: boolean,"plano"?: string,"preset_onboarding"?: string | null,"slug": string,"status"?: string,"stripe_customer_id"?: string | null,"stripe_price_id"?: string | null,"stripe_status"?: string | null,"stripe_subscription_id"?: string | null,"telefone"?: string | null,"trial_ends_at"?: string | null,"updated_at"?: string | null
                   }
                   Update: {
-                    "cortesia"?: boolean,"piloto"?: boolean,"bairro"?: string | null,"cep"?: string | null,"cidade"?: string | null,"cnpj"?: string | null,"complemento"?: string | null,"created_at"?: string | null,"demo"?: boolean | null,"email"?: string | null,"endereco"?: string | null,"estado"?: string | null,"id"?: number,"limite_leads"?: number | null,"limite_usuarios"?: number | null,"nome"?: string,"numero"?: string | null,"permissoes"?: Json | null,"plano"?: string,"preset_onboarding"?: string | null,"slug"?: string,"status"?: string,"stripe_customer_id"?: string | null,"stripe_price_id"?: string | null,"stripe_status"?: string | null,"stripe_subscription_id"?: string | null,"telefone"?: string | null,"trial_ends_at"?: string | null,"updated_at"?: string | null
+                    "bairro"?: string | null,"cep"?: string | null,"cidade"?: string | null,"cnpj"?: string | null,"complemento"?: string | null,"cortesia"?: boolean,"created_at"?: string | null,"demo"?: boolean | null,"email"?: string | null,"endereco"?: string | null,"estado"?: string | null,"id"?: number,"limite_leads"?: number | null,"limite_usuarios"?: number | null,"nome"?: string,"numero"?: string | null,"permissoes"?: Json | null,"piloto"?: boolean,"plano"?: string,"preset_onboarding"?: string | null,"slug"?: string,"status"?: string,"stripe_customer_id"?: string | null,"stripe_price_id"?: string | null,"stripe_status"?: string | null,"stripe_subscription_id"?: string | null,"telefone"?: string | null,"trial_ends_at"?: string | null,"updated_at"?: string | null
                   }
                   Relationships: [
                     {
@@ -1815,6 +1841,32 @@ isOneToOne: true
       referencedColumns: ["id"]
     }
                   ]
+                },"importacoes": {
+                  Row: {
+                    "arquivo": string | null,"contatos_existentes": number,"contatos_novos": number,"created_at": string,"empresa_id": number,"filial_id": number | null,"id": number,"leads_criados": number,"recusadas": NonNullable<Json>,"total": number,"usuario_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "arquivo"?: string | null,"contatos_existentes"?: number,"contatos_novos"?: number,"created_at"?: string,"empresa_id": number,"filial_id"?: number | null,"id"?: never,"leads_criados"?: number,"recusadas"?: NonNullable<Json>,"total": number,"usuario_id"?: string | null
+                  }
+                  Update: {
+                    "arquivo"?: string | null,"contatos_existentes"?: number,"contatos_novos"?: number,"created_at"?: string,"empresa_id"?: number,"filial_id"?: number | null,"id"?: never,"leads_criados"?: number,"recusadas"?: NonNullable<Json>,"total"?: number,"usuario_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "importacoes_empresa_id_fkey"
+      columns: ["empresa_id"]
+isOneToOne: false
+      referencedRelation: "empresas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "importacoes_filial_id_fkey"
+      columns: ["filial_id"]
+isOneToOne: false
+      referencedRelation: "filiais"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"integracao_eventos": {
                   Row: {
                     "acao": string | null,"created_at": string,"detalhes": string | null,"empresa_id": number,"externo_id": string | null,"id": number,"lead_id": number | null,"origem": string,"payload": Json | null,"status": string
@@ -2242,20 +2294,6 @@ isOneToOne: false
       referencedRelation: "estoque_unidades"
       referencedColumns: ["id"]
     }
-                  ]
-                },"importacoes": {
-                  Row: {
-                    "arquivo": string | null,"contatos_existentes": number,"contatos_novos": number,"created_at": string,"empresa_id": number,"filial_id": number | null,"id": number,"leads_criados": number,"recusadas": NonNullable<Json>,"total": number,"usuario_id": string | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "arquivo"?: string | null,"contatos_existentes"?: number,"contatos_novos"?: number,"created_at"?: string,"empresa_id": number,"filial_id"?: number | null,"id"?: never,"leads_criados"?: number,"recusadas"?: NonNullable<Json>,"total": number,"usuario_id"?: string | null
-                  }
-                  Update: {
-                    "arquivo"?: string | null,"contatos_existentes"?: number,"contatos_novos"?: number,"created_at"?: string,"empresa_id"?: number,"filial_id"?: number | null,"id"?: never,"leads_criados"?: number,"recusadas"?: NonNullable<Json>,"total"?: number,"usuario_id"?: string | null
-                  }
-                  Relationships: [
-                    
                   ]
                 },"planos_config": {
                   Row: {

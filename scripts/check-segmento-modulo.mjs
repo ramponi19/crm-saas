@@ -208,7 +208,7 @@ const CORE = new Set([
   'distribuicao_regras', 'etiquetas', 'campos_personalizados', 'usuarios', 'empresa_usuarios', 'acessos', 'filiais', 'empresas',
   'empresa_branding', 'empresa_menu', 'empresa_dados_contrato', 'empresa_segredos', 'empresa_modulos', 'modulo_pedidos',
   'configuracoes_sistema', 'notificacao_prefs', 'push_subscriptions', 'metas', 'metas_comissoes', 'eventos', 'integracao_eventos',
-  'assistente_config', 'assistente_uso', 'financeiro_taxas', 'importacoes',
+  'assistente_config', 'assistente_uso', 'financeiro_taxas', 'importacoes', 'alertas_entrada',
   // plataforma
   'planos_config', 'precos_adicionais', 'stripe_eventos', 'avisos_plataforma', 'superadmin_logs', 'rate_limit', 'presets_onboarding', 'termos_aceites',
   'empresa_convites',

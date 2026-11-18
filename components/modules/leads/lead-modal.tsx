@@ -1441,6 +1441,14 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
               origem: transmissão · {card.transmissao.nome}
             </a>
           )}
+          {/* Nasceu acima do limite de leads do plano: a mensagem do cliente nunca é barrada (18/11/2026). */}
+          {card.avisoLimite && (
+            <span data-aviso-limite={card.avisoLimite.limite}
+              title={`Este lead entrou com a empresa no limite do plano (${card.avisoLimite.abertos.toLocaleString('pt-BR')} leads abertos para um limite de ${card.avisoLimite.limite.toLocaleString('pt-BR')}). A mensagem foi gravada normalmente; para não ver este aviso, aumente o limite ou feche leads antigos.`}
+              className="rounded-full border border-warn/30 bg-warn-soft px-2 py-0.5 text-[11px] font-medium text-warn">
+              acima do limite de leads do plano
+            </span>
+          )}
           <div className="flex-1" />
           {gereLojas && (
             <Button variant="ghost" size="sm" onClick={() => setFundindo(true)} disabled={saving} icon={<Merge size={15} strokeWidth={1.7} />}>
