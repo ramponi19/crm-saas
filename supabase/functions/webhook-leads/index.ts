@@ -25,7 +25,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { timingSafeEqual } from "node:crypto";
-import { bancoIndisponivel, chaveMid, contaDoEvento, ErroDeBanco, esquecer, hashCorpo, jaRecebido, LIMITE_GRANDE, primeiraEntrega, tamanhoCorpo } from "./reenvio.ts";
+import { bancoIndisponivel, chaveMid, contaDoEvento, ErroDeBanco, ErroDeGravacao, esquecer, hashCorpo, jaRecebido, LIMITE_GRANDE, primeiraEntrega, tamanhoCorpo } from "./reenvio.ts";
 import { conferirCanalDeResposta, destinoNaConta, type TipoCanal } from "./canal-resposta.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -1160,6 +1160,16 @@ async function registrarRecebida(canal: Canal, p: {
     ...(canal.filial_id != null ? { filial_id: canal.filial_id } : {}),
   };
 
+  // ENTRADA PENDENTE (18/11/2026): chegou mensagem de cliente da Meta. A gravação (mensagem_registrar) limpa
+  // a marca; se nada gravar em 30 min no horário de atendimento, o cron entrada-parada avisa. Só escreve
+  // quando a marca está vazia. Falha aqui não impede tentar gravar (banco fora cai logo abaixo de qualquer jeito).
+  const { error: ePend, status: sPend } = await db.from("canais").update({ entrada_pendente_desde: new Date().toISOString() })
+    .eq("id", canal.id).is("entrada_pendente_desde", null);
+  if (ePend) {
+    if (bancoIndisponivel(ePend, sPend)) throw new ErroDeBanco(`marcar entrada pendente: ${ePend.message}`);
+    console.error("marcar entrada pendente:", canal.id, ePend.message);
+  }
+
   // O ANÚNCIO ENTRA NA CONVERSA, antes da mensagem — como o cliente vê no
   // aparelho dele. Assim o vendedor lê o que a pessoa acabou de ver, e o
   // histórico guarda CADA entrada por campanha (o negócio só guarda a última).
@@ -1171,7 +1181,8 @@ async function registrarRecebida(canal: Canal, p: {
       tipo: "anuncio", midia_url: p.anuncio.midia,
     });
     if (fora) throw new ErroDeBanco(`anúncio na conversa: ${erro}`);
-    if (erro) console.error("anúncio na conversa:", erro);
+    // Não gravou o card do anúncio: 500 para a Meta reenviar (o que já gravou não duplica).
+    if (erro) throw new ErroDeGravacao(`anúncio na conversa ${p.externalId}: ${erro}`);
   }
 
   const { id: msgId, erro: msgErr, fora: msgFora } = await registrarMensagem(empresaId, canal.id, p.externalId, {
@@ -1180,10 +1191,11 @@ async function registrarRecebida(canal: Canal, p: {
   // Banco fora: 500 para a Meta reenviar o pacote; o que já gravou não duplica
   // (external_id repetido não grava de novo).
   if (msgFora) throw new ErroDeBanco(`gravar mensagem recebida ${p.externalId}: ${msgErr}`);
+  // QUALQUER erro ao gravar a recebida é 500 (regra do 05, 18/11/2026): nunca 200 sem a mensagem no banco.
+  if (msgErr) throw new ErroDeGravacao(`gravar mensagem recebida ${p.externalId}: ${msgErr}`);
 
   await completarCadastro(canal, p, null);
 
-  if (msgErr) { console.error("gravar mensagem recebida:", p.externalId, msgErr); return; }
   if (msgId == null) { console.log("msg duplicada ignorada:", p.externalId); return; }
 
   /**
@@ -2469,23 +2481,29 @@ serve(async (req: Request) => {
     // Pacote processado: agora sim lembra o hash (24 h), grande ou pequeno.
     await jaRecebido(rpc, hash, tamanho, conta, true);
   } catch (e) {
-    // Banco fora: 500 para a Meta reenviar. Nenhum hash de 24 h foi gravado; a trava
-    // do grande é esquecida (e, se o banco ainda estiver fora, expira em 60 s). O que
-    // já foi gravado antes do erro não duplica: mensagem_registrar ignora external_id
-    // repetido.
-    if (e instanceof ErroDeBanco) {
-      console.error("banco indisponível — 500 para a Meta reenviar:", e.message);
+    /**
+     * QUALQUER FALHA = 500, NUNCA 200 (regra permanente do 05, 18/11/2026: "mensagem recebida nunca é
+     * descartada; webhook só responde 200 depois de gravar"). Até 18/11 só o banco fora virava 500; o resto
+     * respondia 200 "para não travar a fila" — e foi assim que ~60 mensagens de clientes novos sumiram no
+     * incidente do limite de leads (06 s.54). Agora a Meta reenvia (com espera crescente, por até alguns
+     * dias) e o alerta de entrada parada avisa se não passar.
+     *
+     * Nenhum hash de 24 h foi gravado; a trava do grande é esquecida (e, se o banco ainda estiver fora,
+     * expira em 60 s). O que já foi gravado antes do erro não duplica: mensagem_registrar ignora external_id
+     * repetido.
+     */
+    const msg = e instanceof Error ? e.message : String(e);
+    if (e instanceof ErroDeGravacao) console.error("mensagem não gravada — 500 para a Meta reenviar:", msg);
+    else if (e instanceof ErroDeBanco) console.error("banco indisponível — 500 para a Meta reenviar:", msg);
+    else console.error("processamento — 500 para a Meta reenviar:", e);
+    try {
       if (grande) await esquecer(rpc, chaveMid(trava));
       // O reenvio da Meta traz os mesmos mids: sem esquecê-los, seria tomado por segunda entrega.
       for (const m of midsDesta) await esquecer(rpc, chaveMid(m));
-      return new Response("banco indisponivel", { status: 500, headers: cors });
-    }
-    // 200 mesmo em erro: 5xx faz a Meta reenviar em loop, e um evento problemático
-    // não pode travar a fila dos outros. O grande grava o hash como antes gravava
-    // (antes de processar): reentrega de um pacote que quebra não é reprocessada.
-    console.error("processamento:", e);
-    if (grande) await jaRecebido(rpc, hash, tamanho, conta, true);
+    } catch (e2) { console.error("esquecer trava/mids:", (e2 as Error).message); }
+    return new Response(e instanceof ErroDeGravacao ? "mensagem nao gravada" : "falha ao processar", { status: 500, headers: cors });
   }
 
+  // Só aqui, com tudo gravado, o 200.
   return ok();
 });

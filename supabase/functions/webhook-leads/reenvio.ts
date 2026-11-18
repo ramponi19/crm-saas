@@ -95,6 +95,16 @@ export class ErroDeBanco extends Error {
 }
 
 /**
+ * A mensagem recebida NÃO foi gravada, por qualquer motivo (18/11/2026, regra permanente do 05: "mensagem
+ * recebida nunca é descartada; webhook só responde 200 depois de gravar"). É um ErroDeBanco para seguir o
+ * mesmo caminho: 500, a Meta reenvia, nada fica lembrado como "já recebido". No incidente de 18/11 o erro
+ * de regra (LEAD_LIMIT_REACHED) virava só log e 200 — ~60 mensagens de 10 clientes novos sumiram.
+ */
+export class ErroDeGravacao extends ErroDeBanco {
+  constructor(mensagem: string) { super(mensagem); this.name = "ErroDeGravacao"; }
+}
+
+/**
  * O erro diz que o BANCO está fora — e não que o dado é ruim?
  *
  * 04/11/2026: com o canal já em cache, o banco caindo no meio de um pacote fazia a
