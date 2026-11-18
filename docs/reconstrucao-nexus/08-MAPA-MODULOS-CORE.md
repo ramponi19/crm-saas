@@ -75,7 +75,7 @@ trava, de segmento ou de dono (o que falta está na coluna); **em preparação**
 | Empresa | Configurações → Minha empresa, Aparência, Menu, Horário, Exportar dados; `/api/empresa*`, `/api/aparencia`, `/api/menu-config`, `/api/exportar`, `/api/push/subscribe`; `empresas`, `empresa_branding`, `empresa_menu`, `empresa_dados_contrato`, `empresa_segredos`, `configuracoes_sistema`, `notificacao_prefs`, `push_subscriptions`; `empresa_fuso`; bucket `lgpd-exportacoes`; cron `lgpd-exportacoes-limpar`, `retencao-diaria` |
 | Insights | `/dashboard`, `/visao-geral`, `/conversao`, `/metas`; `metas`, `metas_comissoes`, `eventos`; `core_indicadores`, `core_evento_emitir` |
 | Central de módulos | `/modulos`, `/vitrine/[modulo]`, `/api/modulos/*`; `empresa_modulos`, `modulo_pedidos`; `core_modulo_ligado`, `core_modulo_config` |
-| Planos e cobrança do SaaS (plataforma) | Configurações → Faturamento, `/api/stripe/*` (4), `/superadmin/planos`; `planos_config`, `stripe_eventos`; cron `expirar-trials`, `sync-stripe` |
+| Planos e cobrança do SaaS (plataforma) | Configurações → Faturamento, `/api/stripe/*` (4), `/superadmin/planos` (plano base e preços, 18/11), `/api/superadmin/precos`; `planos_config` (só o `base` ativo), `precos_adicionais`, `empresas.cortesia`, `stripe_eventos`; cron `expirar-trials`, `sync-stripe` |
 | Plataforma | `/login`, `/register`, `/entrar`, `/reset-senha`, landing, `/superadmin/*` (11 telas, 18 APIs); `avisos_plataforma`, `superadmin_logs`, `rate_limit`, `presets_onboarding`; `set_impersonation`, `encerrar_impersonacao`, `hard_delete_empresa`, `rate_limit_bump` |
 | Assistente (IA, chat com dados) | widget no layout; `/api/assistente`, `/api/assistente/meu-dia` (**hoje "fora"**); `assistente_config`, `assistente_uso`; `assistente_status_leads`, `assistente_leads_visiveis` |
 | Rastreamento de origem | `/i/[codigo]`, `/track.js`, `/api/rastreamento/*` (5); `rastreamento_config/links/visitas/eventos` (dono hoje: plataforma; JM 1 config, 0 links) |
@@ -128,7 +128,7 @@ trava, de segmento ou de dono (o que falta está na coluna); **em preparação**
 ### 3c. "Em preparação" aparecendo onde não devia
 - O menu e a trava do proxy **não olham `emPreparacao`**: numa empresa nova, Agenda, Imóveis, Financiamento e Executivo (preset Imobiliária), Agenda (Saúde), Cardápio e KDS (Food), Avaliações, FIPE e Financiamento (Veículos) aparecem no menu e abrem por endereço.
 - As telas públicas desses módulos (`/agendar/[slug]`, `/menu/[slug]`, `/imob/[slug]`, `/imovel/[id]`) e as APIs abertas (`/api/agendar`, `/api/menu`, `/api/imob`, `/api/portais`, `/api/veiculos`, `/api/fipe`) não conferem nada.
-- O cadastro oferece 7 presets; 4 (Imobiliária, Saúde, Food, Veículos) só ligam módulos em preparação, e a landing (`/para/[vertical]`) vende clínica e restaurante.
+- ~~O cadastro oferece 7 presets; 4 (Imobiliária, Saúde, Food, Veículos) só ligam módulos em preparação, e a landing (`/para/[vertical]`) vende clínica e restaurante.~~ **Resolvido 18/11 (06, seção 53):** cadastro sem segmento (preset `geral`), plano único; landing genérica e `/para/*` → `/`.
 
 ### 3d. Código e dados sem uso
 - Nenhum arquivo de `lib/`, `components/`, `hooks/`, `core/` sem import. Símbolos exportados sem uso: `primeiraDeConfiguracoes`, `paraBanco`, `contarFechamentos`, `FILTROS_VAZIOS`, `StatusEncomenda`, `RastreamentoLink/Evento/Atribuicao`, `KanbanStatus`.
