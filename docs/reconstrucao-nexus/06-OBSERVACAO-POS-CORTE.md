@@ -1744,3 +1744,20 @@ mensagem recebida: uma leitura por índice parcial (`transmissao_envios_resposta
 - **Lição:** um limite "0 = sem limite" num lugar e "0 = zero" no outro. Em plano, o sem limite é **nulo** ou 99999, nunca 0.
 - **Recuperação dos leads (18/11 ~16h40 UTC, pedido do Lucas):** os registros (logs da Edge, do Postgres e o payload) não guardam por qual número da JM cada mensagem entrou. 4 números voltaram a escrever sozinhos depois da correção e viraram card na loja certa: 5519997750637, 5515997949346 e 5519991242373 em Jaguariúna; 5519998421165 em Mogi. Esses 4 cards ganharam a observação do incidente e a marca de anúncio (`_anuncio` com "detalhes perdidos no incidente de 18/11"). Os outros 6 foram criados em **Mogi** pela decisão do Lucas ("Mogi, loja a confirmar"), na esteira, pelo mesmo caminho do webhook (contato + identidade + `core_negocio_do_canal` + conversa no canal 15): 5519997157343 (10h35), 5511983081092 (10h40, anúncio), 5519998600407 (10h54, anúncio), 5519997228998 (10h59, anúncio), 5519991953294 (11h18) e 5511971814429 (11h55). Todos com a observação "Mensagem perdida no incidente de 18/11 (10h22–12h35). Ver a conversa no WhatsApp do celular da loja.", a hora da primeira mensagem e "Loja a confirmar: pode ter sido Jaguariúna (·7419)". Se for de Jaguariúna, a loja transfere o card.
 - **O que muda para não repetir:** 05, "Mensagem recebida nunca é descartada", e a seção 56.
+
+## 55. 18/11: piloto em produção — importação por planilha, situação Piloto, acompanhamento por empresa (migração 0200 + app `1de9e48f`)
+
+- **Migração `20261118000200_piloto_importacao_acompanhamento`** aplicada ~17:34 UTC (aprovada pelo Lucas; IOwait 0,06% na leitura de 65 s): `empresas.piloto`, `importacoes`, `acompanhamento_empresa`. O UPDATE do plano base e o campo `produto_interessado` não mudaram nada em produção (já corrigido / JM e Preview já tinham). Conferido: JM e Preview com os mesmos limites e situação; usuário comum e anon sem acesso à função e à tabela.
+- **App `1de9e48f`** READY (`dpl_5oUHRNFg1jBf5oXPqg35GUtK6aF9`; volta = `dpl_GPwgHGrba4LYeQdQZmsSavFM5K1m` / `61b25b95`), push com IOwait 0,09%.
+- **Smoke em produção (`tests/e2e/smoke-piloto-producao.mjs`):** conta de teste pela API do app (senha gerada no script, nada digitado em página; sessão como cookie do @supabase/ssr).
+  - Página Importar contatos 200.
+  - Leitura do CSV com palpite do telefone; prévia 2 novos / 1 recusada; gravação 2 contatos + 2 leads com a etiqueta "importação", interesse e valor.
+  - Lead novo com "Produto de interesse" na empresa nova 200 (o campo nasce no cadastro).
+  - Empresa nova com limite de leads 99999.
+  - Superadmin na sessão do Lucas: "Piloto" em um clique (sem fim de teste, log `trocar_situacao`); visão geral "Piloto 1", MRR R$ 0,00; Acompanhamento da JM com 12.620 recebidas / 15.585 enviadas em 14 dias e 9 de 9 usuários.
+  - Empresa de teste excluída pela tela do superadmin (sobram 1 e 5; 0 logins de teste; 0 importações). JM continuou criando negócios durante o smoke. Aba fechada.
+
+## 56. 18/11: mensagem recebida sempre gravada + alerta de entrada parada — PREPARADO (05, mesma seção)
+
+- Migração `20261118000300_entrada_sempre_gravada`, Edge `259f3933` (volta = v82 = `c679d4df`) e app `0d2ddf31`. Prova local completa no 05. **Espera a aprovação da 0300; a Edge só depois dela.**
+
