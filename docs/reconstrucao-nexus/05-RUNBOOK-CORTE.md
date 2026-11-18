@@ -562,6 +562,38 @@ branches abertas antes de numerar).
 - **`20261118000200_piloto_importacao_acompanhamento`:** (0) plano `base` com `limite_leads` 99999 onde estiver 0 (o incidente do 06 s.54; em produção já corrigido à mão, não muda nada); (0b) campo `negocio.produto_interessado` em toda empresa que não o tem (só as do corte tinham; empresa nova recusava lead com interesse; em produção JM e Preview já têm, não muda nada; o cadastro passa a criá-lo por `core/campos.ts`); `empresas.piloto` (com CHECK: não junto de `cortesia`); tabela **`importacoes`** (core: uma linha por importação gravada, recusadas em jsonb; RLS lê a própria empresa ou superadmin; grava só o serviço); função **`acompanhamento_empresa(p_empresa, p_dias)`** (SECURITY DEFINER, só `service_role`: mensagens por dia de Brasília, usuários ativos por dia, canais, falhas recentes — 67 ms na JM, 14 dias, tudo em cache). Volta: `supabase/scripts/volta/volta-piloto-importacao.sql`.
 - **Ordem: migração ANTES do app** (o app novo lê `piloto` no superadmin e grava em `importacoes`). O app no ar convive com ela (nada que ele usa muda). (1) push só do SQL e docs; (2) IOwait < 10% (65 s separado) e `apply_migration`; (3) push do app; (4) smoke. Não toca dados da JM.
 
+## Mensagem recebida sempre gravada + alerta de entrada parada (18/11 — PREPARADA, aprovada pelo Lucas; registro no 06, seção 56)
+
+- **`20261118000300_entrada_sempre_gravada`:**
+  - `core_limite_negocios`: na entrada pelo canal (`nexus.entrada_canal = on`, marcado pela `mensagem_registrar`), passar do limite não barra; o negócio nasce ou reabre com `_lead.aviso_limite`, que o card mostra ("acima do limite de leads do plano"). Cadastro à mão, importação e API continuam barrados.
+  - `mensagem_registrar`: na recebida, o negócio é tentado num sub-bloco. Se uma regra o recusar, a mensagem e o contato entram assim mesmo e fica o alerta `negocio_nao_criado`. Gravou (ou reenvio do que já estava gravado) → limpa `canais.entrada_pendente_desde`.
+  - `canais.entrada_pendente_desde` (a Edge marca, a gravação limpa); tabela **`alertas_entrada`** (só o superadmin lê); pg_cron **`entrada-parada`** de 5 em 5 min, que só chama `/api/cron/entrada-parada` quando há o que fazer.
+  - Volta: `supabase/scripts/volta/volta-entrada-sempre-gravada.sql` (corpos de antes iguais aos de produção, conferidos por md5).
+- **Edge `webhook-leads`:** marca a entrada pendente; qualquer falha ao gravar a recebida (inclusive o card do anúncio) é `ErroDeGravacao` → **500**; qualquer exceção no processamento → 500 (antes: 200 para "não travar a fila"). Só responde 200 depois de gravar.
+- **App:**
+  - `lib/alertas-entrada.ts`: 30 min pendente, só no horário de atendimento da empresa. Abre o alerta, avisa (Sentry com um issue por alerta; e-mail para `ALERTA_EMAIL` quando o Resend estiver configurado) e resolve quando o canal volta a gravar.
+  - Alertas na visão geral do superadmin e no Acompanhamento da empresa; aviso de limite no card.
+- **Ordem:** 0200 e 0300 (IOwait < 10%, leitura de 65 s separada) → Edge (guardar a versão de antes como volta) → push do app → smoke. A Edge nova convive com o banco sem a 0300 (a marca de pendente falha e só loga), mas a ordem acima evita isso.
+- **Prova local:** `tests/e2e/entrada-sempre-gravada-e2e.mjs` com a Edge servida localmente:
+  - limite estourado: card com aviso, e o cadastro à mão continua barrado;
+  - empresa suspensa grava;
+  - regra que recusa o negócio: a mensagem entra e fica o alerta;
+  - falha ao gravar dá 500, e o reenvio grava;
+  - banco fora dá 500, e o reenvio grava;
+  - rota do alerta: abre, não duplica, resolve e responde 401 sem o segredo;
+  - o dono vê o aviso no card.
+
+## Mensagem recebida nunca é descartada (regra permanente do Lucas, 18/11/2026)
+
+**Mensagem recebida nunca é descartada; webhook só responde 200 depois de gravar.**
+
+1. Nenhum limite de plano, situação da empresa (teste vencido, só leitura, suspensa) ou regra de criação de lead pode impedir gravar a mensagem e o contato. Se o negócio for barrado por regra, a mensagem entra assim mesmo e o card nasce com aviso para o dono (`_lead.aviso_limite`) ou fica o alerta `negocio_nao_criado`.
+2. Qualquer falha ao gravar responde **erro à Meta** (500), para ela reenviar. Nunca 200 sem a mensagem no banco. O reenvio não duplica (`external_id` único).
+3. Canal que recebe da Meta e não grava há 30 min no horário de atendimento vira alerta para o Lucas e registro no superadmin (`alertas_entrada`).
+4. Toda mudança em limite, gatilho de `negocios`/`contatos`/`mensagens` ou na `mensagem_registrar` passa pelo `tests/e2e/entrada-sempre-gravada-e2e.mjs`. Depois de aplicar em produção, conferir que nasce negócio novo na JM (contagem dos últimos minutos).
+
+Origem: incidente de 18/11 (06 s.54). O plano base entrou com limite de leads 0, o gatilho derrubou a transação inteira da mensagem e a Edge respondeu 200. Resultado: ~60 mensagens de 10 clientes novos perdidas em 2h13, sem reenvio da Meta.
+
 ## Como nasce um módulo (regra permanente do Lucas, 04/11/2026)
 
 **Toda funcionalidade fora do core nasce como módulo.** Preço e o que se vende à parte ficam para a etapa Plataforma. Até lá, "módulo" quer dizer ligar e desligar por empresa, não cobrança.
