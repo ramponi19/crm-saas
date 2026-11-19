@@ -1779,3 +1779,22 @@ Registro pedido "na seção 55"; fica aqui, ao lado do piloto, para a 55 continu
   - Resolvido à mão às 18:06: alerta sem canal não se resolve sozinho, porque a rota só resolve pelo canal; todo alerta real tem canal.
   - **E-mail do Sentry chegou ao Lucas** (confirmado por ele às ~18h10 UTC) pela regra que já existia ("Send a notification for high priority issues"). Nada a ajustar no Sentry. O e-mail direto (`ALERTA_EMAIL`) segue desligado até o Resend ser configurado.
 
+
+## 57. 19/11: apresentação e primeiro cliente — empresa de demonstração, convite por link corrigido, documentos versão piloto 0.9
+
+- **Empresa de demonstração** (Preview, `__preview__`, demo = true, fora das métricas), pronta para apresentar:
+  - Preset "CRM geral" aplicado pelo superadmin (o mesmo do `/register`).
+  - Dados fictícios pelo `supabase/scripts/demo/preview-demonstracao.sql` (idempotente, só na Preview): "Nexus Demonstração" / Loja Centro; 36 contatos; funil 8 Novo, 8 Em contato, 8 Negociando, 8 Convertido, 4 Perdido; 29 conversas e 119 mensagens no WhatsApp e no Instagram de demonstração; 10 tarefas; 5 etiquetas.
+  - Canais de demonstração sem token, `via = 'pagina'`, `external_id 'demo-…'`, telefones 55 11 90000-xxxx: nada sai para a Meta.
+  - Pela tela: módulo Públicos instalado e o público "Negociando, com conversa na semana" (3); automação "entrou em Negociando → tarefa 'Enviar proposta por escrito' em 1 dia" (sem disparo nos cards existentes).
+  - Login de demonstração `demo@nexuscrm.app` (Administrador), com 28 cards, 22 conversas e 8 tarefas atribuídos; os 8 novos na esteira. A conta da revisão da Meta (`meta.review@…`) não foi tocada.
+- **Defeito achado: convite de equipe por link nunca funcionou.**
+  - O `action_link` do Supabase volta com a sessão no fragmento (`#access_token`), e o cliente PKCE do @supabase/ssr não lê fragmento. O Supabase aceitava o convite (`/verify` 303, `user_signedup` às 10:32 UTC) e o `/reset-senha` mostrava "Link inválido ou expirado".
+  - Correção (`a14b1cf8`): o link vai para `/reset-senha?token_hash=…&type=invite` e a página troca por sessão com `verifyOtp`; aceita também o fragmento (links antigos) e o `?code` do "Esqueci a senha".
+  - "Novo usuário" com convite para quem já está na equipe gera um **link novo**: só para quem é desta empresa e de nenhuma outra, abaixo de quem pede, nunca dono nem superadmin.
+  - Em produção (app `a14b1cf8`, READY 10:50 UTC; volta = `b8994a92`; gate verde 416 / 634-5; IOwait 0,06%): o link novo do `demo@nexuscrm.app` foi gerado pela tela, o Lucas abriu numa janela anônima, o link entrou às 10:56:03 e a senha foi gravada às 10:56:12. Usuário online na Equipe. Saída da visualização da Preview conferida.
+- **Documentos legais (Termos, Privacidade, DPA) — "Versão piloto 0.9":**
+  - Termos e DPA redigidos (antes só "em revisão"); dados de quem opera em `lib/legal-operador.ts`.
+  - A versão do cadastro passa de "minuta" para "piloto 0.9" sem pôr as versões no ambiente, para não chamar os usuários da JM à tela /aceite.
+  - NÃO publicado: espera razão social, CNPJ, endereço e e-mail do Lucas, e a decisão sobre a Privacidade, hoje ROSACELL LTDA, a mesma entidade verificada na Meta e declarada na App Review.
+- **Checklist da reunião** (1 página) entregue ao Lucas como documento compartilhável.
