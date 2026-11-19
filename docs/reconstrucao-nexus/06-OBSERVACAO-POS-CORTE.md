@@ -1808,3 +1808,4 @@ Registro pedido "na seção 55"; fica aqui, ao lado do piloto, para a 55 continu
   - Superadmin: Piloto em um clique (trial nulo); Acompanhamento com 5 leads e 2 de 2 usuários ativos.
   - Exclusão pela tela: sobram as empresas 1 e 5, 0 logins de teste, superadmin intacto; aba fechada.
   - Achado de texto: o diálogo de exclusão diz "As contas de login não são apagadas", mas a rota apaga os logins que não estão em outra empresa (foi o caso aqui).
+  - **Corrigido** (app `217bdf85`, READY; volta = `dpl_9PAdFexpscBQFGhJCqjT3mQozVwx`; gate verde 416 / 634-5; IOwait 0,01%). O diálogo agora diz: login apagado quando não pertence a nenhuma outra empresa, com o e-mail livre para um cadastro novo; mantido para quem pertence a outra empresa (mesmo inativo lá) e para o superadmin, que só perde o acesso a esta. Conferido no diálogo real da Preview, cancelado sem excluir (Preview com os 36 contatos).
