@@ -1799,3 +1799,12 @@ Registro pedido "na seção 55"; fica aqui, ao lado do piloto, para a 55 continu
   - Dados do Lucas: os três em nome da **ROSACELL LTDA**, CNPJ 51.971.358/0001-00, Rua José Maria Rangel, 40, Chácara do Ouro, Mogi Guaçu/SP, CEP 13840-294; foro Mogi Guaçu/SP; a mesma entidade verificada na Meta (a Privacidade continua batendo com a App Review).
   - **E-mail de contato ainda não existe** (o Lucas vai criar): Termos e DPA dizem "pelos canais de atendimento informados ao Cliente"; a Privacidade mantém `contato@jmstore.com.br` (o canal de exclusão de dados que a Meta conhece) até o novo ir para `OPERADOR.email`.
 - **Checklist da reunião** (1 página) entregue ao Lucas como documento compartilhável.
+- **Documentos publicados** (`3fe2008d` com `3af372ca`; gate verde 416 / 634-5; IOwait 0,05%): /termos, /dpa e /privacy em produção com ROSACELL, o endereço com CEP 13840-294 e "Versão piloto 0.9".
+- **Teste do fluxo completo em produção** (conta do Lucas por variantes da caixa dele: `lucas.souza19+cadastro@` e `+convite@`; o `lucas.souza19@` é o login de superadmin e não foi usado):
+  - `/register`: o Lucas digitou a senha; os 3 passos mostraram "versão piloto 0.9". Nasceram a empresa 9 no plano base, com teste de 14,0 dias, leads 99999 e 3 usuários, o aceite dos três documentos "piloto 0.9", o campo produto_interessado e o funil do preset geral. A loja saiu "Teste Fluxo PilotoLoja Teste" porque o campo vem preenchido com o nome da empresa e eu digitei por cima (erro de digitação, não do produto).
+  - Primeiro acesso: painel com "Primeiros passos" (0 de 5).
+  - Importação de 5 contatos (CSV): mapeamento sugerido, prévia 5/0/5/0, gravação de 5 contatos com a etiqueta e 5 leads com interesse e valor.
+  - Convite por link do Vendedor: link `token_hash`, senha criada pelo Lucas, entrou às 11:37 e ficou ativo.
+  - Superadmin: Piloto em um clique (trial nulo); Acompanhamento com 5 leads e 2 de 2 usuários ativos.
+  - Exclusão pela tela: sobram as empresas 1 e 5, 0 logins de teste, superadmin intacto; aba fechada.
+  - Achado de texto: o diálogo de exclusão diz "As contas de login não são apagadas", mas a rota apaga os logins que não estão em outra empresa (foi o caso aqui).
