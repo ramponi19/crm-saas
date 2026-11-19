@@ -24,8 +24,12 @@ export const DOCUMENTOS_LEGAIS: Record<DocumentoLegal, { nome: string; href: str
   dpa: { nome: 'Acordo de tratamento de dados (DPA)', href: '/dpa' },
 }
 
-/** A versão de cada documento enquanto o texto final não sai. */
-export const VERSAO_MINUTA = 'minuta'
+/**
+ * A versão de cada documento no cadastro e nas páginas enquanto as do ambiente não são definidas: "piloto 0.9"
+ * desde 19/11/2026 (era "minuta"). Ela NÃO chama quem já usa à tela /aceite — isso só acontece com as três
+ * versões no ambiente (`versoesVigentes`); assim a JM não é interrompida pela versão do piloto.
+ */
+export const VERSAO_PILOTO = 'piloto 0.9'
 
 const doAmbiente = (): Record<DocumentoLegal, string | undefined> => ({
   termos: process.env.TERMOS_VERSAO?.trim() || undefined,
@@ -36,7 +40,7 @@ const doAmbiente = (): Record<DocumentoLegal, string | undefined> => ({
 /** As versões que o cadastro registra e que as páginas mostram: as do ambiente, ou "minuta". */
 export function versoesDoCadastro(): Record<DocumentoLegal, string> {
   const v = doAmbiente()
-  return { termos: v.termos ?? VERSAO_MINUTA, privacidade: v.privacidade ?? VERSAO_MINUTA, dpa: v.dpa ?? VERSAO_MINUTA }
+  return { termos: v.termos ?? VERSAO_PILOTO, privacidade: v.privacidade ?? VERSAO_PILOTO, dpa: v.dpa ?? VERSAO_PILOTO }
 }
 
 /** As versões que quem JÁ USA tem de aceitar (tela /aceite): só com as três no ambiente. */

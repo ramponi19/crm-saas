@@ -1796,5 +1796,6 @@ Registro pedido "na seção 55"; fica aqui, ao lado do piloto, para a 55 continu
 - **Documentos legais (Termos, Privacidade, DPA) — "Versão piloto 0.9":**
   - Termos e DPA redigidos (antes só "em revisão"); dados de quem opera em `lib/legal-operador.ts`.
   - A versão do cadastro passa de "minuta" para "piloto 0.9" sem pôr as versões no ambiente, para não chamar os usuários da JM à tela /aceite.
-  - NÃO publicado: espera razão social, CNPJ, endereço e e-mail do Lucas, e a decisão sobre a Privacidade, hoje ROSACELL LTDA, a mesma entidade verificada na Meta e declarada na App Review.
+  - Dados do Lucas: os três em nome da **ROSACELL LTDA**, CNPJ 51.971.358/0001-00, Rua José Maria Rangel, 40, Chácara do Ouro, Mogi Guaçu/SP, CEP 13840-294; foro Mogi Guaçu/SP; a mesma entidade verificada na Meta (a Privacidade continua batendo com a App Review).
+  - **E-mail de contato ainda não existe** (o Lucas vai criar): Termos e DPA dizem "pelos canais de atendimento informados ao Cliente"; a Privacidade mantém `contato@jmstore.com.br` (o canal de exclusão de dados que a Meta conhece) até o novo ir para `OPERADOR.email`.
 - **Checklist da reunião** (1 página) entregue ao Lucas como documento compartilhável.

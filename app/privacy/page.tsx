@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { VersaoDocumento } from '@/components/legal/versao-documento'
+import { OPERADOR } from '@/lib/legal-operador'
 
 export const metadata: Metadata = {
   title: 'Política de Privacidade | Nexus CRM',
@@ -23,20 +24,24 @@ export const metadata: Metadata = {
  * política que ele não entende é política que ele não valida.
  */
 
+/**
+ * ROSACELL LTDA — a mesma entidade do negócio verificado na Meta (verificação de 08/08/2025) e a declarada
+ * como responsável no `responsible-1` da App Review. Desde 19/11/2026 (Versão piloto 0.9) os dados vêm de
+ * lib/legal-operador.ts, o mesmo lugar dos Termos e do DPA.
+ *
+ * O e-mail daqui fica o que a App Review já conhece (canal de exclusão de dados exigido pela Meta) enquanto o
+ * Lucas cria o endereço novo de contato; quando ele existir, vai para OPERADOR.email e passa a valer aqui também.
+ */
 const EMPRESA = {
-  razaoSocial: 'ROSACELL LTDA',
-  /**
-   * CNPJ da ROSACELL LTDA — a mesma entidade do negócio verificado na Meta
-   * (verificação de 08/08/2025) e a declarada como responsável no `responsible-1`
-   * da App Review. "JM Store Importados" é o nome fantasia da operação de varejo.
-   */
-  cnpj: '51.971.358/0001-00',
-  email: 'contato@jmstore.com.br',
-  site: 'https://crm-saas-beta.vercel.app',
+  razaoSocial: OPERADOR.razaoSocial,
+  cnpj: OPERADOR.cnpj,
+  endereco: OPERADOR.endereco,
+  email: OPERADOR.email || 'contato@jmstore.com.br',
+  site: OPERADOR.site,
 }
 
-const ATUALIZADO_PT = 'Última atualização: 28 de agosto de 2026'
-const ATUALIZADO_EN = 'Last updated: August 28, 2026'
+const ATUALIZADO_PT = 'Última atualização: 19 de novembro de 2026'
+const ATUALIZADO_EN = 'Last updated: November 19, 2026'
 
 /**
  * Operadores. Cada linha aqui corresponde a um registro "processor" no
@@ -230,6 +235,7 @@ export default function PrivacyPage() {
       <Secao titulo="10. Contato">
         <p>
           {EMPRESA.razaoSocial} · CNPJ {EMPRESA.cnpj}<br />
+          {EMPRESA.endereco}<br />
           {EMPRESA.email}<br />
           <a href={EMPRESA.site} style={S.link}>{EMPRESA.site}</a>
         </p>
@@ -351,6 +357,7 @@ export default function PrivacyPage() {
       <Secao titulo="10. Contact">
         <p>
           {EMPRESA.razaoSocial} · CNPJ {EMPRESA.cnpj}<br />
+          {EMPRESA.endereco}<br />
           {EMPRESA.email}<br />
           <a href={EMPRESA.site} style={S.link}>{EMPRESA.site}</a>
         </p>

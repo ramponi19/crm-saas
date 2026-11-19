@@ -1,6 +1,6 @@
 // Cadastro no plano único (18/11/2026): /register em 3 passos (conta → empresa → aceite), resumo do plano base
 // vindo de planos_config (editável no superadmin), sem segmento, aceite de termos + privacidade + DPA na versão
-// "minuta", e o que nasce no banco: empresa, loja principal, dono, aceite e teste de 14 dias. Mais a tabela de
+// "piloto 0.9", e o que nasce no banco: empresa, loja principal, dono, aceite e teste de 14 dias. Mais a tabela de
 // preços de módulos e extras e as páginas legais públicas.
 // Precisa da migração 20261118000100 no banco LOCAL. App LOCAL :3010, Supabase LOCAL.
 // Rodar: node tests/e2e/cadastro-plano-unico-e2e.mjs
@@ -74,12 +74,12 @@ try {
   r = await api(pS, '/api/superadmin/precos', 'PUT', { chave: 'modulo_inexistente_e2e' })
   confere(r.status === 400, 'preço sem valor válido recusado')
 
-  // ── Páginas legais públicas com a versão minuta ────────────────────────────
+  // ── Páginas legais públicas com a Versão piloto 0.9 ────────────────────────
   const pub = await novaPagina()
   for (const [href, nome] of [['/termos', 'Termos de uso'], ['/privacy', 'Política de privacidade'], ['/dpa', 'Acordo de tratamento de dados']]) {
     const resp = await pub.goto(BASE + href, { timeout: 300000 })
     const t = await pub.locator('body').innerText()
-    confere(resp.status() === 200 && pub.url().endsWith(href) && /versão\s+minuta/i.test(t) && t.includes(nome), `${href} pública, com "versão minuta"`)
+    confere(resp.status() === 200 && pub.url().endsWith(href) && /versão\s+piloto 0\.9/i.test(t) && !t.includes('[EU INFORMO]') && t.includes(nome), `${href} pública, com "Versão piloto 0.9"`)
   }
 
   // ── /register pela tela ────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ try {
   const tela3 = await pub.locator('body').innerText()
   const links = await pub.locator('main a, a[target="_blank"]').evaluateAll((as) => as.map((a) => a.getAttribute('href')))
   confere(['/termos', '/privacy', '/dpa'].every((h) => links.includes(h)), `links de termos, privacidade e DPA (${links.join(' ')})`)
-  confere((tela3.match(/versão minuta/g) ?? []).length === 3, 'as três versões "minuta" na tela')
+  confere((tela3.match(/versão piloto 0.9/g) ?? []).length === 3, 'as três versões "piloto 0.9" na tela')
   const criar = pub.getByRole('button', { name: /Criar conta grátis/ })
   confere(await criar.isDisabled(), 'sem o aceite, o botão de criar fica desligado')
   await pub.getByRole('checkbox').check()
@@ -133,7 +133,7 @@ try {
   const dono = sql(`select eu.role||'|'||eu.ativo||'|'||(eu.filial_id = f.id) from empresa_usuarios eu join filiais f on f.empresa_id=eu.empresa_id where eu.empresa_id=${emp} and eu.usuario_id='${uid}'`)
   confere(/^owner\|(t|true)\|(t|true)$/.test(dono), `dono (owner, ativo, na loja principal): ${dono}`)
   const aceites = sql(`select string_agg(documento||':'||versao, ',' order by documento) from termos_aceites where usuario_id='${uid}' and empresa_id=${emp}`)
-  confere(aceites === 'dpa:minuta,privacidade:minuta,termos:minuta', `aceite dos três documentos, versão minuta (${aceites})`)
+  confere(aceites === 'dpa:piloto 0.9,privacidade:piloto 0.9,termos:piloto 0.9', `aceite dos três documentos, versão piloto 0.9 (${aceites})`)
   const quando = sql(`select bool_and(aceito_em > now() - interval '10 minutes')::text||'|'||bool_and(user_agent is not null)::text||'|'||coalesce(max(ip), '(sem ip)') from termos_aceites where usuario_id='${uid}'`)
   confere(/^true\|true\|/.test(quando), `aceite com data e navegador; IP: ${quando.split('|')[2]}`)
   const mods = sql(`select coalesce(string_agg(modulo, ','), '') from empresa_modulos where empresa_id=${emp} and ativo`)
