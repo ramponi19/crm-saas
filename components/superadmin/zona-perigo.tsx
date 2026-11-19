@@ -102,7 +102,13 @@ export function ZonaPerigo({ empresaId, empresaNome }: { empresaId: number; empr
         <p className="mb-3 text-[13px] text-ink-2">
           Isso apaga <strong className="text-ink">todos os dados</strong> de <strong className="text-ink">{empresaNome}</strong>{' '}
           (leads, mensagens, clientes, vendas, produtos, financeiro…) de forma <strong className="text-bad">irreversível</strong>.
-          As contas de login não são apagadas.
+        </p>
+        {/* O que a rota /api/superadmin/empresas/[id]/excluir faz com os logins (passo 5b) — mexeu lá, mexa aqui. */}
+        <p className="mb-3 text-[13px] text-ink-2" data-logins-exclusao>
+          <strong className="text-ink">Logins da equipe:</strong> quem não pertence a nenhuma outra empresa tem o login{' '}
+          <strong className="text-bad">apagado</strong>, e o e-mail fica livre para um cadastro novo. Quem também pertence a
+          outra empresa (mesmo inativo lá), e o superadmin, <strong className="text-ink">mantém o login</strong> e só perde o
+          acesso a esta.
         </p>
         <Input
           label={`Digite "${empresaNome}" para confirmar`}
