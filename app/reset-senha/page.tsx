@@ -17,15 +17,40 @@ export default function ResetSenhaPage() {
   const [erro, setErro]         = useState(false)
 
   useEffect(() => {
-    // Supabase injeta o token na URL como hash; o cliente o troca por sessão automaticamente.
     const supabase = createClient()
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') { setReady(true); setErro(false) }
     })
-    // O evento pode ter ocorrido antes do listener: se já há sessão, libera.
-    supabase.auth.getSession().then(({ data }) => { if (data.session) setReady(true) })
+    /**
+     * TRÊS JEITOS DE O LINK CHEGAR (19/11/2026):
+     *  1. `?token_hash=…&type=invite|recovery` — o convite e o link novo da equipe (/api/equipe/criar-usuario):
+     *     troca por sessão aqui, com verifyOtp. É o jeito que funciona com o cliente do @supabase/ssr (PKCE).
+     *  2. `#access_token=…&refresh_token=…` — o `action_link` antigo do Supabase: o cliente PKCE não lê fragmento,
+     *     e o convidado caía em "Link inválido ou expirado". Lido à mão para os links que já estavam circulando.
+     *  3. `?code=…` — "Esqueci a senha" (PKCE): o próprio cliente troca e dispara PASSWORD_RECOVERY.
+     */
+    const url = new URL(window.location.href)
+    const tokenHash = url.searchParams.get('token_hash')
+    const tipo = url.searchParams.get('type')
+    const frag = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const liberar = () => { setReady(true); setErro(false) }
+    if (tokenHash && (tipo === 'invite' || tipo === 'recovery')) {
+      supabase.auth.verifyOtp({ token_hash: tokenHash, type: tipo }).then(({ error }) => {
+        if (error) setErro(true); else liberar()
+        window.history.replaceState(null, '', '/reset-senha')
+      })
+    } else if (frag.get('access_token') && frag.get('refresh_token')) {
+      supabase.auth.setSession({ access_token: frag.get('access_token')!, refresh_token: frag.get('refresh_token')! })
+        .then(({ error }) => {
+          if (error) setErro(true); else liberar()
+          window.history.replaceState(null, '', '/reset-senha')
+        })
+    } else {
+      // O evento pode ter ocorrido antes do listener: se já há sessão, libera.
+      supabase.auth.getSession().then(({ data }) => { if (data.session) setReady(true) })
+    }
     // Link inválido/expirado: não trava em "Validando…" pra sempre.
-    const t = setTimeout(() => setReady((r) => { if (!r) setErro(true); return r }), 5000)
+    const t = setTimeout(() => setReady((r) => { if (!r) setErro(true); return r }), 8000)
     return () => { sub.subscription.unsubscribe(); clearTimeout(t) }
   }, [])
 

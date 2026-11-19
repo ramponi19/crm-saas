@@ -119,6 +119,25 @@ export async function POST(req: NextRequest) {
       .eq('usuario_id', existente.id).eq('empresa_id', empresaId).maybeSingle()
 
     if (vinculo?.ativo) {
+      // NOVO LINK DE ACESSO (19/11/2026): convidado cujo link venceu ou falhou pede um novo pelo mesmo
+      // "Novo usuário" com convite. Só para quem é da equipe DESTA empresa e de nenhuma outra, e não é dono
+      // nem superadmin: um link de acesso entra na conta inteira, e o admin daqui não pode chegar por ele
+      // à empresa de outra pessoa.
+      if (convite) {
+        const [{ count: outras }, { data: perfil }, { data: papel }] = await Promise.all([
+          service.from('empresa_usuarios').select('id', { count: 'exact', head: true })
+            .eq('usuario_id', existente.id).neq('empresa_id', empresaId).eq('ativo', true),
+          service.from('usuarios').select('is_super_admin').eq('id', existente.id).maybeSingle(),
+          service.from('empresa_usuarios').select('role').eq('usuario_id', existente.id).eq('empresa_id', empresaId).maybeSingle(),
+        ])
+        // E só para quem está ABAIXO de quem pede (a mesma hierarquia da criação): admin não gera link de outro admin.
+        const abaixo = (HIERARQUIA[callerRole] ?? 0) > (HIERARQUIA[papel?.role ?? 'owner'] ?? 0)
+        if (!outras && !perfil?.is_super_admin && papel?.role !== 'owner' && abaixo) {
+          const novo = await linkDeAcesso(service, base(req), emailNormalizado, 'recovery')
+          if ('error' in novo) return NextResponse.json({ error: novo.error }, { status: 400 })
+          return NextResponse.json({ ok: true, id: existente.id, convite: { enviado: false, link: novo.link }, novoLink: true })
+        }
+      }
       return NextResponse.json({ error: 'Este e-mail já está na equipe.' }, { status: 409 })
     }
     if (!vinculo) {
@@ -144,13 +163,10 @@ export async function POST(req: NextRequest) {
   let linkConvite: string | null = null
   let userId: string
   if (convite) {
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin
-    const { data: gerado, error: eLink } = await service.auth.admin.generateLink({
-      type: 'invite', email, options: { data: { nome }, redirectTo: `${base}/reset-senha` },
-    })
-    if (eLink || !gerado?.user) return NextResponse.json({ error: eLink?.message ?? 'Não foi possível gerar o convite' }, { status: 400 })
-    userId = gerado.user.id
-    linkConvite = gerado.properties?.action_link ?? null
+    const gerado = await linkDeAcesso(service, base(req), email, 'invite', nome)
+    if ('error' in gerado) return NextResponse.json({ error: gerado.error }, { status: 400 })
+    userId = gerado.userId
+    linkConvite = gerado.link
   } else {
     const { data: authData, error: authError } = await service.auth.admin.createUser({
       email,
@@ -210,4 +226,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, id: userId, convite: { enviado, link: enviado ? null : linkConvite } })
   }
   return NextResponse.json({ ok: true, id: userId })
+}
+
+/** O endereço do app para os links (o do ambiente, senão o da própria requisição). */
+function base(req: NextRequest): string {
+  return process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin
+}
+
+/**
+ * LINK DE ACESSO PELO token_hash (19/11/2026). O `action_link` do Supabase volta para o app com a sessão no
+ * fragmento da URL (#access_token=…), e o cliente do @supabase/ssr (fluxo PKCE) não lê fragmento: o convidado
+ * caía em "Link inválido ou expirado" em /reset-senha e não entrava nunca. Agora o link vai direto para
+ * /reset-senha com o `token_hash`, e a página troca por sessão com `verifyOtp` (cookie, como o resto do app).
+ * `invite` cria o usuário; `recovery` é o link novo de quem já existe.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function linkDeAcesso(service: any, baseUrl: string, email: string, tipo: 'invite' | 'recovery', nome?: string): Promise<{ userId: string; link: string } | { error: string }> {
+  const { data, error } = await service.auth.admin.generateLink(tipo === 'invite'
+    ? { type: 'invite', email, options: { data: { nome }, redirectTo: `${baseUrl}/reset-senha` } }
+    : { type: 'recovery', email, options: { redirectTo: `${baseUrl}/reset-senha` } })
+  const hash = data?.properties?.hashed_token as string | undefined
+  if (error || !data?.user || !hash) return { error: error?.message ?? 'Não foi possível gerar o link de acesso' }
+  return { userId: data.user.id as string, link: `${baseUrl}/reset-senha?token_hash=${encodeURIComponent(hash)}&type=${tipo}` }
 }
