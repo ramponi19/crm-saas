@@ -1,6 +1,7 @@
 # PDV v2 — Especificação de arquitetura e plano de fases
 
 **Data:** 19/11/2026 · **Tipo:** só documentação (nenhum código, migração ou dado alterado).
+**Revisão 2 (19/11/2026, noite):** decisões do Lucas registradas (seção [Decisões](#decisões)), comissão da JM refeita como teste T-H1, calendário de dias úteis (§N).
 **Base:**
 - [auditoria-pdv.md](auditoria-pdv.md): nota 2/10, 62 itens;
 - hotfix da branch `fix/entregar-sem-pagamento` (`c21eca3a`, `e3cdf2cf`): `concluir_encomenda`, `concluir_venda_pdv`, `encomenda_saldo`, trava `vendas_conclusao_guarda`, colunas `concluida_em/por/via`;
@@ -217,6 +218,7 @@ São usadas nas políticas de **leitura** (ex.: ver venda de outro) e dentro de 
 | `pdv.lancar_retroativo` | sim/não | — (Dono) | — | — | — |
 | `pdv.configurar`, `equipe.cargos` | sim/não | — (Dono) | — | — | — |
 | `auditoria.ver` | sim/não | ✓ | — | — | — |
+| `lojas.ver_rede` (escolher loja ou ver a rede inteira) | sim/não | ✓ | — | — | — |
 | core (hoje em `empresas.permissoes`): `core.ver_financeiro`, `core.ver_relatorios`, `core.ver_leads_outros`, `core.ver_vendas_outros`, `core.excluir`, `core.exportar` | sim/não | migradas com o valor que a empresa salvou | | | |
 
 ¹ A política `caixa.vendedor_pode_receber` (§D) pode liberar o vendedor sem caixa para receber formas não-dinheiro.
@@ -233,6 +235,7 @@ São usadas nas políticas de **leitura** (ex.: ver venda de outro) e dentro de 
 - Troca de empresa: RPC `trocar_empresa_ativa(p_empresa)`, que confere o vínculo, audita e limpa `filial_atual_id`. Na tela, seletor no topo (ao lado do de loja), visível só para quem tem mais de um vínculo.
 - O cache da trava de menu (`nx_mod`) e o cache de 1 min do proxy passam a ter a empresa na chave.
 - Efeito em produção: nenhum, porque hoje ninguém tem dois vínculos ativos.
+- **Decidido (19/11):** o cargo é **por empresa**. O acesso às lojas fica no **cadastro do usuário**: a loja da pessoa (`empresa_usuarios.filial_id`, que `filiais_visiveis()` já lê) e, para ver a rede inteira, a permissão `lojas.ver_rede`. Hoje isso é o papel `owner`/`admin` dentro de `filiais_visiveis()`; a etapa 1.1 cria a permissão sem mudar a função, e a troca acontece quando o papel deixar de decidir acesso.
 - Limitação aceita: a empresa ativa é **por usuário**, não por aba. Duas abas em empresas diferentes não funcionam ao mesmo tempo. Resolver por aba exigiria a empresa no JWT, fora do escopo.
 
 ### Telas
@@ -332,7 +335,7 @@ A etapa logística da encomenda (`aguardando_pedido`, `pedido_feito`, `chegou`) 
 |---|---|
 | Produto serializado exige peça com serial na entrega (na encomenda, só na entrega) | Invariante. *Qual* produto é serializado é cadastro (categoria/produto) |
 | **Aparelho na troca é forma de pagamento** e entra no estoque **na mesma transação** (corrige a pendência do hotfix) | Invariante: a RPC cria a `estoque_unidades` (`tipo='troca'`), marca a cotação `usada_em`, grava a movimentação de entrada, o pagamento `troca` e o termo. Se algo falhar, nada fica |
-| Status da peça de troca ao entrar (`disponivel` ou `em_revisao`) | Política `venda.troca_entra_como` |
+| Status da peça de troca ao entrar | **Decidido (19/11): `em_revisao`** até alguém conferir e liberar (é o "pendente" de hoje, com nome claro). A política `venda.troca_entra_como` existe, com padrão `em_revisao` |
 | Pagamento a mais só em forma que aceita troco (`pagamento_formas.aceita_troco`) | Invariante. O troco é gravado (`vendas_pagamentos.troco` e `caixa_movimentos` tipo `troco`). Sobra em forma sem troco é recusada, ou vira vale-troca na Fase 2 se `venda.sobra_vira_credito` |
 | Cliente obrigatório | Política `venda.cliente_obrigatorio` (`nunca`, `acima_de_valor`, `sempre`); sempre na encomenda e no crediário (invariante) |
 | Sinal mínimo da encomenda | Política `encomenda.sinal_minimo_pct` (padrão 0) |
@@ -415,6 +418,8 @@ Não há limite de caixas: quem tem `caixa.operar` abre **o seu**, com fundo de 
 | `caixa.diferenca_tolerada` | R$ 0,00. Acima disso, o fechamento exige justificativa |
 | Quem reabre | é a permissão `caixa.reabrir` (§B) |
 
+**Decidido (19/11), JM:** `caixa.exige_caixa_aberto` e `caixa.fechamento_cego` começam **desligados**. É configuração gravada para a empresa JM (dado), não padrão do código. A JM liga quando a equipe estiver treinada.
+
 ### Funções
 
 `caixa_abrir(p_fundo, p_rotulo)` · `caixa_movimentar(p_tipo, p_forma, p_valor, p_motivo)` · `caixa_fechar(p_informado jsonb, p_obs)` · `caixa_reabrir(p_sessao, p_motivo)` · `caixa_resumo(p_sessao)` (relatório).
@@ -442,7 +447,9 @@ Não existe nada hoje ([auditoria C](auditoria-pdv.md)): é tudo novo. `financei
 
 ## E. Formas de pagamento e maquininhas
 
-**Onde mora:** "Meios de pagamento" já é uma seção compartilhada por PDV, Assistência e Financeiro ([core/modulos.ts:243](../core/modulos.ts:243)). Para desligar o PDV sem quebrar a Assistência, as tabelas ficam no **core**, com o prefixo `pagamento_`. Decisão pendente nº 1.
+**Onde mora:** "Meios de pagamento" já é uma seção compartilhada por PDV, Assistência e Financeiro ([core/modulos.ts:243](../core/modulos.ts:243)). Para desligar o PDV sem quebrar a Assistência, as tabelas ficam no **core**, com o prefixo `pagamento_`. **Decidido em 19/11.**
+
+Cada empresa escolhe e cadastra as suas maquininhas. A JM usa **PagBank**, que é o primeiro conector (Fase 3); até lá, registro manual.
 
 ### Modelo de dados
 
@@ -525,7 +532,7 @@ Acima dele, o operador pede aprovação.
    - **WhatsApp:** mensagem pelo número da empresa (`lib/whatsapp`) para o celular do aprovador, com um link de uso único;
    - **e-mail** (`lib/email.ts`), com o mesmo link;
    - **PIN no balcão:** o aprovador digita o PIN no aparelho do operador. Depois de 5 erros, bloqueia por 15 minutos.
-3. O link abre `/aprovar/<token>`, que **exige o aprovador logado** (recomendado; decisão pendente nº 5). Mostra o carrinho, o desconto, a margem resultante e o motivo, com os botões Aprovar e Recusar.
+3. O link abre `/aprovar/<token>`, que **exige o aprovador logado** (decidido em 19/11; sem login, o link leva ao login e volta). Mostra o carrinho, o desconto, a margem resultante e o motivo, com os botões Aprovar e Recusar.
 4. O PDV acompanha o pedido por consulta a cada 3 s (sem realtime: evita voltar a tabela à publicação do WAL). Expira em `desconto.espera_minutos` (padrão 10).
 5. `venda_fechar` recebe o `desconto_aprovacao_id` e confere:
    - status `aprovada`;
@@ -574,7 +581,10 @@ Tudo é auditado: pedido, aprovação ou recusa, canal e o uso na venda.
   - bloquear quem tem parcela atrasada há mais de N dias;
   - cadastro exigido (CPF, endereço);
   - arredondamento.
-- **Atenção legal:** o CDC (art. 52, §1º) limita a multa de mora a 2% nas vendas a consumidor. A tela avisa se a empresa configurar mais que isso. Ser aviso ou trava é a decisão pendente nº 8.
+- **Atenção legal:** o CDC (art. 52, §1º) limita a multa de mora a 2% nas vendas a consumidor. **Decidido (19/11): trava.**
+  - Venda a **consumidor final** (cliente pessoa física): a multa acima de 2% é recusada pela RPC e pela tela. É invariante legal, não configuração.
+  - Venda **entre empresas** (cliente com CNPJ): a multa é configurável (`crediario.multa_pct_empresa`).
+  - A JM vende fiado: o crediário segue na Fase 2.
 - **Na venda:** forma de tipo `crediario`. `venda_fechar` confere:
   - limite disponível (limite − saldo devedor);
   - bloqueio;
@@ -609,7 +619,7 @@ Não existe nada hoje. É tudo novo. Boleto e carnê registrado vêm por conecto
 | # | Requisito | Onde fica no modelo |
 |---|---|---|
 | 1 | Escopo por categoria, condição (novo/seminovo) e outros filtros | `comissao_regras.filtro jsonb`: `categorias`, `condicoes`, `produtos`, `marcas`, `filiais`, `cargos`, `usuarios` |
-| 2 | Métrica da faixa: quantidade ou valor; período configurável | `regra.metrica_faixa` (`quantidade`, `valor`); `plano.periodo` (`mes`, `semana`, `quinzena`, `intervalo`) + `dia_inicio` |
+| 2 | Métrica da faixa: quantidade ou valor; período configurável | `regra.metrica_faixa` (`quantidade`, `valor`); `plano.periodo` (`mes`, `semana`, `quinzena`, `intervalo`) + `dia_inicio`. A data de pagamento é outra configuração (`plano.pagamento`), em dia útil pelo calendário (§N) |
 | 3 | Faixa atingida vale para tudo **ou** escalonado | `regra.modo_faixa` (`atingida`, `escalonado`) |
 | 4 | Zero abaixo da 1ª faixa ou mínimo configurável | `regra.abaixo_primeira_faixa` (`zero`, `percentual`, `valor_fixo`) + `valor` |
 | 5 | Condições da venda mudam o %: com/sem troca, forma de pagamento, desconto > X% | `comissao_variantes` (por faixa): `condicao jsonb` (`tem_troca`, `formas_tipo`, `desconto_pct_maior_que`) → `valor` que substitui o da faixa; a primeira que casa, pela prioridade |
@@ -623,7 +633,7 @@ Não existe nada hoje. É tudo novo. Boleto e carnê registrado vêm por conecto
 
 | Tabela | Colunas |
 |---|---|
-| `comissao_planos` | `id`, `empresa_id`, `nome`, `periodo`, `dia_inicio`, `momento`, `vigencia_de/ate`, `ativo` |
+| `comissao_planos` | `id`, `empresa_id`, `nome`, `periodo`, `dia_inicio`, `momento`, `pagamento jsonb` (quando paga: `{regra: 'dia_util', n: 5, mes: 'seguinte'}` ou `{regra: 'dia_fixo', dia: 10}`; usa o calendário do §N), `vigencia_de/ate`, `ativo` |
 | `comissao_regras` | `id`, `plano_id`, `nome`, `prioridade`, `filtro jsonb`, `metrica_faixa`, `modo_faixa`, `contagem` (`regra`: conta só os itens desta regra; `plano`: conta tudo do plano), `troca_conta_na_faixa`, `base`, `tipo_valor`, `abaixo_primeira_faixa`, `abaixo_valor`, `divisao jsonb`, `ativo` |
 | `comissao_faixas` | `id`, `regra_id`, `de`, `ate` (nulo = sem teto), `valor` (% ou R$ por unidade) |
 | `comissao_variantes` | `id`, `faixa_id`, `prioridade`, `condicao jsonb`, `valor` |
@@ -643,22 +653,31 @@ Não existe nada hoje. É tudo novo. Boleto e carnê registrado vêm por conecto
   - **período aberto:** some sozinho da prévia;
   - **período fechado:** a RPC de cancelamento/devolução chama `comissao_ajustar(p_venda)`. Ela recalcula o período fechado **sem** a venda e lança a diferença (novo − original) como `ajuste` negativo no **período aberto**, com `referencia_periodo_id`. Se a devolução derrubar a faixa, a diferença inteira (de todas as vendas) entra no ajuste.
 
-### Caso de validação: tabela da JM como dados
+### Caso de validação: a comissão da JM como dados (decidido em 19/11/2026)
 
-Nada disto está no código. É o que a JM preenche (ou o que semeamos para ela, editável):
+**Decisões da JM** (outras empresas escolhem as suas; nada disto é código):
+- modo: **faixa atingida vale para todas as vendas do período**;
+- aparelhos: **iPhone, iPad, MacBook, Watch e AirPods** (a seleção de categorias é por regra);
+- venda com troca **conta** na quantidade da faixa;
+- base: **valor cheio do aparelho, sem abater a troca** (o percentual menor da venda com troca já compensa);
+- apuração no **mês calendário**; pagamento no **5º dia útil do mês seguinte** *[aguardando confirmação do Lucas]*. Apuração e pagamento são configurações separadas (`comissao_planos.periodo` e `comissao_planos.pagamento`), e o dia útil vem do calendário (§N).
 
 ```jsonc
 // comissao_planos
-{ "nome": "Vendedores JM", "periodo": "mes", "dia_inicio": 1, "momento": "concluida" }
+{ "nome": "Vendedores JM", "periodo": "mes", "dia_inicio": 1, "momento": "concluida",
+  "pagamento": { "regra": "dia_util", "n": 5, "mes": "seguinte" } }   // [aguardando confirmação]
 
 // comissao_regras[0] + faixas + variantes
 { "nome": "Aparelhos novos", "prioridade": 10,
-  // categorias gravadas por id; os nomes são os do cadastro da JM, sem o emoji
-  "filtro": { "categorias": ["Iphone / Smartphone", "Ipad / Tablet", "MacBook / Notebook", "Apple Watch / Smartwatch"],
+  // categorias gravadas por id; os nomes são os do cadastro da JM, sem o emoji.
+  // "AirPods" ainda NÃO existe como categoria na JM (hoje estão em Acessórios): ver decisão D-C2.
+  "filtro": { "categorias": ["Iphone / Smartphone", "Ipad / Tablet", "MacBook / Notebook", "Apple Watch / Smartwatch", "AirPods"],
               "condicoes": ["novo"] },
-  "metrica_faixa": "quantidade", "contagem": "regra", "modo_faixa": "atingida",   // ou "escalonado" (decisão)
-  "troca_conta_na_faixa": true, "base": "liquido_desconto", "tipo_valor": "percentual",
-  "abaixo_primeira_faixa": "zero", "divisao": [{ "papel": "vendedor", "fracao": 1 }],
+  "metrica_faixa": "quantidade", "contagem": "regra", "modo_faixa": "atingida",
+  "troca_conta_na_faixa": true,
+  "base": "liquido_desconto",          // sem abater a troca; antes ou depois do desconto: decisão D-C1
+  "tipo_valor": "percentual", "abaixo_primeira_faixa": "zero",
+  "divisao": [{ "papel": "vendedor", "fracao": 1 }],
   "faixas": [
     { "de": 10, "ate": 20,   "valor": 0.65, "variantes": [{ "condicao": { "tem_troca": true }, "valor": 0.45 }] },
     { "de": 21, "ate": 30,   "valor": 0.80, "variantes": [{ "condicao": { "tem_troca": true }, "valor": 0.60 }] },
@@ -666,24 +685,54 @@ Nada disto está no código. É o que a JM preenche (ou o que semeamos para ela,
 
 // comissao_regras[1]
 { "nome": "Seminovos", "prioridade": 20,
-  "filtro": { "categorias": ["(as mesmas)"], "condicoes": ["seminovo", "usado"] },
+  "filtro": { "categorias": ["(as mesmas 5)"], "condicoes": ["seminovo", "usado"] },
   "metrica_faixa": "quantidade", "contagem": "regra", "modo_faixa": "atingida",
   "troca_conta_na_faixa": true, "base": "liquido_desconto", "tipo_valor": "percentual",
   "abaixo_primeira_faixa": "zero",
   "faixas": [ { "de": 3, "ate": 10, "valor": 1.00 }, { "de": 11, "ate": null, "valor": 1.20 } ] }
 
-// equipe_remuneracao (por vendedor)
+// equipe_remuneracao (por vendedor; só relatório)
 { "salario": 1700.00, "ajuda_custo": 100.00 }
 ```
 
-Acessórios, perfumes e "outros" não casam com nenhuma regra, então não geram comissão. É assim que a tabela da JM está escrita; se isso mudar, é outra regra, sem código.
+Acessórios (fora os AirPods), perfumes e "outros" não casam com nenhuma regra, então não geram comissão.
 
-### Exemplo calculado (vendedor fictício, novembro)
+### Exemplo calculado da JM = teste automático T-H1 (Fase 2)
 
-As premissas abaixo são decisões pendentes (nº 6):
-- base = valor do item líquido de desconto, **sem** abater a troca (a troca já reduz o %);
-- vendas com troca **contam** na faixa;
-- a venda conta quando é concluída.
+Vendedor fictício, novembro de 2026, sem desconto em nenhuma venda (para a base não depender da decisão D-C1):
+
+| Novos (27 unidades) | Sem troca | Com troca |
+|---|---|---|
+| iPhone, iPad, MacBook, Watch | 16 aparelhos · R$ 91.500 | 9 aparelhos · R$ 71.000 |
+| AirPods | 2 × R$ 1.500 = R$ 3.000 | — |
+| **Total** | **18 · R$ 94.500** | **9 · R$ 71.000** |
+
+Mais **12 seminovos** (R$ 30.000) e **1 capa** (Acessórios, R$ 200).
+
+| Regra | Contagem → faixa | Cálculo | Comissão |
+|---|---|---|---|
+| Aparelhos novos | 27 (troca conta) → **21–30 para todas** | R$ 94.500 × 0,80% = R$ 756,00<br/>R$ 71.000 × 0,60% = R$ 426,00 | **R$ 1.182,00** |
+| Seminovos | 12 → **11+ para todas** | R$ 30.000 × 1,2% | **R$ 360,00** |
+| Capa | não casa com regra | — | R$ 0,00 |
+| **Comissão de novembro** | | | **R$ 1.542,00** |
+| + salário R$ 1.700 + ajuda R$ 100 | | | **R$ 3.342,00** |
+| **Pagamento** | 5º dia útil de dezembro/2026 (1, 2, 3, 4 e 7; sem feriado nacional no intervalo) | | **07/12/2026** |
+
+**Asserções do teste T-H1** (o motor tem de devolver exatamente):
+
+| Caso | Entrada | Esperado |
+|---|---|---|
+| T-H1a | o mês acima | R$ 1.182,00 + R$ 360,00 + R$ 0,00 = **R$ 1.542,00**; pagamento **07/12/2026** |
+| T-H1b · base sem abater a troca | iPhone de R$ 8.000 com aparelho de R$ 3.000 na troca, faixa 21–30 | base **R$ 8.000** (não R$ 5.000) × 0,60% = **R$ 48,00** |
+| T-H1c · prévia | 30/11, as 27 do mês | "Novos 27 · faixa 21–30 · faltam **4** para 31+". Se chegar a 31, as 27 passam de R$ 1.182,00 para R$ 945,00 + R$ 568,00 = **R$ 1.513,00** (+R$ 331,00), fora as 4 novas |
+| T-H1d · abaixo da 1ª faixa | vendedor com 9 novos e 2 seminovos | **R$ 0,00** |
+| T-H1e · estorno sem mudar de faixa | em dezembro, devolução de um novo com troca de R$ 9.000 vendido em novembro (fechado) | novembro recalculado com 26, ainda 21–30 → ajuste **−R$ 54,00** lançado em dezembro |
+| T-H1f · estorno que derruba a faixa | vendedor com 21 novos sem troca a R$ 6.000 (R$ 126.000 × 0,80% = R$ 1.008,00), novembro fechado; 1 devolvido em dezembro | novembro recalculado: 20 × R$ 6.000 × 0,65% = R$ 780,00 → ajuste **−R$ 228,00** em dezembro |
+| T-H1g · feriado municipal | o mesmo mês com 03/12 cadastrado como feriado da cidade da loja | pagamento **08/12/2026** |
+
+### Teste do motor nos dois modos = T-H2 (genérico, outras empresas)
+
+O modo escalonado não é o da JM, mas o motor tem de calculá-lo certo. Mesmo conjunto de dados, sem os AirPods. Premissas: base sem abater a troca, troca conta na faixa, conta na conclusão.
 
 **Aparelhos novos: 25 unidades no mês**, em ordem de conclusão:
 
@@ -701,21 +750,11 @@ As premissas abaixo são decisões pendentes (nº 6):
 | Novos | 25 un. → faixa 21–30 para todas:<br/>R$ 91.500 × 0,80% = R$ 732,00<br/>R$ 71.000 × 0,60% = R$ 426,00<br/>**= R$ 1.158,00** | Unidades 1–9: abaixo da 1ª faixa = R$ 0,00<br/>10–20: R$ 42.000 × 0,65% + R$ 32.000 × 0,45% = R$ 273,00 + R$ 144,00 = R$ 417,00<br/>21–25: R$ 19.500 × 0,80% + R$ 18.000 × 0,60% = R$ 156,00 + R$ 108,00 = R$ 264,00<br/>**= R$ 681,00** |
 | Seminovos | 12 un. → faixa 11+ para todas:<br/>R$ 30.000 × 1,2%<br/>**= R$ 360,00** | 1–2: R$ 0,00<br/>3–10: R$ 20.000 × 1% = R$ 200,00<br/>11–12: R$ 6.000 × 1,2% = R$ 72,00<br/>**= R$ 272,00** |
 | **Comissão do mês** | **R$ 1.518,00** | **R$ 953,00** |
-| + salário R$ 1.700 + ajuda R$ 100 | **R$ 3.318,00** | **R$ 2.753,00** |
 
-O que muda entre os dois:
-- no modo 1, ao bater uma faixa, as unidades anteriores (inclusive as 9 abaixo da 1ª faixa) passam a valer o % novo;
-- no escalonado, cada unidade fica com o % da faixa em que caiu.
-
-Para a mesma venda, a diferença aqui é de R$ 565,00 (37% a menos no escalonado).
-
-**Variações para comparar:**
-- *Troca não conta na faixa* (modo 1): contam só as 16 sem troca. A faixa cai para 10–20: R$ 91.500 × 0,65% + R$ 71.000 × 0,45% = R$ 594,75 + R$ 319,50 = **R$ 914,25** nos novos, em vez de R$ 1.158,00.
-- *Prévia do vendedor* (modo 1, em 30/11): "Novos: 25 · faixa 21–30 · faltam **6** para a faixa 31+". Se chegar a 31, as 25 já vendidas passam de R$ 1.158,00 para R$ 915,00 + R$ 568,00 = **R$ 1.483,00** (+R$ 325,00), fora a comissão das 6 novas. "Seminovos: 12 · faixa máxima".
-- *Estorno em mês fechado:*
-  - em dezembro, a unidade nº 25 (com troca, R$ 9.000) é devolvida. Recalculado, novembro fica com 24 unidades, ainda na faixa 21–30, e o ajuste é −R$ 9.000 × 0,60% = **−R$ 54,00**, lançado em dezembro. No escalonado, como era a última unidade, também −R$ 54,00;
-  - se a devolução tirasse uma unidade do começo do mês, todas as seguintes desceriam uma posição, e o recálculo pegaria isso;
-  - se derrubasse a faixa no modo 1 (ex.: de 21 para 20), todas as vendas do mês seriam refeitas na faixa 10–20, e a diferença inteira iria para dezembro.
+Asserções extras do T-H2:
+- *troca não conta na faixa* (modo 1): contam só as 16 sem troca, a faixa cai para 10–20, e os novos dão R$ 594,75 + R$ 319,50 = **R$ 914,25**;
+- *escalonado com devolução da última unidade* (nº 25, com troca, R$ 9.000) em mês fechado: ajuste **−R$ 54,00**;
+- *escalonado com devolução de uma unidade do começo do mês*: todas as seguintes descem uma posição, e o recálculo pega isso.
 
 ### Telas
 
@@ -844,7 +883,9 @@ O texto "Não é documento fiscal" é fixo no cupom não fiscal.
 - IMEI, em texto e código de barras Code 128;
 - saúde da bateria;
 - preço;
-- QR para a ficha do aparelho. Se o QR abre a tela interna (exige login) ou uma página pública da unidade é a decisão pendente nº 7.
+- QR para a ficha do aparelho. **Decidido (19/11):** por padrão abre a **tela interna** (exige login). A **página pública do aparelho** é opção da empresa (política `etiqueta.qr_destino`): mostra modelo, bateria, garantia e preço, **nunca** dado de cliente, por um token próprio da unidade.
+
+**Impressora da JM: Niimbot B2 Pro** (300 dpi, 2", preto e vermelho). O suporte da biblioteca é verificado numa prova de conceito isolada antes da Fase 2 ([spike-niimbot.md](spike-niimbot.md), branch `spike/niimbot-b2pro`).
 
 Os campos vêm de `estoque_unidades` e dos atributos do módulo Celulares. O layout é um `impressao_modelos` do tipo `etiqueta_seminovo`, editável.
 
@@ -922,7 +963,7 @@ Implementações em `lib/fiscal/provedores/<nome>.ts`, como `lib/payments/provid
 - Venda: botão "DANFE" e reenvio por WhatsApp.
 - Fiscal → painel: emitidas, pendentes, rejeitadas com o motivo.
 
-Fica para a Fase 3. As perguntas 1 e 2 da auditoria (provedor e se a JM emite hoje) continuam abertas.
+**Decidido (19/11):** a JM **não emite** nota fiscal eletrônica. O módulo Fiscal fica na Fase 3, opcional por empresa, e o provedor é escolhido lá.
 
 ---
 
@@ -959,7 +1000,7 @@ Fica para a Fase 3. As perguntas 1 e 2 da auditoria (provedor e se a JM emite ho
    - os pagamentos sobem para o cabeçalho, com `natureza = 'legado'` e `caixa_sessao_id` nulo (não havia caixa);
    - status: `concluida` → `concluida`; `encomenda`/`pendente_entrega` → `encomenda` (com a etapa); `cancelada` → `cancelada`;
    - **pagamento não registrado (legado):** venda concluída com pago < total recebe `pendencia_legado = total − pago`. **Nenhum pagamento é inventado.** As 92 da reconciliação ficam visíveis na tela "Reconciliação";
-   - `vendas_vendas` é renomeada para `vendas_vendas_legado`, com escrita revogada, e fica 30 dias para conferência. Depois é removida por migração própria;
+   - `vendas_vendas` é renomeada para `vendas_vendas_legado`, com escrita revogada, e fica guardada **até a reconciliação das encomendas ser concluída** (decidido em 19/11). A remoção é decisão do Lucas, por migração própria;
    - os 23 leitores (§0.4) e os 2 objetos do ZapIntel no banco passam a ler as tabelas novas no **mesmo deploy**.
 3. **Configuração inicial semeada** (editável depois):
    - formas: as 6 das listas atuais;
@@ -984,6 +1025,44 @@ Fica para a Fase 3. As perguntas 1 e 2 da auditoria (provedor e se a JM emite ho
 6. **Volta:** o script devolve `vendas_vendas_legado` ao nome original e reverte as funções. As vendas criadas **depois** da troca são reescritas no formato antigo pelo próprio script (uma linha por item, `grupo_pdv` = id do cabeçalho). O deploy anterior volta pela Vercel.
 
 **Comissões já pagas** (`vendas_comissoes`: 0 linhas) e **caixas antigos** (não existiam): nada a migrar.
+
+---
+
+## N. Calendário de dias úteis (core, pedido em 19/11)
+
+Serve à comissão (data de pagamento), aos vencimentos do crediário e a tudo o que precisar de "dia útil" (prazo de reserva, SLA, previsão de entrega).
+
+### Modelo de dados
+
+| Tabela | Colunas | Regras |
+|---|---|---|
+| `calendario_feriados` (core) | `id`, `empresa_id` (**nulo = nacional**, carregado pelo sistema), `abrangencia` (`nacional`, `estadual`, `municipal`, `empresa`), `uf`, `municipio_ibge`, `filial_id` (nulo = todas as lojas daquela cidade/empresa), `data` (para feriado de data única) ou `dia`/`mes` (fixo todo ano), `movel` (`carnaval`, `sexta_santa`, `corpus_christi`: calculado a partir da Páscoa), `nome`, `tipo` (`feriado`, `ponto_facultativo`), `ativo` | Os nacionais são linhas do sistema (`empresa_id` nulo), só leitura para as empresas. Estaduais e municipais são cadastrados pela empresa. Escrita só por RPC, auditada |
+| `filiais` | + `uf`, `municipio_ibge` (se ainda não houver) | A loja numa cidade diferente pega os feriados da sua cidade |
+
+Políticas (§A), por empresa ou loja:
+- `calendario.dias_semana_uteis` (padrão: segunda a sexta);
+- `calendario.ponto_facultativo_conta` (padrão: o ponto facultativo é dia útil).
+
+**Pré-carregados (nacionais):** 1/1, Carnaval (ponto facultativo), Sexta-feira Santa, 21/4, 1/5, Corpus Christi (ponto facultativo), 7/9, 12/10, 2/11, 15/11, 20/11 (Lei 14.759/2023), 25/12.
+
+### Funções
+
+- `dia_util(p_data, p_filial) → boolean`;
+- `proximo_dia_util(p_data, p_filial)`;
+- `enesimo_dia_util(p_ano, p_mes, p_n, p_filial) → date` (o 5º dia útil da comissão).
+
+São `STABLE` e não dependem de módulo. O cálculo da Páscoa é feito em SQL (algoritmo de Gauss/Meeus), sem tabela por ano.
+
+### Telas
+
+Configurações → Calendário:
+- ano em grade, com os nacionais marcados;
+- "adicionar feriado da cidade/estado/empresa" com o seletor de loja;
+- aviso quando uma loja não tem cidade cadastrada (fica só com os nacionais).
+
+### Fase
+
+Entra no começo da **Fase 2**, antes da comissão e do crediário. Teste: T-H1g (feriado municipal empurra o pagamento de 07/12 para 08/12/2026), mais Páscoa, Carnaval e Corpus Christi corretos em 2026, 2027 e 2028.
 
 ---
 
@@ -1035,7 +1114,7 @@ gantt
 
 **Dependências:**
 - hotfix em produção;
-- as respostas das decisões 1 a 4 e 9;
+- as decisões de 19/11 (registradas no fim);
 - o PDV desligável testado (§0.4).
 
 **Migrações previstas** (números conferidos na hora; regra de colisão):
@@ -1075,6 +1154,7 @@ gantt
 ### Fase 2 — Operação completa · complexidade **G**
 
 **Entregas** (ordem sugerida; cada uma sobe sozinha):
+0. **Calendário de dias úteis** (§N): feriados nacionais pré-carregados, estaduais e municipais da empresa, por loja.
 1. **Pós-venda** (I): cancelamento, devolução, troca, vale, garantia na venda, rastreio por serial. Vem primeiro porque a comissão precisa do estorno.
 2. **Comissão** (H): planos, regras, faixas, variantes, prévia, fechamento, ajuste em período fechado, remuneração total. A tabela da JM é validada contra o exemplo deste documento.
 3. **Desconto e aprovação** (F): regras, pedidos, canais (Nexus, WhatsApp, e-mail, PIN).
@@ -1083,10 +1163,11 @@ gantt
 
 **Dependências:**
 - Fase 1;
-- decisões 5 a 8;
+- as decisões de comissão (D-C1 a D-C3) e o resultado da prova de conceito da Niimbot B2 Pro;
 - o modelo da Niimbot da JM em mãos para testar.
 
 **Migrações previstas:**
+- `calendario_feriados` + `filiais.uf/municipio_ibge` + funções de dia útil + carga dos nacionais;
 - `vendas_devolucoes(_itens)`, `vendas_creditos(_movimentos)`, `vendas_garantias` + RPCs;
 - `comissao_*` + `equipe_remuneracao` + migração de `metas_comissoes` + remoção de `vendas_comissoes`;
 - `desconto_regras`, `desconto_aprovacoes`, `usuarios_pin` + RPCs;
@@ -1141,32 +1222,40 @@ gantt
 - e2e da pré-venda celular → caixa.
 
 ---
+## Decisões
 
-## Decisões que dependem do Lucas
+### Tomadas em 19/11/2026
 
-### Novas, desta especificação
+| Tema | Decisão | Onde ficou |
+|---|---|---|
+| Formas de pagamento | No **núcleo** do sistema (`pagamento_*`), não no PDV | §E |
+| Cargos | Por **empresa**; o acesso às lojas fica no cadastro do usuário | §B |
+| Aparelho da troca | Entra no estoque como **em revisão** | §C |
+| Caixa na JM | Caixa obrigatório e fechamento cego começam **desligados**, como configuração da JM (não do código) | §D |
+| Aprovação por WhatsApp | **Exige o aprovador logado** | §F |
+| QR da etiqueta | **Tela interna** por padrão; página pública do aparelho como opção da empresa (modelo, bateria, garantia, preço, sem dado de cliente) | §J |
+| Multa do fiado | **Bloqueio** acima de 2% em venda a consumidor final; configurável só em venda entre empresas | §G |
+| Migração | Janela noturna aceita. As vendas antigas ficam guardadas **até a reconciliação das encomendas ser concluída**; a remoção é decisão do Lucas | §M |
+| Fiscal (auditoria 1 e 2) | A JM **não emite** NF-e/NFC-e. Módulo Fiscal na Fase 3, opcional por empresa; provedor escolhido lá | §K |
+| Maquininha (auditoria 3) | A JM usa **PagBank**. Cada empresa cadastra as suas; PagBank é o primeiro conector, na Fase 3 | §E |
+| Offline (auditoria 4) | **Sem venda offline** | §0, §K |
+| Pix (auditoria 6) | **Estático com confirmação manual** na Fase 1; gateway do dinâmico na Fase 3 | §E |
+| Fiado (auditoria 7) | A JM **vende fiado**; o crediário segue na Fase 2 | §G |
+| Balcão (auditoria 13) | Respondido pelos dados: a loja usa a encomenda como balcão (85 de 92 concluídas em até 15 minutos). Isso justifica a venda única | §C |
+| Comissão da JM: modo | **Faixa atingida vale para todas** as vendas do período | §H |
+| Comissão da JM: categorias | iPhone, iPad, MacBook, Watch e **AirPods** (seleção por regra) | §H |
+| Comissão da JM: troca | Venda com troca **conta** na faixa | §H |
+| Comissão da JM: base | Valor cheio do aparelho, **sem abater a troca** | §H |
+| Comissão: apuração e pagamento | Mês calendário; pagamento e apuração são configurações separadas | §H, §N |
+| Dias úteis | Calendário de feriados configurável (nacionais pré-carregados, estaduais e municipais por empresa e loja) | §N |
+| Impressora da JM | Niimbot **B2 Pro** (300 dpi, 2", preto e vermelho); prova de conceito antes da Fase 2 | §J, [spike-niimbot.md](spike-niimbot.md) |
 
-1. **Onde moram os meios de pagamento:** no core (`pagamento_*`, recomendado, porque a Assistência e o Financeiro usam sem o PDV) ou dentro do PDV?
-2. **Cargo por empresa ou por loja?** Recomendo por vínculo (empresa), como hoje. Por loja dá mais controle e mais configuração.
-3. **Aparelho da troca entra como** `disponivel` direto ou `em_revisao` até alguém conferir? Recomendo `em_revisao`, que é o "pendente" de hoje com nome claro.
-4. **Caixa na JM:** ligar `exige_caixa_aberto` e o fechamento cego desde o início, ou começar desligado e ligar depois de treinar a equipe? Recomendo começar desligado.
-5. **Aprovação por WhatsApp:** o link exige o aprovador logado (recomendado) ou aprova direto pelo link?
-6. **Comissão da JM:**
-   - quais categorias são "aparelhos" (sugeri iPhone, iPad, MacBook e Watch; acessórios e perfumes fora);
-   - qual modo a JM usa hoje (faixa atingida ou escalonado);
-   - venda com troca conta na faixa (sugeri que sim);
-   - base sem abater a troca (sugeri que sim);
-   - conta na conclusão (sugeri que sim);
-   - período = mês calendário?
-7. **Etiqueta:** qual modelo de Niimbot a JM tem? O QR abre a tela interna (exige login) ou uma página pública da unidade?
-8. **Multa do crediário acima de 2% (CDC):** só aviso ou trava?
-9. **Migração:** janela noturna com a loja fechada e o legado guardado 30 dias está aceita?
+### Abertas
 
-### Que seguem abertas da auditoria (as outras foram respondidas pelo pedido)
-
-- **1 e 2 — Fiscal:** qual provedor; se a JM emite NFC-e hoje e por qual sistema.
-- **3 — Maquininha:** o pedido define PagBank como o primeiro conector. Falta saber qual maquininha a JM usa hoje.
-- **4 — Offline:** esta especificação assume **sem modo offline** (a NFC-e em contingência fica com o provedor). Se precisar vender sem internet, muda a arquitetura.
-- **6 — Pix:** esta especificação assume **Pix estático com confirmação manual** na Fase 1. Falta o gateway do dinâmico.
-- **7 — Crediário:** a JM vende fiado? Se não, o bloco G pode descer para depois.
-- **13 — Balcão:** por que a Pronta Entrega quase não é usada (3 fechamentos)? A venda única resolve se o motivo for a separação em abas; se a loja vende por outro sistema, é outra conversa.
+| # | Pergunta | Precisa até |
+|---|---|---|
+| D-C1 | Base da comissão quando há **desconto**: "valor cheio" é o preço de tabela (antes do desconto) ou o valor cobrado pelo aparelho (depois do desconto)? A troca não é abatida em nenhum dos casos | Fase 2 |
+| D-C2 | **AirPods** não existe como categoria na JM (hoje ficam em Acessórios). A JM cria a categoria "AirPods" e move os produtos (recomendado), ou a regra filtra por produto? | Fase 2 |
+| D-C3 | Pagamento da comissão no **5º dia útil do mês seguinte**: confirmar | Fase 2 |
+| D-N1 | Para a comissão, **sábado** conta como dia útil? (padrão proposto: não, segunda a sexta) | Fase 2 |
+| — | Resultado da prova de conceito da B2 Pro na loja | Fase 2 |
