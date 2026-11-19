@@ -8,8 +8,8 @@ import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { contratosDaVenda, emitirContrato, type DocumentoDisponivel, type ContratoArquivado } from '@/lib/contrato-emitir'
-import { descreverPagamentos, type PagamentoGravado } from '@/lib/pdv-pagamentos'
-import { finalizarEncomenda } from '@/lib/encomendas'
+import { descreverPagamentos, type PagamentoGravado, type Taxa } from '@/lib/pdv-pagamentos'
+import { EncomendaFechar, type EncomendaParaFechar } from '@/components/modules/pdv/encomenda-fechar'
 import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, Modal, Select, notify, type Column } from '@/components/ui'
 import { useFuso } from '@/components/fuso-provider'
 import { agora, diaNoFuso, formatarData } from '@/lib/datas'
@@ -35,12 +35,23 @@ interface Venda {
   quantidade: number | null
   /** Formas usadas no fechamento. Vazio em venda anterior ao multi-pagamento. */
   pagamentos?: PagamentoGravado[]
+  /** O fechamento (várias vendas, uma por item). Nulo em encomenda antiga. */
+  grupo_pdv?: string | null
 }
 
-interface Props { vendas: Venda[]; isAdmin?: boolean; vendedores?: { id: string; nome: string }[]; empresaId: number; documentos?: DocumentoDisponivel[] }
+interface Props {
+  vendas: Venda[]; isAdmin?: boolean; vendedores?: { id: string; nome: string }[]; empresaId: number; documentos?: DocumentoDisponivel[]
+  /** Taxas da empresa: o recebimento do saldo na entrega calcula parcelas e juros com elas. */
+  taxas?: Taxa[]
+  /** Módulo Celulares ligado: sugestões de acessório de celular na entrega. */
+  celulares?: boolean
+}
 
 const STATUS: Record<string, { label: string; tone: 'ok' | 'warn' | 'bad' | 'neutro' }> = {
   concluida: { label: 'Concluída', tone: 'ok' },
+  // Venda de balcão entre gravar e conferir o pagamento (concluir_venda_pdv). Só fica assim se a
+  // tela fechou no meio do fechamento: confira o pagamento antes de qualquer coisa.
+  em_fechamento: { label: 'Em fechamento', tone: 'bad' },
   encomenda: { label: 'Encomenda', tone: 'warn' },
   pendente_entrega: { label: 'Pendente entrega', tone: 'warn' },
   pendente: { label: 'Pendente', tone: 'warn' },
@@ -87,10 +98,11 @@ function exportCSV(rows: Venda[], fuso: string) {
   a.click()
 }
 
-export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empresaId, documentos = [] }: Props) {
+export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empresaId, documentos = [], taxas = [], celulares = false }: Props) {
   const fuso = useFuso()
   const [filtro, setFiltro] = useState('all')
-  const [finalizando, setFinalizando] = useState<number | null>(null)
+  /** A encomenda cuja entrega está aberta (o mesmo recebimento da aba Encomenda do PDV). */
+  const [entregando, setEntregando] = useState<{ encomenda: EncomendaParaFechar; vendedor: string | null } | null>(null)
   const [transf, setTransf] = useState<Venda | null>(null)
   const [novoVend, setNovoVend] = useState('')
   const [transfBusy, setTransfBusy] = useState(false)
@@ -165,18 +177,38 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
   }
 
   /**
-   * A regra de "entregar" mora em `lib/encomendas` — a aba Encomenda do PDV faz
-   * a mesma coisa, e duas cópias seriam duas verdades. O detalhe que justifica a
-   * extração (a série do aparelho, que só existe na unidade) está documentado lá.
+   * ENTREGAR NÃO CONCLUI DIRETO (19/11/2026).
+   *
+   * Até aqui este botão chamava `finalizarEncomenda` SEM pagamento: a venda virava
+   * concluída e o saldo nunca era registrado — 52 encomendas da JM ficaram sem um
+   * centavo em `vendas_pagamentos`. Agora abre o MESMO recebimento da aba
+   * Encomenda (`EncomendaFechar`), que mostra total, já pago e saldo e conclui
+   * pela RPC `concluir_encomenda` (recusa se faltar dinheiro).
+   *
+   * O fechamento é o grupo inteiro: os itens em aberto do mesmo `grupo_pdv` entram
+   * juntos, como na aba Encomenda.
    */
-  async function entregarEncomenda(id: number) {
-    setFinalizando(id)
-    const r = await finalizarEncomenda(createClient(), id)
-    setFinalizando(null)
-    if (!r.ok) { notify.bad('Erro ao finalizar', r.erro); return }
-    notify.ok('Venda concluída',
-      r.baixouEstoque ? 'Unidade baixada do estoque · emita os documentos no ícone 📄' : 'Contabilizada no faturamento')
-    router.refresh()
+  function abrirEntrega(v: Venda) {
+    const doGrupo = v.grupo_pdv
+      ? vendas.filter((x) => x.grupo_pdv === v.grupo_pdv && (x.status === 'encomenda' || x.status === 'pendente_entrega'))
+      : [v]
+    const itens = (doGrupo.length ? doGrupo : [v])
+      .slice().sort((a, b) => a.id - b.id)
+      .map((x) => ({ id: x.id, produto_nome: x.produto_nome ?? x.observacoes ?? 'Produto', valor_venda: x.valor_venda }))
+    setEntregando({
+      vendedor: v.vendedor_nome,
+      encomenda: {
+        id: itens[0].id,
+        cliente_nome: v.cliente_nome ?? 'Sem cliente',
+        clienteId: v.cliente_id,
+        produto_nome: itens.map((i) => i.produto_nome).join(' + '),
+        valor_venda: itens.reduce((s, i) => s + i.valor_venda, 0),
+        // Só para o primeiro desenho: a tela troca pelo número do banco (encomenda_saldo).
+        sinal_pago: (v.pagamentos ?? []).reduce((s, p) => s + (Number(p.valor_pago) || 0), 0),
+        grupo_pdv: v.grupo_pdv ?? null,
+        itens,
+      },
+    })
   }
 
   const stats = useMemo(() => {
@@ -247,7 +279,7 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
         if (v.status === 'encomenda' || v.status === 'pendente_entrega') return (
           <div className="flex items-center justify-end gap-2">
             <Badge tone={s.tone}>{s.label}</Badge>
-            <Button size="sm" variant="outline" loading={finalizando === v.id} icon={<Check size={13} strokeWidth={2} />} onClick={(e) => { e.stopPropagation(); entregarEncomenda(v.id) }}>{v.status === 'pendente_entrega' ? 'Entregar' : 'Finalizar'}</Button>
+            <Button size="sm" variant="outline" icon={<Check size={13} strokeWidth={2} />} onClick={(e) => { e.stopPropagation(); abrirEntrega(v) }}>{v.status === 'pendente_entrega' ? 'Entregar' : 'Finalizar'}</Button>
           </div>
         )
         return <div className="flex items-center justify-end gap-2">{contrato}<Badge tone={s.tone}>{s.label}</Badge></div>
@@ -329,6 +361,28 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
           )}
         </div>
       </Modal>
+
+    {/* Entrega: o mesmo recebimento da aba Encomenda do PDV, com origem "historico". */}
+    <Modal open={!!entregando} onClose={() => setEntregando(null)} size="md"
+      title={`Entregar — ${entregando?.encomenda.cliente_nome ?? ''}`}>
+      {entregando && (
+        <div>
+          <p className="text-[12.5px] text-ink-2">{entregando.encomenda.produto_nome}</p>
+          <EncomendaFechar
+            key={`hist-${entregando.encomenda.id}`}
+            encomenda={entregando.encomenda}
+            taxas={taxas}
+            documentos={documentos}
+            celulares={celulares}
+            empresaId={empresaId}
+            vendedor={entregando.vendedor}
+            origem="historico"
+            onCancelar={() => setEntregando(null)}
+            onPronto={() => { setEntregando(null); router.refresh() }}
+          />
+        </div>
+      )}
+    </Modal>
 
     {transf && (
       <Modal open onClose={() => setTransf(null)} title="Transferir venda" footer={<>

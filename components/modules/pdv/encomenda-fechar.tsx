@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Check, FileText, Plus, Trash2 } from 'lucide-react'
 import { Button, Input, notify } from '@/components/ui'
@@ -8,7 +8,7 @@ import { formatCurrency } from '@/lib/utils'
 import { imprimirContratoHTML } from '@/lib/contrato-tipos'
 import { emitirContrato, type DocumentoDisponivel, type EmitirContratoInput } from '@/lib/contrato-emitir'
 import { parcelasDisponiveis, valorComJuros, type Taxa } from '@/lib/pdv-pagamentos'
-import { finalizarEncomenda } from '@/lib/encomendas'
+import { concluirEncomenda, saldoDaEncomenda, type SaldoEncomenda } from '@/lib/encomendas'
 import { ENCOMENDA_CELULAR } from '@/components/modules/celulares/rotulos'
 
 /**
@@ -31,6 +31,13 @@ import { ENCOMENDA_CELULAR } from '@/components/modules/celulares/rotulos'
  * Não é uma cópia do PDV. As regras que valem dinheiro continuam nas libs
  * compartilhadas — `pdv-pagamentos` calcula juros, `contrato-emitir` monta o
  * documento, `encomendas` conclui a venda. Aqui só se juntam as peças.
+ *
+ * ══ UM SÓ "ENTREGAR" (19/11/2026) ══════════════════════════════════════════
+ *
+ * É esta tela que abre tanto na aba Encomenda do PDV quanto no Histórico
+ * (`origem`). O total e o já pago vêm do banco (`encomenda_saldo`), e a
+ * conclusão é a RPC `concluir_encomenda`, que recusa com "Saldo em aberto" se o
+ * dinheiro não fechar — antes, o Histórico concluía sem receber nada.
  */
 
 const FORMAS = [
@@ -57,7 +64,7 @@ export interface EncomendaParaFechar {
   grupo_pdv: string | null
 }
 
-export function EncomendaFechar({ encomenda, taxas, documentos, empresaId, vendedor, onPronto, onCancelar, celulares = false }: {
+export function EncomendaFechar({ encomenda, taxas, documentos, empresaId, vendedor, onPronto, onCancelar, celulares = false, origem = 'encomenda' }: {
   encomenda: EncomendaParaFechar
   taxas: Taxa[]
   documentos: DocumentoDisponivel[]
@@ -67,6 +74,8 @@ export function EncomendaFechar({ encomenda, taxas, documentos, empresaId, vende
   onCancelar: () => void
   /** Módulo Celulares ligado: sugestões de acessório de celular no campo. */
   celulares?: boolean
+  /** Tela de onde a entrega saiu — gravada em `vendas_vendas.concluida_via`. */
+  origem?: 'encomenda' | 'historico'
 }) {
   const supabase = createClient()
   const [forma, setForma] = useState('pix')
@@ -77,70 +86,56 @@ export function EncomendaFechar({ encomenda, taxas, documentos, empresaId, vende
   const [contexto, setContexto] = useState<Omit<EmitirContratoInput, 'documentoId' | 'nomeDocumento'> | null>(null)
   const [emitindo, setEmitindo] = useState<number | null>(null)
   const [emitidos, setEmitidos] = useState<number[]>([])
+  /**
+   * Total e já pago DO FECHAMENTO, lidos no banco. A soma da tela (itens em
+   * aberto + sinal) não enxerga o pagamento gravado noutra linha do grupo nem o
+   * acessório do balcão já concluído — e é o número do banco que a conclusão
+   * confere. `undefined` = carregando; `null` = não deu para conferir.
+   */
+  const [base, setBase] = useState<SaldoEncomenda | null | undefined>(undefined)
+  const vendaBase = encomenda.itens[0]?.id ?? encomenda.id
+  useEffect(() => {
+    let vivo = true
+    saldoDaEncomenda(supabase, vendaBase).then((s) => { if (vivo) setBase(s) })
+    return () => { vivo = false }
+    // `supabase` é recriado a cada render; a venda é o que importa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendaBase])
 
   const acessoriosValidos = acessorios.filter((a) => a.descricao.trim() && (Number(a.valor) || 0) > 0)
   const totalAcessorios = acessoriosValidos.reduce((s, a) => s + (Number(a.valor) || 0), 0)
-  const total = encomenda.valor_venda + totalAcessorios
-  const saldo = Math.max(0, total - encomenda.sinal_pago)
+  const totalBase = base ? base.total : encomenda.valor_venda
+  const jaPago = base ? base.pago : encomenda.sinal_pago
+  const total = totalBase + totalAcessorios
+  const saldo = Math.max(0, Math.round((total - jaPago) * 100) / 100)
 
   const linha = { id: 'ent', forma, valor: saldo, parcelas, bandeira: 'visa_master' as const }
   const opcoes = parcelasDisponiveis(linha, taxas)
   const comJuros = valorComJuros(linha, taxas)
   const parcela = PARCELA.has(forma)
+  /** Só envia com o saldo coberto: o valor recebido é o saldo inteiro, numa forma válida. */
+  const podeEnviar = !!base && (saldo <= 0.005 || FORMAS.some((f) => f.key === forma))
 
   /**
-   * Fecha a encomenda: acessórios viram venda, cada item conclui a sua, e o
-   * dinheiro entra UMA vez.
-   *
-   * O acessório é uma venda própria no mesmo grupo — é como o PDV faz, e é o que
-   * mantém o relatório por produto correto: a capinha não vira "parte do iPhone".
+   * Fecha a encomenda numa chamada só (`concluir_encomenda`): acessórios, o
+   * saldo recebido, a conferência do total, a série e a baixa do estoque. Se o
+   * banco recusar ("Saldo em aberto"), nada foi gravado.
    */
   async function fechar() {
+    if (!podeEnviar) return
     setSalvando(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const vendaIds = encomenda.itens.map((i) => i.id)
-
-    // Acessórios primeiro: se falharem, nada foi concluído ainda.
-    for (const a of acessoriosValidos) {
-      const { data: vAc, error } = await supabase.from('vendas_vendas').insert({
-        empresa_id: empresaId,
-        grupo_pdv: encomenda.grupo_pdv,
-        cliente_id: encomenda.clienteId,
-        vendedor_id: user?.id ?? null,
-        usuario_id: user?.id ?? null,
-        valor_venda: Number(a.valor) || 0,
-        valor_custo: 0,
-        canal_venda: 'encomenda',
-        status: 'concluida',
-        data_venda: new Date().toISOString(),
-        observacoes: `Acessório: ${a.descricao.trim()}`,
-      } as never).select('id').single()
-      if (error) {
-        setSalvando(false)
-        notify.bad('Erro ao lançar o acessório', error.message)
-        return
-      }
-      if (vAc) vendaIds.push((vAc as { id: number }).id)
-    }
-
-    // Cada item conclui a sua venda; o recebimento vai só na primeira.
-    let falhou: string | null = null
-    let pagou = false
-    for (const [n, item] of encomenda.itens.entries()) {
-      const r = await finalizarEncomenda(supabase, item.id,
-        n === 0 && saldo > 0.005 ? { forma, valor: saldo, parcelas: parcela ? parcelas : null, empresaId } : null)
-      if (!r.ok) { falhou = r.erro ?? 'erro ao concluir'; break }
-      if (n === 0) pagou = r.registrouPagamento
-    }
+    const r = await concluirEncomenda(supabase, vendaBase, {
+      origem,
+      acessorios: acessoriosValidos.map((a) => ({ descricao: a.descricao.trim(), valor: Number(a.valor) || 0 })),
+      pagamentos: saldo > 0.005
+        ? [{ forma, valor: saldo, parcelas: parcela ? parcelas : null, bandeira: forma === 'credito' ? 'visa_master' : null, valor_com_juros: comJuros > saldo + 0.005 ? comJuros : null }]
+        : [],
+    })
     setSalvando(false)
-    if (falhou) { notify.bad('Erro ao finalizar', falhou); return }
+    if (!r.ok) { notify.bad('Entrega não concluída', r.erro); return }
+    const vendaIds = r.vendaIds
 
-    if (saldo > 0.005 && !pagou) {
-      notify.warn('Entrega concluída, mas o recebimento não foi gravado',
-        `Lance ${formatCurrency(saldo)} manualmente no financeiro.`)
-    } else {
-      notify.ok('Venda concluída', saldo > 0.005 ? `${formatCurrency(saldo)} recebido em ${forma}.` : 'Contabilizada no faturamento.')
-    }
+    notify.ok('Venda concluída', saldo > 0.005 ? `${formatCurrency(saldo)} recebido em ${forma}.` : 'Contabilizada no faturamento.')
 
     /**
      * A venda está fechada — agora os documentos.
@@ -231,12 +226,15 @@ export function EncomendaFechar({ encomenda, taxas, documentos, empresaId, vende
     <div className="mt-3 border-t border-line-soft pt-3">
       <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <span className="text-[12.5px] font-semibold text-ink">
-          {saldo > 0.005 ? 'Receber na entrega' : 'Nada a receber — já está pago'}
+          {base === undefined ? 'Conferindo o saldo…'
+            : base === null ? 'Não foi possível conferir o saldo — tente de novo'
+              : saldo > 0.005 ? 'Receber na entrega' : 'Nada a receber — já está pago'}
         </span>
         <span className="text-[11.5px] text-ink-3">
-          <span className="num">{formatCurrency(encomenda.valor_venda)}</span> da encomenda
-          {totalAcessorios > 0 && <> · <span className="num">{formatCurrency(totalAcessorios)}</span> em acessórios</>}
-          {encomenda.sinal_pago > 0.005 && <> · <span className="num text-ok">{formatCurrency(encomenda.sinal_pago)}</span> de entrada</>}
+          Total <span className="num">{formatCurrency(total)}</span>
+          {totalAcessorios > 0 && <> (com <span className="num">{formatCurrency(totalAcessorios)}</span> em acessórios)</>}
+          {' · '}já pago <span className="num text-ok">{formatCurrency(jaPago)}</span>
+          {' · '}saldo <span className="num font-semibold text-ink">{formatCurrency(saldo)}</span>
         </span>
       </div>
 
@@ -304,7 +302,7 @@ export function EncomendaFechar({ encomenda, taxas, documentos, empresaId, vende
 
       <div className="mt-3 flex justify-end gap-2">
         <Button size="sm" variant="ghost" onClick={onCancelar}>Cancelar</Button>
-        <Button size="sm" loading={salvando} icon={<Check size={13} strokeWidth={2} />} onClick={fechar}>
+        <Button size="sm" loading={salvando} disabled={!podeEnviar} icon={<Check size={13} strokeWidth={2} />} onClick={fechar}>
           {saldo > 0.005 ? 'Receber e entregar' : 'Confirmar entrega'}
         </Button>
       </div>

@@ -3139,14 +3139,14 @@ isOneToOne: false
                   ]
                 },"vendas_vendas": {
                   Row: {
-                    "canal_venda": string | null,"cliente_id": number | null,"comanda": string | null,"comissao": number | null,"created_at": string | null,"data_venda": string | null,"desconto_aprovado_por": string | null,"desconto_motivo": string | null,"desconto_valor": number | null,"empresa_id": number,"filial_id": number | null,"forma_pagamento": string | null,"grupo_pdv": string | null,"id": number,"lucro": number | null,"numero_serie": string | null,"observacoes": string | null,"parcelas": number | null,"pedido_compra_id": number | null,"previsao_entrega": string | null,"produto_id": number | null,"quantidade": number,"status": string | null,"unidade_id": number | null,"usuario_id": string | null,"valor_custo": number | null,"valor_venda": number,"vendedor_id": string | null
+                    "canal_venda": string | null,"cliente_id": number | null,"comanda": string | null,"comissao": number | null,"concluida_em": string | null,"concluida_por": string | null,"concluida_via": string | null,"created_at": string | null,"data_venda": string | null,"desconto_aprovado_por": string | null,"desconto_motivo": string | null,"desconto_valor": number | null,"empresa_id": number,"filial_id": number | null,"forma_pagamento": string | null,"grupo_pdv": string | null,"id": number,"lucro": number | null,"numero_serie": string | null,"observacoes": string | null,"parcelas": number | null,"pedido_compra_id": number | null,"previsao_entrega": string | null,"produto_id": number | null,"quantidade": number,"status": string | null,"unidade_id": number | null,"usuario_id": string | null,"valor_custo": number | null,"valor_venda": number,"vendedor_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "canal_venda"?: string | null,"cliente_id"?: number | null,"comanda"?: string | null,"comissao"?: number | null,"created_at"?: string | null,"data_venda"?: string | null,"desconto_aprovado_por"?: string | null,"desconto_motivo"?: string | null,"desconto_valor"?: number | null,"empresa_id": number,"filial_id"?: number | null,"forma_pagamento"?: string | null,"grupo_pdv"?: string | null,"id"?: never,"lucro"?: never,"numero_serie"?: string | null,"observacoes"?: string | null,"parcelas"?: number | null,"pedido_compra_id"?: number | null,"previsao_entrega"?: string | null,"produto_id"?: number | null,"quantidade"?: number,"status"?: string | null,"unidade_id"?: number | null,"usuario_id"?: string | null,"valor_custo"?: number | null,"valor_venda": number,"vendedor_id"?: string | null
+                    "canal_venda"?: string | null,"cliente_id"?: number | null,"comanda"?: string | null,"comissao"?: number | null,"concluida_em"?: string | null,"concluida_por"?: string | null,"concluida_via"?: string | null,"created_at"?: string | null,"data_venda"?: string | null,"desconto_aprovado_por"?: string | null,"desconto_motivo"?: string | null,"desconto_valor"?: number | null,"empresa_id": number,"filial_id"?: number | null,"forma_pagamento"?: string | null,"grupo_pdv"?: string | null,"id"?: never,"lucro"?: never,"numero_serie"?: string | null,"observacoes"?: string | null,"parcelas"?: number | null,"pedido_compra_id"?: number | null,"previsao_entrega"?: string | null,"produto_id"?: number | null,"quantidade"?: number,"status"?: string | null,"unidade_id"?: number | null,"usuario_id"?: string | null,"valor_custo"?: number | null,"valor_venda": number,"vendedor_id"?: string | null
                   }
                   Update: {
-                    "canal_venda"?: string | null,"cliente_id"?: number | null,"comanda"?: string | null,"comissao"?: number | null,"created_at"?: string | null,"data_venda"?: string | null,"desconto_aprovado_por"?: string | null,"desconto_motivo"?: string | null,"desconto_valor"?: number | null,"empresa_id"?: number,"filial_id"?: number | null,"forma_pagamento"?: string | null,"grupo_pdv"?: string | null,"id"?: never,"lucro"?: never,"numero_serie"?: string | null,"observacoes"?: string | null,"parcelas"?: number | null,"pedido_compra_id"?: number | null,"previsao_entrega"?: string | null,"produto_id"?: number | null,"quantidade"?: number,"status"?: string | null,"unidade_id"?: number | null,"usuario_id"?: string | null,"valor_custo"?: number | null,"valor_venda"?: number,"vendedor_id"?: string | null
+                    "canal_venda"?: string | null,"cliente_id"?: number | null,"comanda"?: string | null,"comissao"?: number | null,"concluida_em"?: string | null,"concluida_por"?: string | null,"concluida_via"?: string | null,"created_at"?: string | null,"data_venda"?: string | null,"desconto_aprovado_por"?: string | null,"desconto_motivo"?: string | null,"desconto_valor"?: number | null,"empresa_id"?: number,"filial_id"?: number | null,"forma_pagamento"?: string | null,"grupo_pdv"?: string | null,"id"?: never,"lucro"?: never,"numero_serie"?: string | null,"observacoes"?: string | null,"parcelas"?: number | null,"pedido_compra_id"?: number | null,"previsao_entrega"?: string | null,"produto_id"?: number | null,"quantidade"?: number,"status"?: string | null,"unidade_id"?: number | null,"usuario_id"?: string | null,"valor_custo"?: number | null,"valor_venda"?: number,"vendedor_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -3401,6 +3401,15 @@ isOneToOne: true
               "a_parte": boolean,"contato_id": number,"desde": string,"filial_id": number,"negocio_id": number
             }[]
                            },
+"concluir_encomenda":
+{ Args: { "p_acessorios"?: Json,"p_origem"?: string,"p_pagamentos"?: Json,"p_venda_id": number }; Returns: Json
+                           },
+"concluir_venda_pdv":
+{ Args: { "p_entrega_pendente"?: boolean,"p_grupo": string }; Returns: Json
+                           },
+"encomenda_saldo":
+{ Args: { "p_venda_id": number }; Returns: Json
+                           },
 "etiquetas_aplicar":
 { Args: { "p_aplicar": boolean,"p_etiqueta": number,"p_negocios": (number)[] }; Returns: Json
                            },
@@ -3539,6 +3548,9 @@ isOneToOne: true
         isOneToOne: false
         isSetofReturn: true
       } },
+"vendas_moeda":
+{ Args: { "p": number }; Returns: string
+                           },
 "webhook_mid_novo":
 { Args: { "p_conta": string,"p_mid": string }; Returns: boolean
                            },

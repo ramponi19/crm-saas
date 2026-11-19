@@ -83,6 +83,18 @@ export function resumirPagamentos(linhas: LinhaPagamento[], total: number, taxas
 }
 
 /**
+ * Quanto ainda falta cobrir para a venda poder fechar (0 = pode). Mesma
+ * tolerância de 1 centavo do `fechado`; "passou" (troco) não trava.
+ *
+ * 19/11/2026: o PDV deixava finalizar com "Falta R$ X" — a venda entrava inteira
+ * no faturamento com parte do dinheiro sem registro. O banco também confere
+ * (`concluir_venda_pdv` / `concluir_encomenda` recusam com "Saldo em aberto").
+ */
+export function faltaParaFechar(r: Pick<ResumoPagamento, 'falta'>): number {
+  return r.falta >= 0.01 ? Math.round(r.falta * 100) / 100 : 0
+}
+
+/**
  * Como registrar a venda quando há mais de uma forma. `vendas.forma_pagamento` é
  * uma coluna só; com várias, guarda 'multiplo' — o detalhe fica em
  * `vendas_pagamentos`, que é onde ele sempre esteve.

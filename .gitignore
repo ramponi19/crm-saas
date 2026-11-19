@@ -70,3 +70,6 @@ deno.lock
 # saídas das ferramentas (gate, fotos de saúde da produção)
 /.gate/
 /tools/saude/fotos/
+
+# lista de reconciliação com nome e telefone de clientes (19/11/2026): nunca no git
+/docs/reconciliacao-encomendas.csv

@@ -120,6 +120,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         usuario_id: vendedorId,
         cliente_id: orc.cliente_id ?? null,
         canal_venda: 'downgrade',
+        /**
+         * PENDENTE DE ENTREGA, não concluída (19/11/2026). O `status` não era
+         * enviado e caía no default 'concluida': a venda entrava no faturamento com
+         * só o aparelho registrado como pago — o dinheiro do cliente não existia em
+         * lugar nenhum. Agora ela aparece na aba Encomenda do PDV e no Histórico, e
+         * só conclui no "Entregar", recebendo o saldo (concluir_encomenda).
+         */
+        status: 'pendente_entrega',
         observacoes: `Downgrade — orçamento #${orc.id}. Novo: ${orc.aparelho_novo ?? ''}. Entrada: ${orc.aparelho_usado ?? ''} (R$ ${vale}). Cliente pagou: R$ ${orc.total}.${Number(orc.valor_devolver) > 0 ? ` Saldo a favor do cliente: R$ ${orc.valor_devolver} (${orc.acerto}).` : ''}`,
       } as never).select('id').single<{ id: number }>()
 
@@ -170,8 +178,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       // Claim atômico: só sai do estoque o que ainda ESTÁ no estoque. Se o balcão
       // vendeu a mesma peça antes do cliente clicar no link, a segunda venda não
       // pode ser registrada — seriam dois faturamentos para um aparelho só.
+      // 'reservado', não 'vendido' (19/11/2026): a venda nasce pendente de entrega e a
+      // peça só sai do estoque quando o balcão entrega e recebe (concluir_encomenda).
+      // Reservada, ninguém mais a vende no PDV.
       const { data: baixada } = await svc.from('estoque_unidades')
-        .update({ status: 'vendido' } as never)
+        .update({ status: 'reservado' } as never)
         .eq('id', orc.unidade_id).eq('empresa_id', orc.empresa_id)
         .in('status', ['disponivel', 'reservado'])
         .select('id').maybeSingle()
@@ -208,6 +219,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
           vendedor_id: vendedorId,
           usuario_id: vendedorId,
           canal_venda: 'orcamento',
+          // Pendente de entrega: conclui no "Entregar", recebendo o valor (ver o downgrade acima).
+          status: 'pendente_entrega',
           observacoes: `Venda por orçamento #${orc.id} — ${orc.cliente_nome}.`,
         } as never)
       }

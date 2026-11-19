@@ -1,5 +1,4 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { agora, diaNoFuso, diasEntre, FUSO_PADRAO, paraData } from '@/lib/datas'
 
 /**
@@ -15,8 +14,9 @@ import { agora, diaNoFuso, diasEntre, FUSO_PADRAO, paraData } from '@/lib/datas'
  *      pedido vira `recebido` e nasce a unidade no estoque, já `reservado`
  *      para esta venda — ninguém vende no balcão o aparelho de quem encomendou.
  *
- *   3. ENTREGAR (`finalizarEncomenda` aqui embaixo)
- *      a venda vira `concluida`, a unidade baixa, e aí sim conta no faturamento.
+ *   3. ENTREGAR (`concluirEncomenda` aqui embaixo → RPC `concluir_encomenda`)
+ *      recebe o saldo; só com o fechamento pago a venda vira `concluida`, a
+ *      unidade baixa, e aí sim conta no faturamento.
  *
  * ══ POR QUE ESTE MÓDULO EXISTE ═════════════════════════════════════════════
  *
@@ -139,104 +139,75 @@ export function ordenarPorUrgencia<T extends EncomendaAberta>(lista: T[], hoje: 
   })
 }
 
-export interface ResultadoFinalizar {
-  ok: boolean
-  erro?: string
-  /** Houve baixa de unidade do estoque. */
-  baixouEstoque: boolean
-  /** A série foi copiada da unidade para a venda nesta finalização. */
-  copiouSerie: boolean
-  /** O recebimento do saldo foi gravado em `vendas_pagamentos`. */
-  registrouPagamento: boolean
-}
-
-/** O dinheiro que entra NA ENTREGA — o saldo que faltava. */
+/** O dinheiro que o cliente paga NA ENTREGA (o saldo). Vai para `vendas_pagamentos`. */
 export interface PagamentoNaEntrega {
   forma: string
   valor: number
   parcelas?: number | null
-  empresaId: number
+  bandeira?: string | null
+  /** Com juros repassados ao cliente, quando houver (crédito/link parcelado). */
+  valor_com_juros?: number | null
+}
+
+/** Acessório levado junto na entrega: vira uma venda própria no mesmo fechamento. */
+export interface AcessorioNaEntrega { descricao: string; valor: number }
+
+export interface ResultadoConcluir {
+  ok: boolean
+  erro?: string
+  /** Todas as vendas do fechamento (itens + acessórios novos): é o que amarra o documento. */
+  vendaIds: number[]
+  /** Quantas peças saíram do estoque. */
+  baixou: number
+}
+
+/** Total, já pago e saldo do fechamento — calculados no banco (`encomenda_saldo`). */
+export interface SaldoEncomenda { total: number; pago: number; saldo: number }
+
+/**
+ * Quanto falta receber, pelo banco. A tela mostra ESTE número porque é ele que a
+ * conclusão confere: somar na tela só os itens visíveis já errou (pagamento na
+ * primeira linha do grupo, acessório do balcão já concluído).
+ */
+export async function saldoDaEncomenda(supabase: SupabaseClient, vendaId: number): Promise<SaldoEncomenda | null> {
+  const { data, error } = await supabase.rpc('encomenda_saldo', { p_venda_id: vendaId } as never)
+  if (error || !data) return null
+  const d = data as { total?: number; pago?: number; saldo?: number }
+  return { total: Number(d.total) || 0, pago: Number(d.pago) || 0, saldo: Number(d.saldo) || 0 }
 }
 
 /**
- * ENTREGAR: a venda pendente vira concluída e a unidade baixa do estoque.
+ * ENTREGAR: o ÚNICO caminho que conclui uma encomenda ou uma entrega pendente.
  *
- * Extraído de `historico-view.tsx` sem mudar a regra — inclusive a do IMEI, que
- * é o motivo de isto não poder ser reescrito em outro lugar:
+ * Tudo acontece no banco, numa transação (`concluir_encomenda`, migração
+ * 20261119000100): acessórios, o pagamento do saldo, a conferência "pagamentos do
+ * fechamento = valor do fechamento", a cópia da série da unidade para a venda e a
+ * baixa do estoque. Se faltar dinheiro, o banco recusa com "Saldo em aberto: R$ X"
+ * e nada fica gravado.
  *
- * ⚠️ A SÉRIE DO APARELHO SÓ EXISTE AQUI. Venda de encomenda nasce sem série —
- * no ato do pedido o aparelho ainda não existe. Quem digita o IMEI é o estoque,
- * na unidade, quando a caixa chega. Se ninguém copiar para a venda, a loja fica
- * com uma venda concluída sem identificar o que saiu: consulta de garantia por
- * IMEI não acha, e o termo de garantia sai sem número de série.
+ * ⚠️ POR QUE SAIU DO NAVEGADOR (19/11/2026). Aqui morava `finalizarEncomenda`,
+ * que mudava o status pelo cliente e só gravava o pagamento se alguém o passasse.
+ * O "Entregar" do Histórico não passava: em 19/11 eram 52 encomendas concluídas
+ * sem um centavo em `vendas_pagamentos` e 27 com o valor errado (R$ 651.827
+ * vendidos x R$ 156.947 registrados). O banco agora recusa concluir pelo
+ * navegador (gatilho `vendas_conclusao_guarda`).
  *
- * Só preenche o que está VAZIO: série já registrada no PDV não é sobrescrita.
+ * A regra da série continua valendo, só que lá: venda de encomenda nasce sem
+ * série; quem digita o IMEI é o estoque, na unidade, quando a caixa chega. Só
+ * preenche o que está vazio.
  */
-export async function finalizarEncomenda(
+export async function concluirEncomenda(
   supabase: SupabaseClient,
   vendaId: number,
-  pagamento?: PagamentoNaEntrega | null,
-): Promise<ResultadoFinalizar> {
-  const { data: v } = await supabase.from('vendas_vendas')
-    .select('unidade_id, numero_serie, inventario_unidades:estoque_unidades!vendas_unidade_id_fkey(imei, numero_serie)')
-    .eq('id', vendaId).maybeSingle()
-
-  const uni = Array.isArray(v?.inventario_unidades) ? v?.inventario_unidades[0] : v?.inventario_unidades
-  const serieDaUnidade = uni?.imei || uni?.numero_serie || null
-  const copiouSerie = !v?.numero_serie && !!serieDaUnidade
-
-  const patch: {
-    status: string; data_venda: string; numero_serie?: string
-    forma_pagamento?: string; parcelas?: number
-  } = {
-    status: 'concluida',
-    // A data da venda passa a ser a da ENTREGA: é quando o dinheiro entra e é
-    // por ela que o faturamento do mês conta.
-    data_venda: new Date().toISOString(),
-  }
-  if (copiouSerie) patch.numero_serie = serieDaUnidade as string
-
-  /**
-   * ⚠️ O DINHEIRO DA ENTREGA PRECISA SER GRAVADO AQUI.
-   *
-   * Até 15/09/2026 não era: as 11 encomendas já entregues da JM, R$ 84.540 de
-   * faturamento, estavam TODAS com `vendas_pagamentos` vazio e `forma_pagamento`
-   * nulo. A venda virava concluída e contava no faturamento, mas nenhum
-   * relatório por forma de pagamento — fechamento de caixa, conciliação de taxa
-   * de cartão — enxergava um centavo dela.
-   *
-   * O saldo é recebido justamente neste momento: a entrada (se houve) entrou no
-   * lançamento, o resto entra agora. Por isso a forma vai junto na venda também,
-   * como em qualquer venda do PDV.
-   */
-  if (pagamento && pagamento.valor > 0.005) {
-    patch.forma_pagamento = pagamento.forma
-    if (pagamento.parcelas && pagamento.parcelas > 1) patch.parcelas = pagamento.parcelas
-  }
-
-  const { data: concluiu, error } = await supabase.from('vendas_vendas').update(patch as never).eq('id', vendaId).select('id')
-  if (error) return { ok: false, erro: error.message, baixouEstoque: false, copiouSerie: false, registrouPagamento: false }
-  // 0 linhas: a venda sumiu ou é de outra loja — não diz "entregue" nem registra pagamento.
-  if (nadaGravado(concluiu)) return { ok: false, erro: NADA_GRAVADO, baixouEstoque: false, copiouSerie: false, registrouPagamento: false }
-
-  let registrouPagamento = false
-  if (pagamento && pagamento.valor > 0.005) {
-    const { error: ePag } = await supabase.from('vendas_pagamentos').insert({
-      empresa_id: pagamento.empresaId,
-      venda_id: vendaId,
-      forma_pagamento: pagamento.forma,
-      valor_pago: pagamento.valor,
-      parcelas: pagamento.parcelas && pagamento.parcelas > 1 ? pagamento.parcelas : null,
-    } as never)
-    // A venda JÁ está concluída: falhar aqui não desfaz a entrega, que é fato
-    // consumado no balcão. Quem chamou avisa para lançar o pagamento à mão.
-    registrouPagamento = !ePag
-  }
-
-  let baixouEstoque = false
-  if (v?.unidade_id) {
-    const { data: baixou } = await supabase.from('estoque_unidades').update({ status: 'vendido' } as never).eq('id', v.unidade_id).select('id')
-    baixouEstoque = !nadaGravado(baixou)
-  }
-  return { ok: true, baixouEstoque, copiouSerie, registrouPagamento }
+  opcoes: { pagamentos?: PagamentoNaEntrega[]; acessorios?: AcessorioNaEntrega[]; origem: 'encomenda' | 'historico' },
+): Promise<ResultadoConcluir> {
+  const { data, error } = await supabase.rpc('concluir_encomenda', {
+    p_venda_id: vendaId,
+    p_pagamentos: (opcoes.pagamentos ?? []).filter((p) => p.valor > 0.005),
+    p_acessorios: opcoes.acessorios ?? [],
+    p_origem: opcoes.origem,
+  } as never)
+  if (error) return { ok: false, erro: error.message, vendaIds: [], baixou: 0 }
+  const d = (data ?? {}) as { venda_ids?: number[]; baixou?: number }
+  return { ok: true, vendaIds: d.venda_ids ?? [vendaId], baixou: Number(d.baixou) || 0 }
 }

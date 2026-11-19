@@ -24,7 +24,7 @@ import { PDV_CELULAR } from '@/components/modules/celulares/rotulos'
 import { CAMPO_COMANDA } from '@/components/modules/cardapio/rotulos'
 import { abaixoDoCatalogo, descricaoConfirmeValor, type MedianaVendas, type Referencia } from '@/lib/valor-abaixo-do-catalogo'
 import {
-  resumirPagamentos, valorComJuros, formaResumida, parcelasResumidas, parcelasDisponiveis,
+  resumirPagamentos, valorComJuros, formaResumida, parcelasResumidas, parcelasDisponiveis, faltaParaFechar,
   FORMAS_PARCELAVEIS, type LinhaPagamento,
 } from '@/lib/pdv-pagamentos'
 import { useFuso } from '@/components/fuso-provider'
@@ -303,6 +303,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
     () => resumirPagamentos(pagamentos, totais.total, taxas),
     [pagamentos, totais.total, taxas],
   )
+  /** Dinheiro ainda não coberto pelas formas de pagamento: com isso > 0, a venda não fecha. */
+  const falta = faltaParaFechar(resumoPag)
 
   /**
    * Uma linha só acompanha o total automaticamente — é o caso comum e evita
@@ -357,6 +359,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
     const subtotalBruto = carrinho.reduce((s, c) => s + (c.item.preco_venda ?? 0) * c.qtd, 0) + acessoriosTotal
     if (descontoNum < 0) { notify.warn('Desconto não pode ser negativo'); return }
     if (abatimento > subtotalBruto) { notify.warn('Desconto + troca maior que o valor total'); return }
+    // Pagamento que não cobre o total não fecha (o banco também recusa, em concluir_venda_pdv).
+    if (falta > 0) { notify.warn(`Falta ${fmt(falta)}`, 'Ajuste as formas de pagamento até cobrir o total.'); return }
     if (!jaConfirmado && semPreco.length > 0) { setConfirmarSemPreco(true); return }
     // Troca acima da referência: o vendedor precisa aceitar, e o aceite é gravado
     // logo abaixo. Sem passar por aqui a venda não fecha.
@@ -385,8 +389,19 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       // amarra: é por ele que um aparelho de troca ainda não recebido segura a
       // comissão do fechamento inteiro, e não só da primeira linha.
       const grupoPdv = crypto.randomUUID()
-      const vendaStatus = entregaPendente ? 'pendente_entrega' : 'concluida'
+      /**
+       * A venda nasce EM FECHAMENTO, não concluída (19/11/2026).
+       *
+       * Só vira 'concluida' (ou 'pendente_entrega') em `concluir_venda_pdv`, no
+       * banco, depois de conferir que os pagamentos cobrem o valor. O banco recusa
+       * gravar 'concluida' direto pelo navegador (gatilho vendas_conclusao_guarda).
+       * Se a tela fechar no meio, sobra uma venda "Em fechamento" no Histórico —
+       * e não uma venda concluída sem dinheiro, que era o que acontecia.
+       */
+      const vendaStatus = 'em_fechamento'
       const unitStatus = entregaPendente ? 'reservado' : 'vendido'
+      /** Acessórios que viram venda: entram no rateio do desconto junto com os itens. */
+      const acessoriosValidos = acessorios.filter((ac) => (Number(ac.valor) || 0) > 0 && ac.descricao.trim())
       const trocaNota = TEXTOS_TROCA_PDV.notaVenda(trocasValidas)
       let primeiraVendaId: number | null = null
       let trocaNotaPendente = trocaNota.length > 0
@@ -409,7 +424,11 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       for (const [iCarrinho, c] of carrinho.entries()) {
         const precoCheio = (c.item.preco_venda ?? 0) * c.qtd
         const fatia = subtotalBruto > 0 ? precoCheio / subtotalBruto : 0
-        const ultimaLinha = iCarrinho === carrinho.length - 1
+        // A sobra do rateio fica com a última linha DE TODAS — se houver acessório, é ele.
+        // Antes o último item levava o desconto inteiro que restava e o acessório
+        // ganhava a sua parte de novo: desconto contado duas vezes, e a soma das
+        // vendas não fechava com os pagamentos.
+        const ultimaLinha = iCarrinho === carrinho.length - 1 && acessoriosValidos.length === 0
         const descontoItem = ultimaLinha
           ? cent(descontoNum - descontoRateado)
           : cent(descontoNum * fatia)
@@ -513,18 +532,21 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       }
 
       // #3 Acessórios ofertados (kit proteção, fonte…) → venda extra por item.
-      for (const ac of acessorios) {
+      for (const [iAc, ac] of acessoriosValidos.entries()) {
         const preco = Number(ac.valor) || 0
-        if (preco <= 0 || !ac.descricao.trim()) continue
         const fatiaAc = subtotalBruto > 0 ? preco / subtotalBruto : 0
-        const descAc = descontoNum * fatiaAc
-        const valorAc = preco - descAc
-        const { data: vAc } = await supabase.from('vendas_vendas').insert({
+        const descAc = iAc === acessoriosValidos.length - 1
+          ? cent(descontoNum - descontoRateado)
+          : cent(descontoNum * fatiaAc)
+        descontoRateado += descAc
+        const valorAc = cent(preco - descAc)
+        const { data: vAc, error: eAc } = await supabase.from('vendas_vendas').insert({
           empresa_id: empresaId, grupo_pdv: grupoPdv, cliente_id: clienteSelecionado?.id ?? null, vendedor_id: user.id, usuario_id: user.id,
           valor_venda: valorAc, valor_custo: 0, forma_pagamento: formaPagamento, // sem `lucro`: coluna gerada
           parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null, canal_venda: 'loja_fisica',
-          desconto_valor: descAc, status: 'concluida', observacoes: `Acessório: ${ac.descricao.trim()}`, data_venda: new Date().toISOString(),
+          desconto_valor: descAc, status: vendaStatus, observacoes: `Acessório: ${ac.descricao.trim()}`, data_venda: new Date().toISOString(),
         } as never).select('id').single()
+        if (eAc) throw new Error(eAc.message)
         if (vAc?.id) vendaIds.push(vAc.id)
         // Acessório também não grava pagamento por linha — tudo vai junto na
         // primeira venda do fechamento (ver o bloco de pagamentos abaixo).
@@ -608,6 +630,13 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
           if (ePag) throw new Error(`Os pagamentos não foram gravados: ${ePag.message}`)
         }
       }
+
+      // O banco confere "pagamentos = valor da venda" e só então conclui (ou deixa
+      // pendente de entrega). Falhou: o catch desfaz as vendas e devolve as peças.
+      const { error: eFechar } = await supabase.rpc('concluir_venda_pdv', {
+        p_grupo: grupoPdv, p_entrega_pendente: entregaPendente,
+      } as never)
+      if (eFechar) throw new Error(eFechar.message)
 
       // Termos a assinar, na PRIMEIRA venda do fechamento: são documentos da
       // compra inteira, e marcar cada linha do carrinho faria a mesma compra
@@ -1417,7 +1446,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
               size="lg"
               className="w-full"
               loading={finalizando}
-              disabled={carrinho.length === 0}
+              disabled={carrinho.length === 0 || falta > 0}
+              title={falta > 0 ? `Falta ${fmt(falta)} nas formas de pagamento` : undefined}
               onClick={() => finalizarVenda()}
               icon={!finalizando ? <CheckCircle2 size={19} strokeWidth={1.7} /> : undefined}
             >
