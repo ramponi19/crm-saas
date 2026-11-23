@@ -15,8 +15,9 @@
 
 do $$
 begin
-  if (select md5(prosrc) from pg_proc where proname = 'core_validar_dados' and pronamespace = 'public'::regnamespace)
-     is distinct from 'fb1fdf869fdeb161f019edc4802e91e1' then
+  -- sem os \r (fb1fdf86... com eles): vale igual na produção e no banco local montado pelos arquivos CRLF
+  if (select md5(replace(prosrc, E'\r', '')) from pg_proc where proname = 'core_validar_dados' and pronamespace = 'public'::regnamespace)
+     is distinct from '07b1bc72a10687de1d11d5a420ec739e' then
     raise exception 'core_validar_dados mudou desde a conferência de 23/11/2026; revise antes de aplicar';
   end if;
 end $$;

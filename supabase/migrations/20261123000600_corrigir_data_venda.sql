@@ -29,7 +29,8 @@
 do $guarda$
 begin
   -- o corpo em produção tem de ser o da M1 (20261123000200): senão para, em vez de sobrescrever outra versão
-  if md5((select prosrc from pg_proc where oid = 'public.core_negocio_ganho_protegido()'::regprocedure))
+  -- sem os \r: o arquivo é CRLF e a produção recebeu o corpo sem eles (o replay local falhava; 23/11/2026)
+  if md5(replace((select prosrc from pg_proc where oid = 'public.core_negocio_ganho_protegido()'::regprocedure), E'\r', ''))
      <> '6d9c6eeb9cb543356ad91b4f4327ffc4' then
     raise exception 'M3: core_negocio_ganho_protegido em produção não é o da M1 — conferir antes de aplicar';
   end if;
