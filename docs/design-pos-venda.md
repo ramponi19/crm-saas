@@ -458,15 +458,39 @@ O módulo `avaliacoes` (veículos) está em preparação. A régua da Aletrini u
 A nova ordem é a correção do §0 mais o pós-venda:
 
 1. Há negócio **aberto** e ativo → entra nele. Sem mudança.
-2. Há **chamado aberto** do contato (status ≠ `resolvido`), ou **acompanhamento do pós-venda agendado de ontem até hoje** e ainda pendente → a mensagem fica na conversa como hoje (`mensagens` é por contato e loja). **Nenhum negócio é aberto.** O chamado ou acompanhamento ganha a marca "cliente respondeu", e a fila do pós-venda mostra isso.
-3. Há negócio **ganho** com `ganho_em` dentro de `pos_venda_dias` → igual ao item 2: o cliente está "em pós-venda", sem negócio novo.
+2. **Só com o módulo ligado** (regra ajustada pelo Lucas em 23/11). A mensagem fica no pós-venda, sem abrir negócio, **apenas** quando o contato (na loja) tem:
+   - um **chamado aberto** (status de tipo ≠ `resolvido`); **ou**
+   - um **acompanhamento pendente já vencido ou com data de hoje**, dentro da janela `posvenda.janela_acompanhamento_dias` (padrão **3**). Em termos de banco: `status = 'pendente'` e `previsto_para` entre o início do dia de (hoje − janela) e o fim de hoje, no fuso da empresa.
+   - A mensagem fica na conversa como hoje (`mensagens` é por contato e loja). O chamado ou o acompanhamento ganha a marca "cliente respondeu", e a fila do pós-venda mostra isso.
+   - **Passo futuro não segura mensagem.** Um D+330 agendado para daqui a meses, ou um D+7 para amanhã, não faz diferença: o cliente que escreve querendo comprar cai nas regras da M1 abaixo e ganha negócio novo. Sem isso, uma régua de 12 meses esconderia as recompras, que é o problema que a M1 e a 4A acabaram de resolver.
+   - O acompanhamento vencido há mais que a janela também não segura: ele já está na fila de atrasados do responsável, e a mensagem nova pode ser outra conversa.
+3. **Regra da M1 (em produção):** há negócio **ganho**, arquivado ou não, com `ganho_em` dentro de `pos_venda_dias` → a mensagem entra nele ("em pós-venda", sem negócio novo).
 4. Há negócio **perdido** ou arquivado → **reabre o mesmo**, como hoje.
 5. **Ganho fora da janela e nada aberto → cria um negócio NOVO** na primeira etapa do funil padrão. O ganho antigo não é tocado. A ficha mostra "cliente recorrente em negociação".
 6. Nenhum negócio → cria um, como hoje.
 
 Sobre a configuração:
 - X = `pos_venda_dias` **já é por empresa** e já tem tela. Ele passa para `empresa_config` (`core.pos_venda_dias`) quando o motor do PDV v2 existir, mantendo o valor atual.
-- Os itens 2 e 3 só olham as tabelas `posvenda_*` se o módulo estiver ligado (`core_modulo_ligado(p_empresa,'posvenda')`). Sem módulo, valem só os itens 1, 3, 4, 5 e 6.
+- O item 2 só olha as tabelas `posvenda_*` se o módulo estiver ligado (`core_modulo_ligado(p_empresa,'posvenda')`). Sem módulo, valem os itens 1, 3, 4, 5 e 6, que são exatamente a função da M1/M1b em produção.
+- `posvenda.janela_acompanhamento_dias` é lida por `config_valor_emp(p_empresa, 'posvenda', 'janela_acompanhamento_dias', p_filial)`. Vale `coalesce` com 3; 0 = só os de hoje.
+
+**Testes obrigatórios da M7** (transação desfeita no banco, como a M1):
+
+| Cenário | Esperado |
+|---|---|
+| **Cliente com D+330 agendado (futuro), ganho há 300 dias, manda "quero comprar o 18"** | **Negócio NOVO** (`novo_apos_ganho`); o D+330 continua pendente e intacto; nada marcado como "cliente respondeu" |
+| D+7 agendado para amanhã, ganho há 6 dias | Entra no ganho pela regra 3 (dentro dos 30 dias), não pelo acompanhamento |
+| D+330 agendado para amanhã, ganho há 329 dias | Negócio novo (passo futuro não segura) |
+| Acompanhamento com data de hoje, ganho fora da janela | Fica no pós-venda: nenhum negócio aberto, acompanhamento com "cliente respondeu" |
+| Acompanhamento vencido há 2 dias (janela 3) | Fica no pós-venda |
+| Acompanhamento vencido há 5 dias (janela 3) | Negócio novo; o acompanhamento segue na fila de atrasados |
+| Janela configurada em 0 | Só o de hoje segura |
+| Chamado aberto (aguardando cliente), ganho há 200 dias | Fica no pós-venda; o chamado ganha o evento `cliente_respondeu` |
+| Chamado resolvido, ganho há 200 dias | Negócio novo |
+| Cliente com negócio aberto e chamado aberto | Entra no negócio aberto (regra 1 vem antes) |
+| Módulo desligado com acompanhamento de hoje | Ignora o pós-venda: igual à M1 |
+| Acompanhamento de hoje em **outra loja** do mesmo contato | Não segura (a regra é por contato e loja) |
+| Perdido, arquivado, sem negócio | Iguais à M1 (reabre; reabre; cria) |
 
 **Atenção:** mexer nessa função muda o comportamento de recebimento de todos os canais. Teste e promoção seguem o cuidado já registrado para a Edge (memória "Integrações Meta — zona sensível"): migração com rollback, teste com contato de teste e conferência em `negocio_historico`.
 
@@ -567,7 +591,7 @@ Convenções:
 - `nps_limite_detrator` (6), `nps_responsavel_chamado` (responsavel_da_loja);
 - `envio_automatico` (false), `categorias_aparelho` ([1,2,3,4]), `sem_resposta_tentar_em_dias` (2).
 - No core: `ciclo_dias_entre_compras` (7), `ciclo_nota_promotor` (9), `ciclo_validade_nps_meses` (12), `ciclo_inativo_meses` (null = desligado), `pos_venda_dias` (já existe, 30).
-- No módulo também: `responsavel_padrao` (por loja; **D9**).
+- No módulo também: `responsavel_padrao` (por loja; **D9**) e `janela_acompanhamento_dias` (3; roteamento da M7, §2.6).
 
 **Armazenamento provisório e a migração para o `empresa_config` (D6, 23/11).** Enquanto o `empresa_config` do PDV v2 não existir, as chaves ficam em `configuracoes_sistema`, a tabela que já existe com `empresa_id`, `chave` e `valor` jsonb, sem loja. As convenções são escolhidas para a migração ser mecânica.
 
@@ -618,7 +642,7 @@ Convenções:
 | M4 | `contato_ciclo` | Tabela `contato_ciclo`, função `contato_ciclo_recalcular`, gatilho em `negocios` (status, ganho_em, etapa, delete) e backfill dos 3,7 mil contatos da JM. Lê os limites por `config_valor_emp('core', 'ciclo_*')` | core | M2 |
 | M5 | `quadro_por_status` | `quadro_base`, `quadro_contagens` e `quadro_pagina` ganham `p_status` (padrão `aberto`), mais o índice parcial se o EXPLAIN pedir | core | — |
 | M6 | `posvenda_modulo` | As 10 tabelas `posvenda_*` com RLS (responsável NOT NULL), `posvenda_resolver_responsavel`, `posvenda_iniciar_jornadas` (gatilho no ganho; passos vencidos nascem `pulado`), `posvenda_registrar`, `posvenda_chamado_abrir`/`_mover` (SLA em horas corridas), reatribuição ao desativar usuário, e as sementes na instalação: status e categorias de chamado, SLA padrão, pesquisa NPS e régua "iPhone e aparelhos" com o D+90 seminovo ligado e o seguro desligado | módulo | M2, M4 |
-| M7 | `canal_le_posvenda` | `core_negocio_do_canal` com os itens 2 e 3 do §2.6 (chamado aberto ou acompanhamento pendente segura a mensagem sem abrir negócio), só com o módulo ligado | core | M6 |
+| M7 | `canal_le_posvenda` | `core_negocio_do_canal` com o item 2 do §2.6: só **chamado aberto** ou **acompanhamento vencido ou de hoje dentro de `posvenda.janela_acompanhamento_dias` (3)** segura a mensagem sem abrir negócio. Passo futuro nunca segura. Só com o módulo ligado; o resto é a M1. Os testes do §2.6 vêm junto, com destaque para o D+330 agendado e a recompra | core | M6 |
 | — | Aplicar a triagem da etapa Pós Venda | Script, não migração: backup, transação, filtro pelo status atual, histórico `triagem_pos_venda`. Depois `funil_etapas.ativo = false` na etapa 38 e o nome "Pós Venda (antiga)" | dados | planilha do Matheus |
 
 **Fase 2:**
@@ -631,22 +655,29 @@ Convenções:
 
 ### 8.3 MVP (o mínimo para a JM usar)
 
-**Entregas, em ordem.** Cada uma vai para produção sozinha, na sequência migração → app → conferência.
+**Entregas em produção (plano aprovado pelo Lucas em 23/11, com ajustes).** São três entregas, A, B e C. Cada uma vai para produção na sequência migração → app → validação, e a próxima só começa depois da validação da anterior. Diff e testes de cada migração passam pelo Lucas antes de aplicar.
+
+| Entrega | Conteúdo |
+|---|---|
+| **A** | M2 + M3 + modal de ganho (data da venda, categoria, condição e valor, com validação no servidor) + modal de motivo ao reabrir + botão "Corrigir data da venda" (itens 2 abaixo) |
+| **B** | M4 + M5 + telas do ciclo de vida e quadro só com abertos (itens 3 e 4) |
+| **C** | M6 + M7 + `/pos-venda` + Configurações › Pós-venda + aba Pós-venda na ficha (item 5). A vitrine vem por último, dentro da C ou depois |
+| Fora das entregas | Triagem (item 1), em paralelo, e o desligamento da etapa (item 6), só depois da triagem aplicada |
 
 0. ✅ **Feito:** M1, M1b e 4A em produção. A venda não é mais apagada, e o ZapIntel lê o ganho.
 1. **Triagem da etapa Pós Venda.** O Matheus preenche o `triagem_pos_venda.csv` e o script aplica (com backup).
    - Não depende de código novo. Pode correr em paralelo com o resto.
-2. **Ganho com data e reabrir com motivo** (core; M2 e M3 + app):
+2. **Entrega A — Ganho com data e reabrir com motivo** (core; M2 e M3 + app):
    - modal de ganho com **data da venda** (hoje como padrão) e os campos obrigatórios da etapa Convertido (categoria, condição novo/seminovo, valor);
    - a rota `/api/leads/mover` aceita e valida `ganho_em` e confere os campos obrigatórios no servidor;
    - modal de **motivo** ao tirar uma venda do ganho (dono e admin);
    - botão **"Corrigir data da venda"** (dono e admin), que chama `corrigir_data_venda`.
-3. **Quadro só com abertos** (M5 + app): ganho e perdido viram lista filtrada, e o quadro ganha faixas de soltar "Ganhou" / "Perdeu".
-4. **Ciclo de vida** (M4 + app):
+3. **Entrega B — Quadro só com abertos** (M5 + app): ganho e perdido viram lista filtrada, e o quadro ganha faixas de soltar "Ganhou" / "Perdeu".
+4. **Entrega B — Ciclo de vida** (M4 + app):
    - estágio no cabeçalho da ficha do cliente, somando os contatos com o mesmo telefone (D2);
    - coluna e filtro na lista de Clientes;
    - aba Compras com os ganhos e o total gasto (corrige o "Compras = 0").
-5. **Módulo Pós-venda** (M6 e M7 + app; chave `posvenda`, menu "Pós-venda", D4):
+5. **Entrega C — Módulo Pós-venda** (M6 e M7 + app; chave `posvenda`, menu "Pós-venda", D4):
    - Configurações › Pós-venda:
      - responsável padrão por loja, obrigatório para ligar o módulo (D9);
      - régua iPhone (passos, ligar e desligar);
@@ -656,7 +687,7 @@ Convenções:
    - Fila `/pos-venda` em três abas: Atrasados, Hoje e Próximos 7 dias. Ações: Abrir WhatsApp com o texto montado, Registrar resultado, NPS manual, Reagendar, Pular e Abrir chamado.
    - Chamados: lista com filtros (sem realtime), abrir e mover, SLA em horas corridas. Nota de NPS ≤ 6 abre chamado para o responsável da loja.
    - Aba Pós-venda na ficha do cliente: jornada, NPS e chamados.
-   - Vitrine `/vitrine/posvenda` para quem não tem o módulo.
+   - Vitrine `/vitrine/posvenda` para quem não tem o módulo: por último, dentro da C ou logo depois.
 6. **Desligar a etapa "Pós Venda"**, depois da triagem aplicada e conferida.
 
 **Fica para a Fase 2:**
