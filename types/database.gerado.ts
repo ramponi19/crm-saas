@@ -3479,6 +3479,9 @@ isOneToOne: true
 "rate_limit_bump":
 { Args: { "p_chave": string,"p_janela": string }; Returns: number
                            },
+"reabrir_negocio":
+{ Args: { "p_motivo": string,"p_negocio": number }; Returns: Json
+                           },
 "refresh_status_atrasados":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
