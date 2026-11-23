@@ -608,7 +608,7 @@ Convenções:
 3. **Ninguém lê `configuracoes_sistema` direto para essas chaves.** O SQL usa a função **`config_valor_emp(p_empresa, p_modulo, p_chave, p_filial)`**, `STABLE` e `SECURITY DEFINER`.
    - Ordem de leitura: valor da loja, valor da empresa, `null`. É a mesma do `config_valor` do PDV v2 §A; o padrão fica no chamador (`coalesce` com o padrão do manifesto).
    - Para a sessão, há o atalho `config_valor(p_modulo, p_chave, p_filial)`, que usa `get_empresa_id()`, com o mesmo nome e a mesma assinatura do PDV v2.
-   - A escrita passa só por `config_salvar(p_modulo, p_chave, p_valor, p_filial)`. Ela confere dono ou admin e o módulo ligado, e grava no envelope.
+   - A escrita passa só por `config_salvar(p_modulo, p_chave, p_valor, p_filial)`. Ela confere dono ou admin, sessão que pode escrever e loja da própria empresa, e grava no envelope (com `atualizado_por` e `atualizado_em`). **Não** exige o módulo ligado: a D9 pede o responsável padrão preenchido antes de ligar o pós-venda.
    - O TypeScript usa um único `lib/config.ts` (`lerConfig` e `salvarConfig`), que chama essas RPCs.
 4. **Migração quando o PDV v2 Fase 1 criar o `empresa_config`.** É uma migração só, e ninguém fora dela muda:
    1. cria `empresa_config`, se ainda não existir;
