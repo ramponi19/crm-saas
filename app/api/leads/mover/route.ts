@@ -35,6 +35,12 @@ export async function POST(req: Request) {
      * observações (04/11/2026), então montar o texto lá apagaria o que já havia.
      */
     justificativa?: string
+    /**
+     * Tirar uma VENDA FECHADA do ganho (23/11/2026, migração 20261123000200): só pela RPC
+     * `reabrir_negocio`, que exige dono/admin e este motivo. Sem ele a rota responde 409
+     * com `codigo: 'GANHO_REABRIR'` e nada se move.
+     */
+    motivo_reabertura?: string
   }
   if (!body.leadId || (!body.kanban_status && !body.funilId)) {
     return NextResponse.json({ error: 'Dados incompletos' }, { status: 400 })
@@ -111,6 +117,21 @@ export async function POST(req: Request) {
     : etapaRow?.tipo === 'perdido' ? 'perdido'
     : !etapaRow && (body.perdido_em ?? n.perdido_em) ? 'perdido' : 'aberto'
 
+  /**
+   * VENDA FECHADA NÃO SAI DO GANHO PELO ARRASTO (23/11/2026). O banco recusa (gatilho
+   * `negocios_ganho_protegido`); aqui a recusa vira uma resposta que a tela entende. Com o
+   * motivo, a RPC confere a permissão (dono/admin), grava `reaberto_manual` no histórico e
+   * devolve o negócio aberto na primeira etapa — daí em diante é um movimento comum.
+   */
+  const reabrindoVenda = n.status === 'ganho' && status !== 'ganho'
+  const motivoReabertura = body.motivo_reabertura?.trim()
+  if (reabrindoVenda && !motivoReabertura) {
+    return NextResponse.json({
+      error: 'Esta venda já está fechada. Para tirá-la do ganho, informe o motivo da reabertura (só dono ou administrador).',
+      codigo: 'GANHO_REABRIR',
+    }, { status: 409 })
+  }
+
   const agora = new Date().toISOString()
   const patch: Record<string, unknown> = {
     funil_id: funilAlvo,
@@ -155,6 +176,19 @@ export async function POST(req: Request) {
    * justificativa sumia (contato de uma loja, negócio na outra). Agora, se o
    * contato não aceita a gravação, nada se move e a tela mostra o motivo.
    */
+  // A reabertura da venda é a PRIMEIRA gravação: tudo o que podia recusar o movimento (etapa,
+  // motivo de perda) já foi conferido acima, então não sobra venda reaberta sem movimento.
+  if (reabrindoVenda) {
+    const { error: errReabrir } = await supabase.rpc('reabrir_negocio', { p_negocio: n.id, p_motivo: motivoReabertura ?? '' })
+    if (errReabrir) {
+      const semPermissao = errReabrir.message.includes('SEM_PERMISSAO')
+      return NextResponse.json({
+        error: semPermissao ? 'Só o dono ou um administrador reabre uma venda fechada.' : errReabrir.message,
+        codigo: semPermissao ? 'GANHO_SEM_PERMISSAO' : 'GANHO_REABRIR_FALHOU',
+      }, { status: semPermissao ? 403 : 400 })
+    }
+  }
+
   const justificativa = body.justificativa?.trim()
   const observacoes = body.observacoes ?? (justificativa
     ? (n.contato?.observacoes ? n.contato.observacoes + '\n' : '')
