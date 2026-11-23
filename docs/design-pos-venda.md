@@ -706,6 +706,23 @@ Convenções:
 
 - **Dependências finais:** M6 depende só da M2 (configuração) e da Entrega A (`dados.venda`). A M7 depende da M6. A M4 (na B) passa a ler `posvenda_respostas` para o NPS. A M5 continua independente.
 
+**Ativação do módulo sobre as vendas que já existem (pedido do Lucas, 23/11/2026; parte da Entrega C).**
+- Ao ligar o módulo, as vendas fechadas antes da instalação ganham jornada **só com os passos que ainda caem de hoje em diante**, contados a partir do `ganho_em`.
+  - Passo já vencido **não é criado**: nada de D+1 ou D+7 retroativo, nem nasce como `pulado`.
+  - Na prática, venda com mais de 30 dias recebe só o D+330 (ciclo de troca) e, no seminovo, às vezes o D+90.
+- A ativação roda como **função própria** (`posvenda_ativar_existentes`), chamada uma vez na instalação. É idempotente: `unique (negocio_id, cadencia_id)`.
+- **Antes de ativar, o Lucas vê a simulação** (`scripts/conciliar-vendas/simular-ativacao.mjs`): quantas jornadas e passos, por categoria e por mês de vencimento. A ativação respeita o teto diário por responsável e o intervalo mínimo.
+- **Simulação de 23/11/2026** (290 ganhos da JM; categorias dos 147 da conciliação pela simulação do texto dos pedidos; os outros 143 sem categoria):
+
+| Cenário | Jornadas | Passos | Por mês de vencimento | Maior dia |
+|---|---|---|---|---|
+| Só a régua de aparelhos (iPhone, iPad, Mac, Watch) | 141 | 210 (141 D+330, 40 D+30, 23 D+90, 6 D+7) | nov/26 22 · dez 28 · jan/27 10 · fev 9 · jun 1 · jul 36 · ago 29 · set 52 · out 23 | 6 passos (29/11) |
+| Aparelhos + régua "Geral" (D+7 e D+330) para quem não tem categoria | 290 | 403 | nov/26 66 · dez 28 · jan 10 · fev 9 · jun 1 · jul 54 · ago 74 · set 75 · out 86 | 22 passos (25/11) |
+
+  - A fila não enche de uma vez. O grosso cai de **jul a out/2027** (o D+330 das vendas de ago a nov/2026); o resto se espalha por nov/26 a fev/27.
+  - Os números mudam com a data real da ativação: quanto mais tarde, menos D+7 e D+30 sobram.
+  - Os 143 ganhos sem categoria são os marcados no quadro antes da Entrega A. Parte deles tem pedido no grupo (125 pedidos casaram com ganhos já existentes na conciliação) e pode ser classificada do mesmo jeito que os 147, antes da ativação.
+
 0. ✅ **Feito:** M1, M1b e 4A em produção. A venda não é mais apagada, e o ZapIntel lê o ganho.
 1. **Triagem da etapa Pós Venda.** O Matheus preenche o `triagem_pos_venda.csv` e o script aplica (com backup).
    - Não depende de código novo. Pode correr em paralelo com o resto.
