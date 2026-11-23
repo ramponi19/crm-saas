@@ -3,6 +3,7 @@ import { exigirModuloLigado } from '@/lib/modulo-ligado'
 import { requireOwnerOrAdminApi } from '@/lib/owner'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { cifrarToken, cofreConfigurado } from '@/lib/canais/crypto'
+import { recusaNoPreview } from '@/lib/segredo-no-preview'
 
 /**
  * Config do pixel/CAPI da empresa (somente owner/admin).
@@ -42,6 +43,8 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
+  // Preview: banco da produção com chave de teste → não grava segredo (lib/segredo-no-preview.ts)
+  const recusa = recusaNoPreview(); if (recusa) return recusa
   const auth = await requireOwnerOrAdminApi()
   if (auth.error) return auth.error
   // Rastreamento de origem é módulo em preparação (17/11/2026) até os relatórios de retorno por origem.

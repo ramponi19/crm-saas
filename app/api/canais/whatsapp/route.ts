@@ -6,6 +6,7 @@ import {
   trocarCodigoPorToken, inspecionarToken, assinarWaba, statusDoNumero,
   sincronizarAppDoCelular, numerosDaWaba, wabaDoToken, descobrirWhatsApp, metaConfigurada, ehErro,
 } from '@/lib/canais/meta'
+import { recusaNoPreview } from '@/lib/segredo-no-preview'
 
 /**
  * Conecta o WhatsApp do cliente por Coexistência: o número segue no app do
@@ -28,6 +29,8 @@ import {
  * vem registrado do app, e não existe PIN.
  */
 export async function POST(req: Request) {
+  // Preview: banco da produção com chave de teste → não grava segredo (lib/segredo-no-preview.ts)
+  const recusa = recusaNoPreview(); if (recusa) return recusa
   try {
     const auth = await requireOwnerOrAdminApi()
     if (auth.error) return auth.error

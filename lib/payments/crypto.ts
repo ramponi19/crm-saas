@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { barrarCifraNoPreview } from '@/lib/segredo-no-preview'
 
 // ============================================================
 // Criptografia das credenciais de pagamento dos tenants.
@@ -29,6 +30,7 @@ function getKey(): Buffer {
 }
 
 export function encryptCredenciais(obj: Record<string, string>): string {
+  barrarCifraNoPreview('cofre de pagamento e segredos')
   const key = getKey()
   const iv = crypto.randomBytes(12)
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv)
