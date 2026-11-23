@@ -589,7 +589,7 @@ branches abertas antes de numerar).
 - **Edge `webhook-leads`:** `envioTransmissao` lê `canal_id` e envia por ele (conferido como no card: empresa, loja do negócio, WhatsApp, ativo); `envioAutomatico` aceita `canalId` do app (o WhatsApp em que o cliente falou por último na loja), senão a última recebida na loja, senão `canalDaLoja`.
 - **App:** tela de Canais com todos os números de cada tipo; Transmissão escolhe o número quando a loja tem mais de um; Automatize escolhe o número da conversa; `/api/modelos?negocio=&canal=` (card e Comunicação) e a tela de modelos dizem o final do número.
 - **Ordem (obrigatória):** migração (IOwait < 10%, leitura de 65 s separada) → Edge (`tools/deploy-edge.sh <commit>`; volta = v84 = `27b7390c`) → push do app → smoke. **A Edge nova NUNCA antes da migração:** ela pede `transmissoes.canal_id`; sem a coluna o select falha e toda transmissão em andamento seria recusada ("transmissão pausada, encerrada ou de outra empresa").
-- **Prova local:** ida/volta/ida limpas; `tests/e2e/multinumero-e2e.mjs` (tudo ok; 2 itens não verificáveis no local, ditos no próprio teste); `transmissao-e2e` 103/103 com a Edge local e a Graph falsa; `canal-resposta-e2e` ok; 421 unitários; Deno 16/16.
+- **Prova local:** ida/volta/ida limpas; `tests/e2e/multinumero-e2e.mjs` (tudo ok; 2 itens não verificáveis no local, ditos no próprio teste); `transmissao-e2e` 103/103 com a Edge local e a Graph falsa; `canal-resposta-e2e` ok; `automatize-e2e` 29/29 (corrigido para aprovação por número); 421 unitários; Deno 16/16.
 
 ## Mensagem recebida nunca é descartada (regra permanente do Lucas, 18/11/2026)
 
