@@ -79,6 +79,24 @@ export function lerValor(v: unknown): number {
   return /^\d+(\.\d+)?$/.test(normal) ? Number(normal) : Number.NaN
 }
 
+/**
+ * O campo de valor vem PREENCHIDO com o valor do negócio. Enquanto ninguém mexeu nele, o que se
+ * digita ou cola SUBSTITUI o valor, nunca se junta a ele (23/11/2026: no teste, "4590" + "4590,00"
+ * virou "45904590,00"). Recebe o texto de antes e o de agora, depois de um único evento de digitação:
+ *   - texto que só cresceu (tecla, colar, autocompletar) → fica só o trecho novo, em qualquer posição;
+ *   - texto que diminuiu ou trocou um pedaço selecionado → é edição de propósito: fica como está.
+ * Só vale para o PRIMEIRO evento; depois disso o campo é texto comum.
+ */
+export function valorDigitado(anterior: string, novo: string): string {
+  if (novo.length <= anterior.length) return novo
+  let ini = 0
+  while (ini < anterior.length && anterior[ini] === novo[ini]) ini++
+  let fim = 0
+  while (fim < anterior.length - ini && anterior[anterior.length - 1 - fim] === novo[novo.length - 1 - fim]) fim++
+  if (ini + fim < anterior.length) return novo
+  return novo.slice(ini, novo.length - fim)
+}
+
 export function validarVendaGanho(entrada: VendaInformada | null | undefined, ctx: ContextoVenda): ResultadoVenda {
   const v = entrada ?? {}
   const data = typeof v.data === 'string' ? v.data.trim() : ''
