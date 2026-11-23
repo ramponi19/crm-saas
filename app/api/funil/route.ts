@@ -176,6 +176,19 @@ export async function POST(req: Request) {
           )
         }
       }
+      // E nenhum negócio ENTRA no ganho em lote (23/11/2026, Entrega A do pós-venda): ganhar exige
+      // data, categoria, condição e valor da venda, um por um (/api/leads/mover).
+      if (statusDestino === 'ganho') {
+        const { count: naoVendas } = await service.from('negocios')
+          .select('id', { count: 'exact', head: true })
+          .eq('empresa_id', empresaId).eq('ativo', true).eq('etapa_id', etapa.id).neq('status', 'ganho')
+        if ((naoVendas ?? 0) > 0) {
+          return NextResponse.json(
+            { error: `"${etapa.label}" tem ${naoVendas} lead(s) que não são vendas fechadas: eles não podem ir para uma etapa de ganho em lote. Escolha uma etapa aberta como destino (cada venda é marcada com os dados dela).` },
+            { status: 400 },
+          )
+        }
+      }
       // A data do ganho acompanha o status, como no arrasto (/api/leads/mover): quem
       // entra no ganho ganha a data de agora; quem já era ganho a mantém; quem sai a perde.
       const { error: erroMove } = await service.from('negocios')

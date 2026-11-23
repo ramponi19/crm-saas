@@ -67,6 +67,7 @@ interface LinhaNegocio {
   valor_estimado: number | null
   motivo_perda_id: number | null
   perdido_em: string | null
+  ganho_em: string | null
   created_at: string | null
   dados: Json | null
   etapa: { slug: string } | null
@@ -81,7 +82,7 @@ interface LinhaNegocio {
 const SELECT_OUTRAS_LOJAS: string = 'id, filial_id, status, created_at, filial:filiais!negocios_filial_id_fkey(nome)'
 
 const SELECT_NEGOCIO: string = `id, empresa_id, contato_id, filial_id, funil_id, responsavel_id, status, valor_estimado,
-  motivo_perda_id, perdido_em, created_at, dados,
+  motivo_perda_id, perdido_em, ganho_em, created_at, dados,
   etapa:funil_etapas!negocios_etapa_id_fkey(slug),
   contato:contatos!negocios_contato_id_fkey(id, nome, telefone, instagram, origem, observacoes, foto_url, dados, etiqueta_ids)`
 
@@ -164,6 +165,7 @@ export async function carregarCardDoLead(
     convertido_em: l.convertido_em == null ? null : Number(l.convertido_em),
     motivo_perda_id: n.motivo_perda_id,
     perdido_em: n.perdido_em,
+    ganho_em: n.ganho_em ?? null,
     funil_id: n.funil_id,
     foto_url: c.foto_url,
     etiqueta_ids: c.etiqueta_ids ?? [],

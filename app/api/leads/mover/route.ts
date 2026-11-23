@@ -7,9 +7,11 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { nadaGravado, SEM_PERMISSAO_CONTATO, SEM_PERMISSAO_NEGOCIO } from '@/lib/linhas-afetadas'
 import { formatarData } from '@/lib/datas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { diaNoFuso } from '@/lib/datas'
+import { ganhoEmDaData, validarVendaGanho, type VendaInformada } from '@/lib/venda-ganho'
 
 /** `string`, não literal: o parser de tipos do supabase-js estoura com relação embutida. */
-const SELECT_NEGOCIO: string = 'id, empresa_id, funil_id, responsavel_id, status, ganho_em, perdido_em, dados, etapa:funil_etapas!negocios_etapa_id_fkey(slug), contato:contatos!negocios_contato_id_fkey(id, nome, observacoes)'
+const SELECT_NEGOCIO: string = 'id, empresa_id, funil_id, responsavel_id, status, ganho_em, perdido_em, created_at, dados, etapa:funil_etapas!negocios_etapa_id_fkey(slug), contato:contatos!negocios_contato_id_fkey(id, nome, observacoes)'
 
 /**
  * Move um lead de etapa e dispara as automações de "entrou_na_etapa".
@@ -41,6 +43,12 @@ export async function POST(req: Request) {
      * com `codigo: 'GANHO_REABRIR'` e nada se move.
      */
     motivo_reabertura?: string
+    /**
+     * Os dados da VENDA, obrigatórios ao ENTRAR no ganho (23/11/2026, Entrega A do pós-venda):
+     * data (vira `ganho_em`), categoria, condição e valor — lib/venda-ganho.ts. Sem eles a rota
+     * responde 422 com `codigo: 'GANHO_DADOS'` e o campo que falta; nada se move.
+     */
+    venda?: VendaInformada
   }
   if (!body.leadId || (!body.kanban_status && !body.funilId)) {
     return NextResponse.json({ error: 'Dados incompletos' }, { status: 400 })
@@ -73,7 +81,7 @@ export async function POST(req: Request) {
    */
   type NegocioAtual = {
     id: number; empresa_id: number; funil_id: number | null; responsavel_id: string | null; perdido_em: string | null
-    status: string; ganho_em: string | null
+    status: string; ganho_em: string | null; created_at: string
     dados: Record<string, unknown> | null; etapa: { slug: string } | null
     contato: { id: number; nome: string | null; observacoes: string | null } | null
   }
@@ -132,6 +140,33 @@ export async function POST(req: Request) {
     }, { status: 409 })
   }
 
+  /**
+   * ENTRAR NO GANHO EXIGE A VENDA (23/11/2026). Qualquer tela que marca ganho passa por aqui
+   * (quadro, ficha do lead, "Converter em cliente", ficha imobiliária): sem data, categoria,
+   * condição e valor válidos, 422 e nada se move. Ganho → ganho (outra etapa de ganho) mantém tudo.
+   */
+  const entrandoNoGanho = status === 'ganho' && n.status !== 'ganho'
+  let ganhoEmNovo: string | null = null
+  let dadosVenda: Record<string, unknown> | null = null
+  let valorVenda: number | null = null
+  if (entrandoNoGanho) {
+    const fuso = await fusoDaEmpresa(supabase, empresaId)
+    const { data: cats } = await supabase.from('estoque_categorias').select('id')
+      .eq('empresa_id', n.empresa_id).eq('ativo', true)
+    const v = validarVendaGanho(body.venda, {
+      hoje: diaNoFuso(new Date(), fuso),
+      criadoEm: diaNoFuso(new Date(n.created_at), fuso),
+      categorias: ((cats ?? []) as { id: number }[]).map((c) => Number(c.id)),
+    })
+    if (!v.ok) return NextResponse.json({ error: v.erro, codigo: 'GANHO_DADOS', campo: v.campo }, { status: 422 })
+    ganhoEmNovo = ganhoEmDaData(v.venda.data, fuso)
+    valorVenda = v.venda.valor
+    dadosVenda = {
+      data: v.venda.data, categoria_id: v.venda.categoria_id, condicao: v.venda.condicao, valor: v.venda.valor,
+      registrada_por: user.id, registrada_em: new Date().toISOString(),
+    }
+  }
+
   const agora = new Date().toISOString()
   const patch: Record<string, unknown> = {
     funil_id: funilAlvo,
@@ -145,9 +180,14 @@ export async function POST(req: Request) {
      * (ganho há até N dias) ou abre negócio novo. Ganho → ganho mantém a data; sair do
      * ganho a limpa, como a reabertura pelo canal (`core_negocio_do_canal`) faz.
      */
-    ganho_em: status === 'ganho' ? (n.status === 'ganho' && n.ganho_em ? n.ganho_em : agora) : null,
+    ganho_em: status === 'ganho' ? (n.status === 'ganho' && n.ganho_em ? n.ganho_em : (ganhoEmNovo ?? agora)) : null,
   }
   if (!etapaRow) patch.dados = { ...(n.dados ?? {}), _lead: { ...dadosLead, kanban_status: etapa } }
+  // A venda informada: valor do negócio e `dados.venda` (data, categoria, condição, valor, quem e quando).
+  if (dadosVenda) {
+    patch.valor_estimado = valorVenda
+    patch.dados = { ...((patch.dados as Record<string, unknown> | undefined) ?? n.dados ?? {}), venda: dadosVenda }
+  }
 
   /**
    * Perda exige motivo da EMPRESA — a regra estava só na tela (porte do 58d7d3f).

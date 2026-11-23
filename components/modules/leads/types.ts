@@ -25,6 +25,8 @@ export interface Lead {
   convertido_em: number | null
   motivo_perda_id?: number | null
   perdido_em?: string | null
+  /** Data da venda (venda fechada). Só muda por corrigir_data_venda (dono/admin). */
+  ganho_em?: string | null
   funil_id?: number | null
   /** Foto de perfil (Instagram/Messenger). WhatsApp não expõe foto. */
   foto_url?: string | null

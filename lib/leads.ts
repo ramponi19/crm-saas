@@ -375,36 +375,25 @@ async function contatoDoLead(svc: Db, empresaId: number, l: NovoLead): Promise<{
  *   - lead criado à mão (ou por formulário, portal, agendamento) cria negócio novo:
  *     é decisão de quem cadastrou;
  *   - `kanban_status` vira a etapa de mesmo slug no funil (o padrão, se não vier);
- *     etapa ganho/perdido dá o status;
+ *     etapa de perda dá o status; etapa de GANHO é recusada (400: venda fechada só com os dados da venda);
  *   - o limite do plano é do banco (gatilho `negocios_limite`): 402 com LEAD_LIMIT_REACHED.
  * Só pelo serviço. Quem chama confere a sessão, a empresa e a loja antes.
  */
 export async function criarLead(svc: Db, empresaId: number, l: NovoLead): Promise<ResultadoLead> {
-  const contato = await contatoDoLead(svc, empresaId, l)
-  if ('error' in contato) return contato
-  if (l.origem && l.origem_id) {
-    const { error } = await svc.from('contato_identidades')
-      .insert({ empresa_id: empresaId, contato_id: contato.id, canal_tipo: l.origem, external_id: l.origem_id })
-    if (error && error.code !== '23505') return { error: `identidade: ${error.message}`, status: 500 }
-  }
-
-  if (l.origem && CANAIS.includes(l.origem) && l.origem_id) {
-    const { data, error } = await svc.rpc('core_negocio_do_canal', {
-      p_empresa: empresaId, p_contato: contato.id, p_filial: l.filial_id ?? null, p_primeira_msg: l.primeira_msg ?? null,
-      p_so_existente: false, p_origem: l.origem, p_origem_id: l.origem_id,
-    })
-    if (error) return erroDeGravacao(error)
-    return { id: data as number, contato_id: contato.id }
-  }
-
+  const doCanal = !!(l.origem && CANAIS.includes(l.origem) && l.origem_id)
+  /**
+   * Funil e etapa ANTES do contato (23/11/2026): lead novo não nasce como venda fechada — ganhar
+   * exige data, categoria, condição e valor da venda (/api/leads/mover, lib/venda-ganho.ts). A recusa
+   * vem antes de gravar qualquer coisa.
+   */
   let funilId = l.funil_id ?? null
-  if (!funilId) {
+  if (!doCanal && !funilId) {
     const { data } = await svc.from('funis').select('id').eq('empresa_id', empresaId).eq('padrao', true).eq('interno', false)
       .order('id').limit(1)
     funilId = (data?.[0]?.id as number | undefined) ?? null
   }
   let etapa: { id: number; tipo: string | null } | null = null
-  if (funilId) {
+  if (!doCanal && funilId) {
     let q = svc.from('funil_etapas').select('id, tipo, slug, ordem').eq('funil_id', funilId)
     q = l.kanban_status ? q.eq('slug', l.kanban_status) : q.order('ordem').order('id')
     const { data } = await q.limit(1)
@@ -414,7 +403,28 @@ export async function criarLead(svc: Db, empresaId: number, l: NovoLead): Promis
       etapa = (primeira?.[0] as { id: number; tipo: string | null } | undefined) ?? null
     }
   }
-  const status = etapa?.tipo === 'ganho' ? 'ganho' : etapa?.tipo === 'perdido' ? 'perdido' : 'aberto'
+  if (etapa?.tipo === 'ganho') {
+    return { error: 'Lead novo não nasce como venda fechada: crie o lead numa etapa aberta e marque a venda com a data e o valor dela.', status: 400 }
+  }
+
+  const contato = await contatoDoLead(svc, empresaId, l)
+  if ('error' in contato) return contato
+  if (l.origem && l.origem_id) {
+    const { error } = await svc.from('contato_identidades')
+      .insert({ empresa_id: empresaId, contato_id: contato.id, canal_tipo: l.origem, external_id: l.origem_id })
+    if (error && error.code !== '23505') return { error: `identidade: ${error.message}`, status: 500 }
+  }
+
+  if (doCanal) {
+    const { data, error } = await svc.rpc('core_negocio_do_canal', {
+      p_empresa: empresaId, p_contato: contato.id, p_filial: l.filial_id ?? null, p_primeira_msg: l.primeira_msg ?? null,
+      p_so_existente: false, p_origem: l.origem, p_origem_id: l.origem_id,
+    })
+    if (error) return erroDeGravacao(error)
+    return { id: data as number, contato_id: contato.id }
+  }
+
+  const status = etapa?.tipo === 'perdido' ? 'perdido' : 'aberto'
   const dados: Json = {}
   if (l.produto_interessado) dados.produto_interessado = l.produto_interessado
   if (l.interesse != null) dados._interesse = l.interesse
@@ -430,7 +440,6 @@ export async function criarLead(svc: Db, empresaId: number, l: NovoLead): Promis
   const { data: neg, error } = await svc.from('negocios').insert({
     empresa_id: empresaId, filial_id: l.filial_id ?? null, contato_id: contato.id, funil_id: funilId, etapa_id: etapa?.id ?? null,
     status, responsavel_id: l.responsavel_id ?? null, valor_estimado: l.valor_estimado ?? null, dados,
-    ...(status === 'ganho' ? { ganho_em: new Date().toISOString() } : {}),
     ...(status === 'perdido' ? { perdido_em: new Date().toISOString() } : {}),
   }).select('id').single()
   if (error) return erroDeGravacao(error)

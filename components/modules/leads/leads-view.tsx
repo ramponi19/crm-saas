@@ -445,6 +445,7 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
       {/* Kanban */}
       <div className={`flex-1 min-h-0 overflow-hidden transition-opacity ${carregando ? 'opacity-50' : ''}`}>
         <KanbanBoard
+          rotuloUsado={perfil.rotuloUsado}
           leads={leads}
           usuarios={usuarios}
           columns={columns}
