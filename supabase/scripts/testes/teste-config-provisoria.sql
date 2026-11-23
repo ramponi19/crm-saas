@@ -50,6 +50,14 @@ begin
   begin perform config_salvar('core', '', '1'::jsonb); e := 'gravou'; exception when others then e := split_part(sqlerrm, ':', 1); end;
   r := r || jsonb_build_object('t6_chave_vazia', e);
 
+  -- 6b. nome com cara de segredo é recusado
+  begin perform config_salvar('integracao', 'api_key', '"x"'::jsonb); e := 'gravou'; exception when others then e := split_part(sqlerrm, ':', 1); end;
+  r := r || jsonb_build_object('t6b_api_key', e);
+  begin perform config_salvar('meta', 'token_acesso', '"x"'::jsonb); e := 'gravou'; exception when others then e := split_part(sqlerrm, ':', 1); end;
+  r := r || jsonb_build_object('t6b_token', e);
+  begin perform config_salvar('core', 'senha_wifi', '"x"'::jsonb); e := 'gravou'; exception when others then e := split_part(sqlerrm, ':', 1); end;
+  r := r || jsonb_build_object('t6b_senha', e);
+
   -- 7. módulo desligado: grava mesmo assim (D9: configurar antes de ligar). Empresa 5 não tem posvenda.
   r := r || jsonb_build_object('t7_posvenda_desligado_na_5', not core_modulo_ligado(5, 'posvenda'),
     't7_gravou_mesmo_assim', config_valor('posvenda', 'responsavel_padrao', 1) is not null);
@@ -64,6 +72,17 @@ begin
   r := r || jsonb_build_object('t9_vendedora_le', config_valor('core', 'teste_m2'));
   begin perform config_salvar('core', 'teste_m2', '1'::jsonb); e := 'gravou'; exception when others then e := split_part(sqlerrm, ':', 1); end;
   r := r || jsonb_build_object('t9_vendedora_grava', e);
+
+  -- 9b. chaves antigas da tabela NÃO são lidas por config_valor/config_valor_emp, de nenhum jeito.
+  --     A JM tem horario_comercial, roleta_leads:3 etc.; a vendedora (sessão JM) tenta montar o nome.
+  r := r || jsonb_build_object(
+    't9b_jm_tem_chaves_antigas', (select count(*) from configuracoes_sistema where empresa_id = 1 and position('.' in chave) = 0),
+    't9b_horario_comercial', jsonb_build_array(config_valor('horario', 'comercial'), config_valor('horario_comercial', ''),
+                                               config_valor('', 'horario_comercial'), config_valor_emp(1, 'horario_comercial', ''),
+                                               config_valor_emp(1, 'horario_comercial', null)),
+    't9b_roleta', jsonb_build_array(config_valor('roleta_leads', '3'), config_valor('roleta_leads:3', 'x'), config_valor_emp(1, 'roleta_leads:3', '')),
+    't9b_sla', jsonb_build_array(config_valor('sla', 'atendimento'), config_valor('sla_atendimento', 'x')),
+    't9b_curinga', jsonb_build_array(config_valor('%', '%'), config_valor('horario_comercial''--', 'x')));
 
   -- 10. sem sessão: lê nulo, não grava
   perform set_config('request.jwt.claims', '', true);
