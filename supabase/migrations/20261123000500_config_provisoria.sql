@@ -16,6 +16,13 @@
 -- loja da própria empresa. NÃO exige o módulo ligado: a D9 pede o responsável padrão preenchido ANTES de
 -- ligar o pós-venda.
 --
+-- Segurança (pedido do Lucas, 23/11):
+--   - as funções só leem e gravam chaves '<modulo>.<chave>' com módulo e chave validados
+--     (^[a-z][a-z0-9_]{0,62}$): nenhuma chave antiga da tabela (horario_comercial, roleta_leads:3,
+--     sla_atendimento, whatsapp_saude...) é alcançável por elas, nem montando o nome;
+--   - NENHUM SEGREDO (token, chave de API, senha) vai para '<modulo>.<chave>'. Segredo fica onde está hoje
+--     (cofre, variáveis de ambiente). config_salvar recusa nomes que pareçam segredo (CHAVE_PROIBIDA).
+--
 -- Volta: supabase/scripts/volta/volta-config-provisoria.sql.
 
 -- Leitura com a empresa explícita (gatilhos, Edge, funções do módulo). Só service_role e funções
@@ -32,6 +39,9 @@ as $$
            nullif(c.valor -> 'empresa', 'null'::jsonb))
     from public.configuracoes_sistema c
    where c.empresa_id = p_empresa
+     -- só o formato novo: módulo e chave validados, nunca uma chave antiga da tabela
+     and p_modulo ~ '^[a-z][a-z0-9_]{0,62}$'
+     and p_chave ~ '^[a-z][a-z0-9_]{0,62}$'
      and c.chave = p_modulo || '.' || p_chave
 $$;
 revoke all on function public.config_valor_emp(bigint, text, text, bigint) from public, anon, authenticated;
@@ -75,6 +85,10 @@ begin
   end if;
   if coalesce(p_modulo, '') !~ '^[a-z][a-z0-9_]{0,62}$' or coalesce(p_chave, '') !~ '^[a-z][a-z0-9_]{0,62}$' then
     raise exception 'CHAVE_INVALIDA: módulo e chave em minúsculas, letras, números e _' using errcode = 'P0001';
+  end if;
+  -- segredo não mora aqui: fica no cofre / variável de ambiente
+  if p_chave ~ '(token|secret|segredo|senha|password|passwd|api_?key|apikey|credencial|private_?key)' then
+    raise exception 'CHAVE_PROIBIDA: segredo (token, chave de API, senha) não é guardado na configuração' using errcode = 'P0001';
   end if;
   if p_filial is not null and not exists (select 1 from public.filiais f where f.id = p_filial and f.empresa_id = v_emp) then
     raise exception 'FILIAL_INVALIDA: a loja não é desta empresa' using errcode = 'P0001';

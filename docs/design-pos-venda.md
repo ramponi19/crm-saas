@@ -597,6 +597,7 @@ Convenções:
 
 1. **Uma linha por chave**, com o nome `<modulo>.<chave>`, igual ao par `(modulo, chave)` do `empresa_config`. Exemplos: `posvenda.intervalo_minimo_dias`, `posvenda.responsavel_padrao`, `core.ciclo_dias_entre_compras`.
    - Nunca um jsonb "saco de chaves" como o `retorno_cliente` de hoje: ele força a migração a desmontar o objeto e a conhecer cada campo.
+   - **Nenhum segredo no formato `<modulo>.<chave>` (regra do Lucas, 23/11).** Token, chave de API e senha ficam onde estão hoje (cofre das integrações, variáveis de ambiente da Vercel e da Edge). O motivo: qualquer membro da empresa lê `configuracoes_sistema` pela RLS atual. O `config_salvar` recusa nomes com cara de segredo (`token`, `secret`, `senha`, `password`, `api_key`, `credencial`, `private_key` → `CHAVE_PROIBIDA`), e as funções só alcançam chaves `<modulo>.<chave>` válidas: as antigas (`horario_comercial`, `roleta_leads:3`…) ficam fora do alcance delas.
 2. **O valor sempre no mesmo envelope:**
 
    ```json
