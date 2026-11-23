@@ -583,7 +583,7 @@ branches abertas antes de numerar).
   - rota do alerta: abre, não duplica, resolve e responde 401 sem o segredo;
   - o dono vê o aviso no card.
 
-## Mais de um número por loja — Transmissão guarda o número (PREPARADA 23/11, NÃO aplicada; 06 seção 59)
+## Mais de um número por loja — Transmissão guarda o número (APLICADA 23/11 11:06 UTC; Edge v85, volta v84; app e9be2cac — 06 seção 59)
 
 - **`20261123000100_transmissao_canal`:** `transmissoes.canal_id` (número que envia; nulo nas antigas, que seguem pela regra da loja); gatilho `transmissoes_canal_valido` (WhatsApp, desta empresa, da loja da transmissão ou da rede; ativo ao escolher); `modelo_aprovado_no_canal`; `transmissao_montar` confere o número e a aprovação NELE quando há `canal_id`, e como antes quando não há. Volta: `supabase/scripts/volta/volta-transmissao-canal.sql` (o `transmissao_montar` volta ao corpo da 20261111000300 — conferir por md5 em produção antes de aplicar).
 - **Edge `webhook-leads`:** `envioTransmissao` lê `canal_id` e envia por ele (conferido como no card: empresa, loja do negócio, WhatsApp, ativo); `envioAutomatico` aceita `canalId` do app (o WhatsApp em que o cliente falou por último na loja), senão a última recebida na loja, senão `canalDaLoja`.
