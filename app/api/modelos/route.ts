@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { metaConfigurada } from '@/lib/canais/meta'
 import { aprovadosNoCanal, aprovadosNoNumeroDaLoja, criarEmTodosOsNumeros, numerosWhatsApp, sincronizarModelos } from '@/lib/canais/modelos-waba'
 import { avisosDePagamento } from '@/lib/canais/saude-whatsapp'
+import { rotuloDoNumeroNaLoja } from '@/lib/canais/rotulo-loja'
 
 /**
  * Lista os modelos. `?sync=1` confere o estado da análise na Meta antes — em CADA número de
@@ -29,7 +30,7 @@ export async function GET(req: Request) {
         .eq('empresa_id', empresaId).order('status').order('nome'),
       supabase.from('modelos_mensagem_wabas').select('modelo_id, waba_id, status, motivo_recusa').eq('empresa_id', empresaId),
       numerosWhatsApp(svc, empresaId),
-      svc.from('filiais').select('id, nome').eq('empresa_id', empresaId),
+      svc.from('filiais').select('id, nome, cidade').eq('empresa_id', empresaId),
     ])
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -59,11 +60,12 @@ export async function GET(req: Request) {
       envio = { filial_id: filial, aprovados: ids, avisosPagamento: wabaId ? avisos.filter((a) => a.waba_id === wabaId) : [] }
     }
 
-    // Nome do número = a loja que envia por ele e o FINAL do número (o waba_id não diz nada ao
-    // lojista). Com dois números na mesma loja, só o nome da loja não dizia qual (23/11/2026).
-    const nomeLoja = new Map(((filiais ?? []) as { id: number; nome: string }[]).map((f) => [f.id, f.nome]))
+    // Nome do número = a loja que envia por ele (nome · cidade, a mesma regra da tela de Canais —
+    // lib/canais/rotulo-loja.ts) e o FINAL do número: "JM Store Importados · Mogi Guaçu ·2028".
+    // O waba_id não diz nada ao lojista; e com dois números na mesma loja, só a loja não dizia qual.
+    const lojaPorId = new Map(((filiais ?? []) as { id: number; nome: string; cidade: string | null }[]).map((f) => [f.id, f]))
     const rotulo = new Map(numeros.map((n) => [n.wabaId,
-      n.filiais.map((f, i) => `${f == null ? 'Empresa' : nomeLoja.get(f) ?? `Loja ${f}`} ·${n.finais[i]}`).join(', ')]))
+      n.filiais.map((f, i) => rotuloDoNumeroNaLoja(f == null ? null : lojaPorId.get(f) ?? { nome: `Loja ${f}` }, n.finais[i])).join(', ')]))
     const modelos = (data ?? []).map((m) => ({
       ...m,
       numeros: numeros.map((n) => {

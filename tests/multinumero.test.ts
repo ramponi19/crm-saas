@@ -10,6 +10,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { finalDoNumero } from '@/lib/canais/modelos-waba'
+import { rotuloDaLoja, rotuloDoNumeroNaLoja } from '@/lib/canais/rotulo-loja'
 
 const ler = (p: string) => readFileSync(p, 'utf8')
 
@@ -67,6 +68,45 @@ test('item 6: modelos do número escolhido no card e na Comunicação; a rota co
   assert.match(rota, /aprovadosNoCanal\(svc, empresaId, wabaDoCanal\)/)
   assert.match(ler('components/modules/leads/lead-modal.tsx'), /&canal=\$\{canalEscolhido\.canalId\}/)
   assert.match(ler('components/modules/comunicacao/conversa-painel.tsx'), /&canal=\$\{conversa\.canal_id\}/)
-  // A tela de modelos diz QUAL número (loja + final), não só a loja.
-  assert.match(rota, /·\$\{n\.finais\[i\]\}/)
+  // A tela de modelos diz QUAL número (loja + final), pela mesma regra da tela de Canais.
+  assert.match(rota, /rotuloDoNumeroNaLoja\(/)
+  assert.match(rota, /select\('id, nome, cidade'\)/)
+  assert.match(ler('components/modules/canais/canais-view.tsx'), /\{rotuloDaLoja\(l\)\}/)
+})
+
+test('rótulo da loja e do número: nome · cidade · final (a regra das duas telas)', () => {
+  // Os cadastros da JM em produção (23/11/2026).
+  const mogi = { nome: 'JM Store Importados', cidade: 'Mogi Guaçu' }
+  const jag = { nome: 'JM Store Importados · Jaguariúna', cidade: null }
+  assert.equal(rotuloDaLoja(mogi), 'JM Store Importados · Mogi Guaçu')
+  assert.equal(rotuloDaLoja(jag), 'JM Store Importados · Jaguariúna')
+  assert.equal(rotuloDoNumeroNaLoja(mogi, '2028'), 'JM Store Importados · Mogi Guaçu ·2028')
+  assert.equal(rotuloDoNumeroNaLoja(jag, '7419'), 'JM Store Importados · Jaguariúna ·7419')
+  // A cidade que já está no nome não repete (com ou sem acento).
+  assert.equal(rotuloDaLoja({ nome: 'JM Store Importados · Jaguariuna', cidade: 'Jaguariúna' }), 'JM Store Importados · Jaguariuna')
+  assert.equal(rotuloDaLoja({ nome: 'Loja Centro', cidade: '  ' }), 'Loja Centro')
+  // Número da empresa inteira (sem loja).
+  assert.equal(rotuloDoNumeroNaLoja(null, '3653'), 'Empresa ·3653')
+})
+
+test('janela da Meta bloqueada: detectada pelo window.open nulo, e o open original volta', async () => {
+  const { abrirVigiandoJanela, AVISO_JANELA_BLOQUEADA } = await import('@/lib/canais/janela-bloqueada')
+  const original = () => null
+  const bloqueia = { open: original as (...a: never[]) => unknown }
+  const r1 = abrirVigiandoJanela(bloqueia, () => { bloqueia.open() })
+  assert.deepEqual(r1, { bloqueada: true, abriu: false })
+  assert.equal(bloqueia.open, original, 'o window.open original volta depois da chamada')
+  const abre = { open: (() => ({ janela: true })) as (...a: never[]) => unknown }
+  assert.deepEqual(abrirVigiandoJanela(abre, () => { abre.open() }), { bloqueada: false, abriu: true })
+  // O SDK que nem tentou abrir (ex.: abre depois, fora do clique) não é tratado como bloqueio.
+  const nada = { open: (() => null) as (...a: never[]) => unknown }
+  assert.deepEqual(abrirVigiandoJanela(nada, () => {}), { bloqueada: false, abriu: false })
+  // Mesmo se o SDK lançar erro, o open original volta.
+  const erro = { open: original as (...a: never[]) => unknown }
+  assert.throws(() => abrirVigiandoJanela(erro, () => { throw new Error('x') }))
+  assert.equal(erro.open, original)
+  const tela = ler('components/modules/canais/canais-view.tsx')
+  assert.match(tela, /abrirVigiandoJanela\(window, \(\) => \{/)
+  assert.match(tela, /notify\.warn\(AVISO_JANELA_BLOQUEADA\)/)
+  assert.match(AVISO_JANELA_BLOQUEADA, /Seu navegador bloqueou a janela da Meta\. Permita pop-ups para este site e tente de novo\./)
 })

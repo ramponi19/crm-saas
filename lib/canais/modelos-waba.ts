@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { decifrarToken } from '@/lib/canais/crypto'
+import { finalDoNumero } from '@/lib/canais/rotulo-loja'
 import { apagarModelo, criarModelo, ehErro, listarModelos, statusDoModelo } from '@/lib/canais/meta'
 
 /**
@@ -26,13 +27,8 @@ export interface NumeroWhatsApp {
   finais: string[]
 }
 
-/** "+55 19 99886-2028 · JM Store" → "2028". */
-export function finalDoNumero(nome: string | null, externalId: string | null): string {
-  const d = (nome ?? '').split('·')[0].replace(/\D/g, '')
-  if (d.length >= 4) return d.slice(-4)
-  const e = (externalId ?? '').replace(/\D/g, '')
-  return e.length >= 4 ? e.slice(-4) : '?'
-}
+// A regra do final do número mora em rotulo-loja.ts (pura, vale também no navegador).
+export { finalDoNumero }
 
 /** As WABAs de WhatsApp da empresa (canais ativos com token), uma entrada por WABA. */
 export async function numerosWhatsApp(svc: Db, empresaId: number): Promise<NumeroWhatsApp[]> {

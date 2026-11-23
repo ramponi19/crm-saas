@@ -5,6 +5,8 @@ import { MessageCircle, Instagram, Send, RefreshCw, Unplug, AlertTriangle, Loade
 import { Button, Badge, ConfirmDialog, Modal, Textarea, notify } from '@/components/ui'
 import { useFuso } from '@/components/fuso-provider'
 import { formatarData, formatarDataHora } from '@/lib/datas'
+import { rotuloDaLoja } from '@/lib/canais/rotulo-loja'
+import { abrirVigiandoJanela, AVISO_JANELA_BLOQUEADA } from '@/lib/canais/janela-bloqueada'
 
 // ⚠️ Zona sensível (Meta). Esta tela dispara o fluxo oficial de conexão.
 // O token do cliente nunca passa por aqui: o navegador recebe só um código de
@@ -132,6 +134,8 @@ export function CanaisView({ appId }: { appId: string }) {
   //      usuário e o navegador bloqueia a janela.
   const [sdkPronto, setSdkPronto] = useState(false)
   const sessao = useRef<{ phoneNumberId?: string; wabaId?: string }>({})
+  /** A última tentativa teve a janela da Meta bloqueada pelo navegador (já avisado). */
+  const janelaBloqueada = useRef(false)
 
   useEffect(() => {
     if (!appId) return
@@ -196,11 +200,16 @@ export function CanaisView({ appId }: { appId: string }) {
       return notify.bad('O conector da Meta ainda está carregando. Tente de novo em alguns segundos.')
     }
     sessao.current = {}
+    janelaBloqueada.current = false
     setConectando('whatsapp')
     registrar('sdk_clique', { canal: 'whatsapp' })
     try {
+      const fb = window.FB
+      // A janela da Meta pode ser BLOQUEADA pelo navegador (23/11/2026): o SDK não chama o retorno
+      // e o botão ficava em "Aguardando a Meta…" para sempre. Vigiamos o window.open da chamada.
+      const janela = abrirVigiandoJanela(window, () => {
       // Callback SÍNCRONO de propósito — o SDK recusa função async.
-      window.FB.login((resp) => { void concluirWhatsApp(resp) }, {
+      fb.login((resp) => { void concluirWhatsApp(resp) }, {
         config_id: configId,
         response_type: 'code',
         override_default_response_type: true,
@@ -223,6 +232,13 @@ export function CanaisView({ appId }: { appId: string }) {
           version: 'v4',
         },
       })
+      })
+      if (janela.bloqueada && !janela.abriu) {
+        janelaBloqueada.current = true
+        setConectando(null)
+        registrar('sdk_janela_bloqueada', { canal: 'whatsapp' })
+        notify.warn(AVISO_JANELA_BLOQUEADA)
+      }
     } catch (e) {
       setConectando(null)
       registrar('sdk_login_excecao', { msg: (e as Error).message })
@@ -231,6 +247,8 @@ export function CanaisView({ appId }: { appId: string }) {
   }
 
   async function concluirWhatsApp(resp: RespostaFb) {
+    // Janela bloqueada já foi avisada; um retorno vazio do SDK depois disso não vira "cancelada".
+    if (janelaBloqueada.current && !resp?.authResponse?.code) return
     const code = resp?.authResponse?.code
     if (!code) {
       setConectando(null)
@@ -699,7 +717,7 @@ export function CanaisView({ appId }: { appId: string }) {
                             >
                               <option value="">Toda a rede</option>
                               {lojas.map((l) => (
-                                <option key={l.id} value={l.id}>{l.cidade ? `${l.nome} · ${l.cidade}` : l.nome}</option>
+                                <option key={l.id} value={l.id}>{rotuloDaLoja(l)}</option>
                               ))}
                             </select>
                           </label>
