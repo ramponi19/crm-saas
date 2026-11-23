@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { useFuso } from '@/components/fuso-provider'
 import { diaNoFuso } from '@/lib/datas'
-import { CONDICOES, DATA_MINIMA, validarVendaGanho, type CampoVenda, type CondicaoVenda } from '@/lib/venda-ganho'
+import { CONDICOES, DATA_MINIMA, validarVendaGanho, valorDigitado, type CampoVenda, type CondicaoVenda } from '@/lib/venda-ganho'
 import { cn } from '@/lib/utils'
 
 /** O que o modal devolve — vai no corpo de /api/leads/mover como `venda`. */
@@ -50,6 +50,8 @@ export function GanhoModal({ leadNome, valorInicial, criadoEm, confirmar = 'Marc
   const [categoria, setCategoria] = useState<number | null>(null)
   const [condicao, setCondicao] = useState<CondicaoVenda | null>(null)
   const [valor, setValor] = useState(valorInicial && valorInicial > 0 ? String(valorInicial).replace('.', ',') : '')
+  // Valor ainda é o que veio do negócio: a primeira digitação/colagem SUBSTITUI (lib/venda-ganho.ts).
+  const [valorIntocado, setValorIntocado] = useState(true)
   const [categorias, setCategorias] = useState<{ id: number; nome: string }[] | null>(null)
   const [tentou, setTentou] = useState(false)
 
@@ -140,7 +142,10 @@ export function GanhoModal({ leadNome, valorInicial, criadoEm, confirmar = 'Marc
         </fieldset>
 
         <Input label="Valor da venda (R$)" inputMode="decimal" autoComplete="off" placeholder="0,00"
-          value={valor} onChange={(e) => setValor(e.target.value)} error={erroDe('valor')} required />
+          value={valor} error={erroDe('valor')} required
+          // Focar seleciona tudo (no celular o toque posiciona o cursor depois do foco, daí o setTimeout).
+          onFocus={(e) => { const el = e.currentTarget; setTimeout(() => el.select(), 0) }}
+          onChange={(e) => { const novo = e.target.value; setValor(valorIntocado ? valorDigitado(valor, novo) : novo); setValorIntocado(false) }} />
       </div>
     </Modal>
   )

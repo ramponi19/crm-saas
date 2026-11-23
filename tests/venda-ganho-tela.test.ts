@@ -50,6 +50,14 @@ describe('Venda fechada (GanhoModal)', () => {
     assert.match(h, /inputMode="decimal"|inputmode="decimal"/)
     assert.match(h, /value="3295"/)
   })
+  test('valor preenchido é SUBSTITUÍDO ao digitar ou colar, nunca acrescentado (achado de 23/11)', () => {
+    const src = readFileSync('components/modules/leads/ganho-modal.tsx', 'utf8')
+    const campo = src.slice(src.indexOf('label="Valor da venda (R$)"'), src.indexOf('</div>', src.indexOf('label="Valor da venda (R$)"')))
+    assert.match(campo, /onFocus=\{[^\n]*\.select\(\)/, 'focar o campo seleciona o valor inteiro')
+    assert.match(campo, /valorIntocado \? valorDigitado\(valor, novo\) : novo/, 'o primeiro evento passa pela regra de substituir')
+    assert.match(campo, /setValorIntocado\(false\)/, 'depois do primeiro evento o campo é texto comum')
+    assert.match(campo, /inputMode="decimal"/, 'teclado numérico no celular')
+  })
   test('condição em dois botões: Novo e Usado (ou o termo da empresa)', () => {
     assert.match(h, /role="radiogroup" aria-label="Condição"/)
     assert.ok(h.includes('>Novo<') && h.includes('>Usado<'))

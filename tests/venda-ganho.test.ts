@@ -15,7 +15,7 @@
 import { test, describe, mock, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { bancoFalso, type Consulta, type Responder } from './banco-falso'
-import { validarVendaGanho, ganhoEmDaData, lerValor } from '@/lib/venda-ganho'
+import { validarVendaGanho, ganhoEmDaData, lerValor, valorDigitado } from '@/lib/venda-ganho'
 
 // ── regras puras ─────────────────────────────────────────────────────────────
 describe('validarVendaGanho', () => {
@@ -66,6 +66,47 @@ describe('validarVendaGanho', () => {
     const agora = new Date('2026-11-23T15:00:00Z')
     assert.equal(ganhoEmDaData('2026-10-15', 'America/Sao_Paulo', agora), '2026-10-15T15:00:00.000Z')
     assert.equal(ganhoEmDaData('2026-11-23', 'America/Sao_Paulo', agora), agora.toISOString())
+  })
+})
+
+// O campo de valor vem preenchido ("4590"): o primeiro evento de digitação SUBSTITUI, nunca junta.
+// Cada caso é o par (texto antes, texto depois do evento) que o navegador entrega ao onChange.
+describe('valorDigitado: valor preenchido é substituído, nunca acrescentado', () => {
+  const PRE = '4590'
+  for (const [nome, depois, fica] of [
+    ['digitar com o cursor no fim (o bug de 23/11)', '45907', '7'],
+    ['digitar com o cursor no começo', '74590', '7'],
+    ['digitar com o cursor no meio', '45790', '7'],
+    ['digitar o mesmo dígito do fim', '45900', '0'],
+    ['colar no fim', '45904.590,00', '4.590,00'],
+    ['colar com R$', '4590R$ 5.200,00', 'R$ 5.200,00'],
+    ['colar no começo', '5.200,004590', '5.200,00'],
+    ['teclado numérico do celular: vírgula no fim', '4590,', ','],
+  ] as const) {
+    test(nome, () => assert.equal(valorDigitado(PRE, depois), fica))
+  }
+  test('tudo selecionado (foco) e digitar: o navegador já troca; fica o que veio', () => {
+    assert.equal(valorDigitado(PRE, '7'), '7')
+  })
+  test('apagar (backspace) é edição de propósito: fica como está', () => {
+    assert.equal(valorDigitado(PRE, '459'), '459')
+    assert.equal(valorDigitado(PRE, ''), '')
+  })
+  test('trocar só um pedaço selecionado: fica como a pessoa escolheu', () => {
+    assert.equal(valorDigitado(PRE, '4520'), '4520') // "9" selecionado → "2"
+    assert.equal(valorDigitado(PRE, '45123'), '45123') // "90" selecionado → "123" (cresceu, mas trocou parte)
+  })
+  test('apagar e digitar: depois do primeiro evento o campo é texto comum (o modal para de substituir)', () => {
+    const passo1 = valorDigitado(PRE, '') // apagou tudo
+    assert.equal(passo1, '')
+    // segundo evento já não passa por valorDigitado: o modal marca intocado = false no primeiro onChange
+    assert.equal(lerValor('5200'), 5200)
+  })
+  test('campo vazio (negócio sem valor): digitar é texto comum', () => {
+    assert.equal(valorDigitado('', '5'), '5')
+  })
+  test('o resultado de cada caso é um valor que o servidor aceita', () => {
+    for (const v of ['7', '4.590,00', 'R$ 5.200,00', '5.200,00']) assert.ok(Number.isFinite(lerValor(v)), v)
   })
 })
 
