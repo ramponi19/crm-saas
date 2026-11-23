@@ -8,6 +8,8 @@ import path from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 
 const PASTA = process.argv[2]
+// Pasta de saida opcional (rodadas novas nao sobrescrevem o conciliacao_revisar.csv marcado pelo Lucas)
+const SAIDA = process.argv[3] || PASTA
 const EMPRESA = 1
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL, chave = process.env.SUPABASE_SERVICE_ROLE_KEY
 if (!PASTA || !url || !chave) { console.error('uso: node --env-file=.env.local conciliar.mjs <pasta>'); process.exit(1) }
@@ -69,6 +71,15 @@ for (let de = 0; ; de += 1000) {
     .eq('empresa_id', EMPRESA).order('lead_id').range(de, de + 999)
   if (error) throw new Error('perfil: ' + error.message)
   perfis.push(...data); if (data.length < 1000) break
+}
+
+// Negocios de recompra criados depois de um ganho (core_negocio_do_canal / restauracao, acao novo_apos_ganho):
+// nunca entram na conversao — sao conversa nova, nao o pedido antigo.
+const recompra = new Set()
+{
+  const { data, error } = await sb.from('negocio_historico').select('negocio_id').eq('empresa_id', EMPRESA).eq('acao', 'novo_apos_ganho')
+  if (error) throw new Error('historico: ' + error.message)
+  for (const h of data) recompra.add(h.negocio_id)
 }
 
 const funil = new Map(funis.map((f) => [f.id, f]))
@@ -192,7 +203,7 @@ for (const p of pedidos) {
 }
 casados.sort((a, b) => a.p.data_pedido.localeCompare(b.p.data_pedido))
 for (const { p, m } of casados) {
-  const negs = m.ids.flatMap((id) => negDoContato.get(id) || []).filter((n) => !interno(n))
+  const negs = m.ids.flatMap((id) => negDoContato.get(id) || []).filter((n) => !interno(n) && !recompra.has(n.id))
   const dia = p.data_pedido
   const abertos = negs.filter((n) => n.status === 'aberto' && n.ativo && !usados.has(n.id))
   const elegiveis = abertos.filter((n) => diaLocal(n.created_at) <= dia)
@@ -289,7 +300,7 @@ semPedido.sort((a, b) => a.dias_parado - b.dias_parado)
 const esc = (v) => { const s = String(v ?? ''); return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s }
 function csv(nome, linhas, cols) {
   cols = cols || [...new Set(linhas.flatMap((l) => Object.keys(l)))]
-  fs.writeFileSync(path.join(PASTA, nome), '﻿' + [cols.join(';'), ...linhas.map((l) => cols.map((c) => esc(l[c])).join(';'))].join('\r\n'), 'utf8')
+  fs.writeFileSync(path.join(SAIDA, nome), '﻿' + [cols.join(';'), ...linhas.map((l) => cols.map((c) => esc(l[c])).join(';'))].join('\r\n'), 'utf8')
 }
 const COLS_AT = ['negocio_id', 'contato_id', 'ficha_zapintel_id', 'cliente', 'telefone', 'produto_pedido', 'etapa_atual', 'status_atual', 'ganho_em_proposto', 'classificacao_zapintel_atual',
   'valor_pedido', 'vendedor', 'loja_origem', 'faixa', 'id_pedido', 'criterio', 'data_pedido', 'cliente_nexus', 'telefone_nexus', 'loja_nexus', 'criado_em', 'produto_negocio', 'produto_compativel',
@@ -300,7 +311,7 @@ csv('pedidos_sem_negocio.csv', semNegocio, ['id_pedido', 'cliente', 'telefone', 
 csv('negocios_abertos_sem_pedido.csv', semPedido)
 csv('divergencias.csv', diverg, ['tipo', 'negocio_id', 'contato_id', 'cliente_nexus', 'telefone_nexus', 'etapa_atual', 'status_atual', 'criado_em', 'ganho_em_atual', 'classificacao_zapintel_atual',
   'loja_nexus', 'id_pedido', 'cliente', 'telefone', 'produto_pedido', 'data_pedido', 'valor_pedido', 'detalhe'])
-fs.writeFileSync(path.join(PASTA, 'conciliacao_atualizar.json'), JSON.stringify(atualizar))
+fs.writeFileSync(path.join(SAIDA, 'conciliacao_atualizar.json'), JSON.stringify(atualizar))
 
 const por = (arr, k) => arr.reduce((o, x) => ((o[x[k]] = (o[x[k]] || 0) + 1), o), {})
 const filaAbertos = negocios.filter((n) => n.status === 'aberto' && n.ativo && !interno(n)).length
