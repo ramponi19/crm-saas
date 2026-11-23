@@ -683,12 +683,12 @@ Convenções:
 |---|---|
 | **A** | M2 + M3 + modal de ganho (data da venda, categoria, condição e valor, com validação no servidor) + modal de motivo ao reabrir + botão "Corrigir data da venda" (itens 2 abaixo) |
 | **B** | M4 + M5 + telas do ciclo de vida e quadro só com abertos (itens 3 e 4). **Depois da C** |
-| **C** | M6 + M7 + `/pos-venda` + Configurações › Pós-venda + aba Pós-venda na ficha (item 5). A vitrine vem por último, dentro da C ou depois. **Antes da B; só com o staging pronto** |
+| **C** | M6 + M7 + `/pos-venda` + Configurações › Pós-venda + aba Pós-venda na ficha (item 5). A vitrine vem por último, dentro da C ou depois. **Antes da B; pelo ritual do banco local (§8.6.1)** |
 | Fora das entregas | Triagem (item 1), em paralelo, e o desligamento da etapa (item 6), só depois da triagem aplicada |
 
 **Ordem nova (decisão do Lucas, 23/11/2026): A → C → B.**
 - ✅ **A em produção** em 23/11: M2, M3 e app, com o deploy `2b00174f`.
-- **C vem antes de B**, e começa só **depois do staging pronto** (§8.6).
+- **C vem antes de B**, e segue o ritual do banco local (§8.6 e §8.6.1; o staging foi descartado em 23/11).
 - O que muda na C para funcionar **sem a M4 (ciclo de vida) e sem a M5 (quadro só com abertos)**:
 
 | Ponto da C | Plano antigo (dependia de B) | Plano novo (sem M4/M5) |
@@ -790,41 +790,98 @@ O detalhe da Fase 2 e da Fase 3 está no fim do §8.3. A ordem dentro de cada fa
 | Contato duplicado por loja divide o histórico do mesmo cliente | A ficha soma pelo telefone (D2); a fusão de contatos já existe (`lib/fusao-contatos.ts`) |
 | Dependência do motor de configuração do PDV v2 | Chave provisória em `configuracoes_sistema` (D6) |
 
-### 8.6 Pendência de infraestrutura antes da Entrega C: ambiente de teste separado
+### 8.6 Ambiente de teste: o Supabase LOCAL (Docker), não um projeto de staging
 
-**O problema (conferido em 23/11/2026).** Os previews da Vercel usam as **mesmas** variáveis do Supabase que a produção. `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` têm o alvo "production + preview".
-- Testar num link de preview grava no banco real: marcar venda, reabrir, mover lead.
-- O preview também recebe segredos de produção: `META_APP_SECRET`, `CHANNEL_ENCRYPTION_KEY`, `WEBHOOK_VERIFY_TOKEN`, `PAYMENT_ENCRYPTION_KEY`, `CRON_SECRET`.
-- Até a Entrega B dá para conviver com isso, testando com lead de teste ou na empresa "Nexus Demonstração". A Entrega C não dá: ela cria jornadas, acompanhamentos e chamados em massa ao instalar o módulo, e muda o roteamento de toda mensagem que chega (M7). Testar isso no banco real é testar em produção.
+**Decisão do Lucas (23/11/2026, substitui a opção A): NÃO se cria o `crm-saas-staging`.** O ambiente de teste é o Supabase local que roda em Docker na máquina do Lucas.
+- A opção A e o projeto de staging ficam no histórico do git deste arquivo. Custo extra: zero.
 
-**Opção A (recomendada): projeto Supabase de staging.**
-- **Custo:** cerca de **US$ 10 por mês**, que é o compute Micro de mais um projeto (US$ 0,01344/h). A organização está no plano **Pro**: os US$ 10 de créditos de compute já cobrem a produção e não cobrem um segundo projeto. Disco até 8 GB e egress do teste cabem na cota.
-- **Passos:**
-  1. Criar o projeto `crm-saas-staging` em `sa-east-1`, com compute Micro, na mesma organização.
-  2. **Esquema:** aplicar as migrações do repositório (`supabase db push` contra o staging) e comparar com a produção pela listagem de tabelas, funções, políticas e gatilhos (`supabase db diff` e/ou `pg_dump --schema-only` dos dois). A produção não tem o histórico completo do repositório: o que faltar entra como migração de acerto. O mesmo problema já apareceu no Supabase local.
-  3. **Dados só fictícios:** a semente da demonstração (`supabase/scripts/demo/preview-demonstracao.sql`) mais uma empresa "JM de teste" com as mesmas etapas, categorias e vocabulário da JM. **Nunca** copiar cliente real (LGPD).
-  4. **Usuários de teste** no Auth do staging: dono, admin e vendedor em duas lojas. As senhas ficam com o Lucas, ou num arquivo local fora do git.
-  5. **Edge Functions** publicadas no staging, sem credenciais reais da Meta: o webhook da Meta continua só na produção. Para testar o recebimento, usar a Edge local ou a Graph falsa do e2e. Os crons do staging ficam desligados, ou ligados só os que estiverem em teste.
-  6. **Vercel:** separar as variáveis do alvo "Preview" das de "Production".
-     - As três do Supabase passam a apontar para o staging.
-     - Os segredos (Meta, canal, pagamento, cron, Anthropic) passam a ter valores de teste ou ficam vazios no preview.
-     - A produção não muda.
-  7. **Rotina de migração:** cada migração vai primeiro para o staging e é testada no preview. Só depois vai para a produção, com o mesmo ritual de hoje (IOwait, volta, md5).
-- **Tempo estimado:** cerca de 1 dia, a maior parte no passo 2 (fechar a diferença de esquema).
+**O problema que continua (conferido em 23/11/2026).** Os previews da Vercel usam as **mesmas** variáveis do Supabase que a produção: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` têm o alvo "production + preview".
+- Testar num link de preview grava no banco real. Por isso o **preview não é ambiente de teste de gravação**: serve para ver a tela; quem testa gravação é o local.
+- O preview também recebe segredos de produção. A proposta para isso está no item "Previews da Vercel", abaixo (aguarda o ok do Lucas).
 
-**Opção B: Supabase Branching** (um branch por PR, integrado ao GitHub e à Vercel).
-- **Custo:** sem taxa fixa; US$ 0,01344 por hora enquanto o branch existe (Micro), fora dos créditos e fora do teto de gasto. Um branch efêmero por PR custa centavos por dia. Um branch persistente custa os mesmos ~US$ 10 por mês da opção A.
-- **A favor:** cada PR ganha um banco limpo, e a integração com a Vercel preenche as variáveis do preview sozinha.
-- **Contra, hoje:** o branch é montado **só pelas migrações do repositório** mais `seed.sql`, e a produção não bate com o histórico do repositório. Até o passo 2 da opção A estar resolvido, o branch nasceria diferente da produção. Além disso, cada PR pagaria o tempo de subir e popular um banco novo.
-- **Caminho natural:** fazer a opção A agora. Quando o esquema do repositório reproduzir a produção, avaliar trocar o staging fixo pelo branching.
+**O banco local reproduz a produção (conferido em 23/11/2026).**
+- Um Supabase local descartável, montado do zero por **todas** as migrações da `main`, ficou com o esquema `public` igual ao da produção: 114 tabelas, 416 índices, 509 restrições, 447 políticas, 79 gatilhos, 119 funções, view e permissões.
+- **Fora da comparação ficaram só:**
+  - os 3 `_backup_*` operacionais da produção;
+  - duas linhas de comentário em `automacao_reservar` e `transmissao_reservar`;
+  - o `work_mem` das 3 funções do painel do ZapIntel, que a migração `0800` devolve à produção (a 4A o tinha apagado).
+- **Para chegar lá, dois consertos:**
+  - as travas por hash da M3 e da 0700 passaram a ignorar `\r`: os arquivos são CRLF e a produção recebeu os corpos sem eles;
+  - a 0800 alinha `work_mem` e uma permissão.
+- **Regra para migração nova com trava por hash:** comparar sempre `md5(replace(prosrc, E'\r', ''))`.
+- A comparação usa a impressão digital do catálogo: um hash por tabela, coluna, função, política, gatilho, índice e restrição. Esquemas `auth`, `storage` e `realtime` ficaram fora; quando forem precisos, entram na mesma conta.
 
-**Decisão do Lucas (23/11/2026): opção A**, projeto `crm-saas-staging` em São Paulo, compute Micro. Regras: só dados fictícios; Edge sem credenciais da Meta (nada no staging envia mensagem real); variáveis de Preview da Vercel apontando para o staging, com segredos de teste. Avisar o Lucas antes de criar o projeto (custo confirmado) e antes de trocar as variáveis da Vercel.
+**Como o local é montado.**
+1. **Esquema:** `npx supabase db reset` aplica todas as migrações do repositório.
+   - Nunca `db push` ou `link` contra a produção: a produção não tem o histórico de migrações do repositório.
+2. **Dados só fictícios:**
+   - a semente da demonstração (`supabase/scripts/demo/preview-demonstracao.sql`);
+   - uma empresa "JM de teste" com as etapas, categorias e vocabulário da JM;
+   - usuários de teste (dono, admin e vendedor em duas lojas), com senha só local.
+   - O dump real (`tools/banco/montar-local.sh`) **não** é usado para teste: é ferramenta de diagnóstico, cifrado, aberto só pelo Lucas.
+3. **Edge e crons:** a Edge local não recebe credencial real da Meta (nada envia mensagem real). Os crons só rodam quando um teste os chama.
+4. **Máquina:** Docker só com o IDE fechado. Ao terminar: `npx supabase stop` (guarda o volume), fechar o Docker Desktop e `wsl --shutdown`.
 
-### 8.7 Pendências para depois do staging (registradas em 23/11/2026, nada feito ainda)
+**Testes contra o banco local.**
+- **`npm run test:local`** (suíte de integração, `tests/integracao/*.test.ts`): rotas e RPCs **gravando de verdade** no banco local, com sessões reais dos usuários de teste.
+  - O script recusa qualquer URL que não seja `127.0.0.1`/`localhost`.
+  - Confere o resultado no banco local com a service_role local (a chave padrão do Supabase local, que não é segredo).
+- **Cobertura mínima:** todo caminho que grava em `negocios`, `contatos` ou `dados` e já quebrou ou é crítico.
+  - Marcar venda pelo quadro, pela ficha e pelo "Converter em cliente": com e sem dados, data futura, categoria de outra empresa.
+  - Corrigir data e reabrir: dono e admin passam; vendedor recebe 403.
+  - Criar lead com produto, reserva, importação, juntar negócios.
+  - O `teste-*.sql` de cada migração.
+- **Isolamento:** cada teste cria os próprios leads na "JM de teste". `db reset` + semente devolvem o estado inicial em cerca de 1 minuto.
+- **Testes de tela:** `npm run dev` apontando para o Supabase local (`.env.local.teste` com URL e chaves locais, fora do git), com os dados fictícios. É onde se testa o modal, o quadro e o celular antes de qualquer deploy.
+
+**Previews da Vercel — proposta (NÃO aplicada; aguarda o ok do Lucas).**
+- **O risco hoje:** o preview usa o banco da produção e tem a `CHANNEL_ENCRYPTION_KEY` da produção. Por isso consegue decifrar os tokens dos canais e mandar WhatsApp e Instagram de verdade.
+  - Com a `PAYMENT_ENCRYPTION_KEY`, decifra as credenciais de pagamento e os segredos das empresas: Pixel/CAPI e token de portal.
+  - Com o `CRON_SECRET`, alguém com o link pode disparar os jobs (automações, transmissão) contra o banco real.
+- **Troca proposta:** só no alvo **Preview**. A produção não muda.
+
+| Variável | No preview passa a ser | Efeito |
+|---|---|---|
+| `CHANNEL_ENCRYPTION_KEY` | chave de teste (32 bytes aleatórios) | não decifra token de canal → não envia mensagem, não sincroniza modelos, não renova token |
+| `PAYMENT_ENCRYPTION_KEY` | chave de teste | não decifra credencial de pagamento nem segredo de empresa (CAPI, token de portal) |
+| `META_APP_SECRET`, `INSTAGRAM_APP_SECRET` | valor de teste | conectar canal ou Instagram pelo preview falha na troca do código |
+| `WEBHOOK_VERIFY_TOKEN` | valor de teste | nada (o webhook da Meta aponta para a produção e para a Edge) |
+| `CRON_SECRET` | valor de teste | nada (cron da Vercel só roda em produção); fecha a porta dos jobs pelo link do preview |
+| `META_APP_ID`, `NEXT_PUBLIC_META_*`, `META_GRAPH_VERSION` | ficam | identificadores públicos, sem poder sozinhos |
+
+- **O que quebra no preview:**
+  - enviar mensagem e transmissão;
+  - conectar ou reconectar canal (WhatsApp, Instagram, Messenger);
+  - lista de modelos aprovados e renovação de token;
+  - configurar pagamento e ler gateway;
+  - Pixel/CAPI;
+  - entrada de leads por portal ou site com o token da empresa;
+  - rodar cron pelo link.
+  - As telas que só leem continuam funcionando, inclusive o status dos canais que vem do banco.
+- **⚠ Cuidado que a troca cria:** salvar pelo preview um segredo novo (conectar canal, configurar pagamento, gerar token de portal) gravaria no **banco da produção** um valor cifrado com a chave de teste, ilegível para a produção.
+  - Junto com a troca, essas três rotas passam a recusar quando `VERCEL_ENV = 'preview'`. É uma mudança pequena de código.
+- **O que continua igual:** o preview ainda lê e grava no banco da produção com a service_role. Isso só muda apontando o preview para outro banco, o que não existe mais na decisão de 23/11.
+
+---
+
+### 8.6.1 Ritual de deploy (REGRA, decisão do Lucas em 23/11/2026)
+1. **Migração no Supabase local primeiro**, junto com o `teste-*.sql` dela.
+2. **`npm run test:local` passando** (rotas e RPCs gravando no banco local). Mudança de tela: conferida no `npm run dev` contra o local.
+3. **Produção:** migração pelo `apply_migration` do MCP, com IOwait conferido, volta e trava por hash (sem `\r`).
+4. **Deploy:**
+   - `main` por cherry-pick numa worktree temporária;
+   - checagens de sempre (tsc, `npm test` e as 8 `check:*`);
+   - IOwait antes do push;
+   - deploy anterior anotado para voltar.
+5. **Conferência em produção** na "Nexus Demonstração", sem dado da JM.
+- Nenhuma exceção sem o ok do Lucas.
+- A correção do gatilho de dados (prioridade 2 do §8.7) e a Entrega C inteira seguem este ritual.
+
+### 8.7 Pendências (registradas em 23/11/2026; o ambiente de teste é o local, §8.6)
 
 **Prioridade decidida pelo Lucas (23/11/2026):**
 1. **Agora:** achado (d), o campo de valor do modal substitui o valor, nunca acrescenta. Vai para a produção junto com o arquivo da migração 0700.
-2. **Depois do staging:** o gatilho `core_validar_dados` confere só as chaves que mudaram, comparando com o valor anterior, e inclui `produto_interessado` na conferência. Teste no staging antes da produção.
+2. **Pelo ritual do §8.6.1 (local primeiro):** o gatilho `core_validar_dados` confere só as chaves que mudaram, comparando com o valor anterior, e inclui `produto_interessado` na conferência.
 3. **Entrega C:**
    - (b) ao reabrir uma venda, `dados.venda` vai para o histórico e sai do negócio;
    - (c) avaliar exigir `dados.venda` no banco na entrada em ganho e restringir quem edita `dados.venda` depois de gravado.
@@ -837,25 +894,8 @@ O detalhe da Fase 2 e da Fase 3 está no fim do §8.3. A ordem dentro de cada fa
 - Na mesma transação da RPC: `dados = jsonb_set(dados, '{venda,data}', to_jsonb(p_data::text))` quando `dados ? 'venda'`. O histórico `data_venda_corrigida` continua guardando as duas datas.
 - Teste novo: depois de corrigir, `dados.venda.data` = dia local do `ganho_em`. A divergência fica impossível por construção.
 
-**2. Testes de rota que gravam no banco rodam também contra o staging. APROVADO pelo Lucas em 23/11/2026; é REGRA a partir do staging pronto.**
-- **Regra do deploy:**
-  1. A migração vai primeiro para o staging.
-  2. `npm run test:staging` passa contra o preview do commit.
-  3. Só então a `main`.
-- Nenhuma exceção sem o ok do Lucas. Até o staging existir, vale o ritual de hoje (checagens, IOwait, volta anotada) mais o teste funcional na empresa "Nexus Demonstração".
-- **Suíte de integração**, `tests/integracao/*.test.ts`, rodada por `npm run test:staging`. Ela não importa a rota: chama o **preview da Vercel** do mesmo commit, que depois do passo 6 do §8.6 usa o banco do staging, com sessões reais dos usuários de teste (dono, admin e vendedor de duas lojas).
-  - As senhas ficam em `.env.staging.local`, fora do git. O script faz login pelo Auth do staging e guarda os cookies.
-  - Confere o resultado no banco do staging com a service_role do staging, nunca a da produção.
-- **Cobertura mínima:** todo caminho que grava em `negocios`, `contatos` ou `dados` e já quebrou ou é crítico.
-  - Marcar venda pelo quadro, pela ficha e pelo "Converter em cliente": com e sem dados, futura, categoria de outra empresa.
-  - Corrigir data e reabrir: dono e admin passam; vendedor recebe 403.
-  - Criar lead com produto, reserva, importação, juntar negócios.
-- **Isolamento:** cada teste cria os próprios leads na empresa "JM de teste" e os arquiva no fim. Uma vez por semana a semente é refeita.
-- **No ritual de deploy**, antes do cherry-pick para a `main`:
-  - migração aplicada primeiro no staging, com o `teste-*.sql` dela rodado lá;
-  - `npm run test:staging` verde contra o preview do commit.
-  - Sem os dois, não há push para a `main`. Depois de estável, vira um check do GitHub no PR.
-- **Custo:** zero além do staging. Cada rodada leva cerca de 1 a 2 minutos.
+**2. Testes de rota que gravam no banco: contra o Supabase LOCAL.** Aprovado pelo Lucas em 23/11/2026. Primeiro como proposta com staging; o mesmo dia trocou o staging pelo local.
+- Suíte `npm run test:local`, cobertura e ritual: §8.6 e §8.6.1.
 
 **3. Achados do teste funcional de 23/11 (empresa 5), aguardando decisão.**
 - **a. A tela esconde "Reabrir venda" e "Corrigir data da venda" do superadmin impersonando.** O banco aceita, porque `is_empresa_admin` cobre o superadmin. O hook `useSouAdmin` procura o usuário na lista da equipe, onde ele não está. Correção: o hook pergunta ao banco, com `is_empresa_admin(get_empresa_id())`. Para o dono e o admin reais, a tela já está certa.
@@ -895,7 +935,7 @@ O detalhe da Fase 2 e da Fase 3 está no fim do §8.3. A ordem dentro de cada fa
 | — | Data da venda no ganho | **Mantida no modal de ganho** (hoje como padrão). Para datas já gravadas, a RPC **`corrigir_data_venda(negocio_id, nova_data, motivo)`**, só dono e admin, com histórico. **Não usar `reabrir_negocio`** para isso | §2.3, M3 |
 
 **Ainda pendente com o Lucas:**
-- ok para criar o staging (§8.6, opção A) e, depois, para trocar as variáveis de Preview da Vercel;
+- ok para a troca das variáveis de Preview da Vercel (proposta no §8.6; o staging foi descartado em 23/11);
 - aprovar este plano (§8) antes de qualquer migração ou código do MVP;
 - marcar o `conciliacao_revisar.csv`;
 - confirmar o 5096 com a equipe.
