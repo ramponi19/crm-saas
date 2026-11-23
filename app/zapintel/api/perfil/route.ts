@@ -6,7 +6,7 @@ import { carregarConversas } from '@/lib/zapintel/conversas'
 import { montarFicha } from '@/lib/zapintel/ficha'
 import { produtosDaFicha } from '@/lib/zapintel/produtos-da-ficha'
 import { ondeTravou } from '@/lib/zapintel/travou'
-import { gerarPerfil, guardarPerfil, lerPerfil, marcaDaConversa } from '@/lib/zapintel/perfil'
+import { ajustarAoNegocio, gerarPerfil, guardarPerfil, lerPerfil, marcaDaConversa, statusDoNegocio } from '@/lib/zapintel/perfil'
 
 /**
  * A FICHA DO LEAD, ESCRITA POR IA.
@@ -68,11 +68,13 @@ export async function POST(req: Request) {
   }
 
   const marca = marcaDaConversa(lead)
+  // A classe da ficha segue o status do NEGÓCIO (4A, 23/11/2026): ganho = cliente; aberto nunca é.
+  const statusNegocio = await statusDoNegocio(db, empresaId, id)
 
   if (!forcar) {
     const guardado = await lerPerfil(db, empresaId, id, marca)
     if (guardado?.atual) {
-      return NextResponse.json({ ...guardado, doCache: true })
+      return NextResponse.json({ ...guardado, perfil: ajustarAoNegocio(guardado.perfil, statusNegocio), doCache: true })
     }
   }
 
@@ -147,10 +149,11 @@ export async function POST(req: Request) {
 
   // O modelo que ESCREVEU, devolvido pela chamada — não o configurado, que
   // pode ter mudado entre um e outro.
-  await guardarPerfil(db, empresaId, id, marca, r.perfil, r.modelo, r.ms)
+  const perfil = ajustarAoNegocio(r.perfil, statusNegocio)
+  await guardarPerfil(db, empresaId, id, marca, perfil, r.modelo, r.ms)
 
   return NextResponse.json({
-    perfil: r.perfil,
+    perfil,
     geradoEm: new Date().toISOString(),
     modelo: r.modelo,
     atual: true,

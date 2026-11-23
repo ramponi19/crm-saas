@@ -5,7 +5,7 @@ import { carregarConversas } from '@/lib/zapintel/conversas'
 import { montarFicha } from '@/lib/zapintel/ficha'
 import { produtosDaFicha } from '@/lib/zapintel/produtos-da-ficha'
 import { ondeTravou } from '@/lib/zapintel/travou'
-import { lerPerfil, marcaDaConversa } from '@/lib/zapintel/perfil'
+import { ajustarAoNegocio, lerPerfil, marcaDaConversa, statusDoNegocio } from '@/lib/zapintel/perfil'
 import { iaDoCrmLigada } from '@/lib/zapintel/ia'
 
 /**
@@ -98,7 +98,9 @@ export async function GET(req: Request) {
      * `/zapintel/api/perfil` — e enquanto a nova não chega, a antiga fica à
      * vista, marcada como desatualizada, em vez de a tela ficar vazia.
      */
-    const perfil = await lerPerfil(db, empresaId, id, marcaDaConversa(lead))
+    const guardado = await lerPerfil(db, empresaId, id, marcaDaConversa(lead))
+    // A classe segue o status do negócio (4A, 23/11/2026): a ficha guardada pode ser de antes do ganho.
+    const perfil = guardado && { ...guardado, perfil: ajustarAoNegocio(guardado.perfil, await statusDoNegocio(db, empresaId, id)) }
 
     /**
      * A IA ESTÁ LIGADA? A TELA PRECISA SABER ANTES DE PEDIR.

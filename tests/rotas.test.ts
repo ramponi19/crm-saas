@@ -55,6 +55,8 @@ mock.module('@/lib/zapintel/conversas', {
 mock.module('@/lib/zapintel/perfil', {
   namedExports: {
     marcaDaConversa: () => ({ marca: 1, mensagens: 1, transcritos: 0 }),
+    ajustarAoNegocio: (p: unknown) => p,
+    statusDoNegocio: async () => null,
     lerPerfil: async () => estado.guardado && { ...estado.guardado, perfil: {}, geradoEm: '', modelo: null },
     gerarPerfil: async () => { estado.chamadasIA++; return { ok: false, status: 503, erro: 'sem IA no teste' } },
     guardarPerfil: async () => {},
