@@ -3,10 +3,13 @@ import { requireEmpresaRoleApi } from '@/lib/owner'
 import { encryptCredenciais } from '@/lib/payments/crypto'
 import { buildProvider, type ProviderId } from '@/lib/payments'
 import { algumModuloLigado, exigirModuloLigado } from '@/lib/modulo-ligado'
+import { recusaNoPreview } from '@/lib/segredo-no-preview'
 
 const PROVIDERS_VALIDOS: ProviderId[] = ['manual', 'mercadopago', 'asaas', 'efibank', 'pagseguro']
 
 export async function POST(req: NextRequest) {
+  // Preview: banco da produção com chave de teste → não grava segredo (lib/segredo-no-preview.ts)
+  const recusa = recusaNoPreview(); if (recusa) return recusa
   /**
    * Dono ou admin, não "qualquer logado".
    *

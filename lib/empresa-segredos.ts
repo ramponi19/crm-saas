@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { encryptCredenciais, decryptCredenciais } from '@/lib/payments/crypto'
+import { CODIGO_PREVIEW, emPreview } from '@/lib/segredo-no-preview'
 
 type Svc = ReturnType<typeof createServiceClient>
 
@@ -25,6 +26,8 @@ export async function lerSegredo(svc: Svc, empresaId: number, chave: string): Pr
 
 /** Grava (ou troca) o segredo. Devolve o erro sem o valor — quem chama decide o que dizer. */
 export async function gravarSegredo(svc: Svc, empresaId: number, chave: string, valor: string): Promise<{ error: string | null }> {
+  // Preview: a cifra recusaria (lib/segredo-no-preview.ts); aqui vira erro devolvido, como os outros.
+  if (emPreview()) return { error: `${CODIGO_PREVIEW}: segredo da empresa não é gravado no preview.` }
   const { error } = await svc.from('empresa_segredos').upsert(
     { empresa_id: empresaId, chave, valor_cifrado: encryptCredenciais({ valor }), atualizado_em: new Date().toISOString() },
     { onConflict: 'empresa_id,chave' },
