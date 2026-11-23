@@ -1,6 +1,6 @@
 # Clientes e Pós-venda — desenho (modelo HubSpot adaptado ao Nexus)
 
-> Status: **proposta**, somente desenho (23/11/2026). Nada foi implementado nem migrado.
+> Status: **plano aguardando a aprovação do Lucas** (23/11/2026). Decisões D1–D12 tomadas (§3). Do desenho, só a M1/M1b e a 4A do ZapIntel estão em produção; o MVP (§8.3) ainda não começou.
 > Base: leitura do código (`main` + branch atual) e do banco de produção só com SELECT.
 > Relacionados: [pdv-v2-especificacao.md](pdv-v2-especificacao.md) (motor de configuração §A, pós-venda do PDV §I, integração com o CRM §L), conciliação de vendas (`scripts/conciliar-vendas/`).
 
@@ -29,6 +29,15 @@ O comportamento de hoje vai contra a regra "negócio ganho vira histórico, não
   - perdido continua reabrindo, que é o comportamento desejado para quem volta depois de perder.
   - os 8 ganhos já reabertos podem ser restaurados pelo `detalhe` do histórico.
 - A correção está na migração M1 (§8.2).
+
+**Em produção desde 23/11/2026 (D1).**
+- **M1** (`20261123000200_ganho_protegido`):
+  - ganho fora da janela abre negócio novo (`novo_apos_ganho` no histórico);
+  - o gatilho `negocios_ganho_protegido` barra qualquer saída do ganho e qualquer troca de `ganho_em`;
+  - a única porta é a RPC `reabrir_negocio(negocio, motivo)`: só dono ou admin, motivo obrigatório, grava `reaberto_manual`.
+- **M1b** (`…0300`): ganho **arquivado** dentro da janela também recebe a mensagem; arquivar e desarquivar vão para o histórico.
+- **Restauração:** as 8 vendas reabertas pelo bug foram restauradas (`ganho_restaurado`), com 4 negócios novos de recompra.
+- **Conciliação:** a 4B da conciliação rodou **depois** da M1 (147 negócios).
 
 ---
 
@@ -89,7 +98,10 @@ O comportamento de hoje vai contra a regra "negócio ganho vira histórico, não
 ### 1.3 O quadro do funil
 
 - **Não esconde ganho nem perdido.** `quadro_base` não filtra `status`, e as colunas Convertido e Perdido aparecem com o texto "Vendas fechadas aparecem aqui" ([kanban-column.tsx:83](../components/modules/leads/kanban-column.tsx)).
-- **Ganho pode voltar a aberto** arrastando: [app/api/leads/mover/route.ts:127](../app/api/leads/mover/route.ts) limpa o `ganho_em` sem pedir permissão.
+- **Ganho não volta mais a aberto sem permissão (M1, em produção desde 23/11/2026).**
+  - O gatilho `negocios_ganho_protegido` barra no banco a saída do ganho e a troca de `ganho_em`.
+  - A rota [app/api/leads/mover/route.ts](../app/api/leads/mover/route.ts) devolve 409 `GANHO_REABRIR` quando falta o motivo. Com motivo, chama `reabrir_negocio`, que só aceita dono ou admin (403 `GANHO_SEM_PERMISSAO` para os outros).
+  - Falta na tela o modal que pede o motivo: hoje aparece só a mensagem de erro.
 - O que mudar está em §2.5.4.
 
 ---
@@ -161,7 +173,10 @@ O comportamento de hoje vai contra a regra "negócio ganho vira histórico, não
 **Multi-empresa:**
 - `empresa_id` em toda linha, com a RLS padrão.
 - Os limites (dias entre compras, nota de promotor, validade do NPS, meses para inativo) são chaves `core.ciclo_*` em `empresa_config`.
-- O contato de cada loja é um contato separado, como hoje (`contatos.filial_id`). Por isso o ciclo é **por contato**, e a ficha soma os contatos de lojas diferentes que tenham o mesmo telefone. **Decisão D2.**
+- O contato de cada loja é um contato separado, como hoje (`contatos.filial_id`). Por isso o ciclo é **por contato**, e a ficha soma os contatos de lojas diferentes que tenham o mesmo telefone (`telefone_e164`). **Decisão D2 (23/11):** ciclo por contato, somado na ficha pelo telefone.
+  - A ficha mostra o estágio **mais alto** entre os contatos somados.
+  - Mostra também as compras de todos eles, cada uma com a loja.
+  - A lista de Clientes filtra pelo estágio de cada contato.
 
 ---
 
@@ -224,11 +239,23 @@ O comportamento de hoje vai contra a regra "negócio ganho vira histórico, não
 
 **`posvenda_cadencia_passos`:**
 - `ordem`, `dia_offset` (≥ 0), `ancora` (`ganho` | `entrega`; nulo = a da régua), `hora_sugerida`.
+- `ativo` (o passo pode ficar pronto e desligado, como o seguro do D+90; **D7**) e `filtros` jsonb **do passo** (mesmo formato dos da régua, por exemplo `{"condicao": "seminovo"}`). Um passo cujo filtro não casa com a compra não é materializado.
 - `tipo_acao`: `whatsapp` | `ligacao` | `pesquisa` | `tarefa_interna`.
 - `titulo` e `roteiro`: texto com variáveis `{nome}`, `{produto}`, `{vendedor}`, `{loja}`, `{data_compra}`.
 - `modelo_id` (modelo aprovado da Meta, opcional; usado fora da janela de 24 h).
 - `pesquisa_id` (quando `tipo_acao = pesquisa`).
-- `responsavel`: `vendedor_do_negocio` | `responsavel_do_contato` | `gerente_da_loja` | `usuario:<uuid>`.
+- `responsavel`: `vendedor_do_negocio` | `responsavel_do_contato` | `responsavel_da_loja` | `usuario:<uuid>`.
+
+**Responsável padrão por loja (D9, 23/11).** É a configuração `posvenda.responsavel_padrao`, com um usuário por loja; na JM, um para Guaçu (3) e um para Jaguariúna (6).
+- **Nenhum acompanhamento ou chamado nasce sem responsável.** A função `posvenda_resolver_responsavel(p_empresa, p_filial, p_regra, p_negocio)` decide nesta ordem:
+  1. a regra do passo (o vendedor do negócio, o responsável do contato ou um usuário fixo), **desde que** o usuário esteja ativo na empresa (`empresa_usuarios.ativo`) e veja a loja;
+  2. senão (sem vendedor, vendedor inativo ou sem acesso à loja), o **responsável padrão da loja** do negócio;
+  3. senão, o responsável padrão da empresa (valor sem loja da mesma chave);
+  4. senão, o **dono** da empresa. É a última rede: o dono sempre existe.
+- `responsavel_id` é **NOT NULL** em `posvenda_acompanhamentos` e `posvenda_chamados`.
+- **Instalação:** o módulo só liga com o responsável padrão preenchido para cada loja ativa. A tela de configuração mostra quem está vazio.
+- **Responsável desligado da empresa:** ao desativar um usuário em `empresa_usuarios`, os passos pendentes e os chamados abertos dele vão para o responsável padrão da loja, pela mesma função. Fica o registro em `posvenda_chamado_eventos`, e no acompanhamento a observação "reatribuído".
+- **Nos passos da régua da JM:** D+1 e D+330 ficam com o `vendedor_do_negocio`. NPS e o chamado de nota baixa ficam com o `responsavel_da_loja`.
 - `tolerancia_dias`: depois desse prazo atrasado, o passo vira "perdido". Não fica para sempre na fila.
 - `pular_se`: lista de condições, por exemplo `chamado_aberto` ou `respondeu_nps`.
 
@@ -244,7 +271,15 @@ O comportamento de hoje vai contra a regra "negócio ganho vira histórico, não
 - **Motivo:** a equipe registra o ganho dias depois da venda. Com `ganho_em` = clique, a régua de pós-venda (D+1, D+7…) começa atrasada e a janela da Edge (`pos_venda_dias`) fica deslocada: a mensagem do cliente cai em pós-venda quando já devia abrir negócio novo, ou o contrário. Exemplo real: o 5096 foi marcado ganho em 23/11, com pedido no grupo em 15/10 (a confirmar com a equipe).
 - **Hora:** data passada grava meio-dia no fuso da empresa; hoje grava o instante atual.
 - **Servidor:** a rota `/api/leads/mover` aceita `ganho_em` no corpo, recusa data futura ou anterior à criação do negócio por mais de 30 dias (tolerância para venda registrada antes do lead) e, sem o campo, usa agora (compatível com os clientes antigos).
-- **Correção depois:** trocar a data de um ganho já gravado continua só pelo caminho de exceção (`reabrir_negocio` ou uma RPC própria de "corrigir data da venda", com motivo e registro em `negocio_historico`), porque o gatilho da M1 trava `ganho_em`.
+- **Correção depois (decisão de 23/11):** a data de um ganho já gravado só muda pela RPC própria **`corrigir_data_venda(p_negocio bigint, p_nova_data date, p_motivo text)`**. **Nunca** por `reabrir_negocio`, que serve para tirar do ganho, não para corrigir a data.
+  - **Só dono ou admin** (`is_empresa_admin`), com a mesma checagem de empresa e de somente leitura da `reabrir_negocio`.
+  - Recusa: negócio que não é ganho, data futura, motivo com menos de 5 caracteres e data igual à atual.
+  - **Grava em `negocio_historico`** a ação `data_venda_corrigida`, com `por_usuario` e `detalhe` = data anterior, data nova e motivo.
+  - **Libera o gatilho da M1** com uma exceção própria (`nexus.corrigir_data_venda` = id do negócio), que permite **só** trocar `ganho_em` com o status continuando ganho.
+  - **Hora gravada:** meio-dia no fuso da empresa; se for hoje, o instante atual.
+  - **Efeitos:** recalcula o ciclo de vida. Com o módulo ligado, **reancora os passos pendentes** da jornada; os já feitos ficam como estão. Também muda a janela de roteamento da Edge, porque ela lê `ganho_em`.
+  - **Tela:** o botão "Corrigir data da venda" aparece na lista de ganhos e na aba Compras da ficha, só para dono e admin.
+  - **Primeiro caso:** o 5096, se a equipe confirmar que a venda é a de 15/10.
 
 ### Recompra no meio da régua
 
@@ -266,7 +301,8 @@ O comportamento de hoje vai contra a regra "negócio ganho vira histórico, não
 | 1 | D+1 da **entrega** | WhatsApp | Chegou bem? Transferência de dados, Face ID, iCloud, película. Oferece ajuda |
 | 2 | D+7 | Pesquisa (NPS) | "De 0 a 10, quanto recomendaria a JM?" + comentário |
 | 3 | D+30 | WhatsApp | Acessórios: capa, película, carregador, AirPods. Com cupom, se a empresa quiser |
-| 4 | D+90 | WhatsApp | **Só seminovo:** saúde da bateria e dicas de carga. **Seguro:** só se a JM vender. **Decisão D7** |
+| 4 | D+90 | WhatsApp | **Só seminovo** (filtro do passo `condicao = seminovo`): saúde da bateria e dicas de carga. **D7** |
+| 4b | D+90 | WhatsApp | **Seguro:** semeado **pronto e desligado** (`ativo = false`). Liga quando a JM tiver um parceiro de seguro. **D7** |
 | 5 | D+330 | Ligação ou WhatsApp | Ciclo de troca: avaliação do usado como entrada. Fica antes de completar 1 ano, a tempo de oferecer o modelo novo |
 
 O "lançamento do iPhone" (setembro) não é um passo, é uma **campanha**: o público "clientes de iPhone há mais de 10 meses" no módulo Públicos + Transmissão.
@@ -306,7 +342,7 @@ O módulo `avaliacoes` (veículos) está em preparação. A régua da Aletrini u
 
 **Nota baixa:**
 - Nota ≤ `posvenda.nps_limite_detrator` (padrão 6) **abre um chamado** da categoria "Insatisfação", prioridade alta.
-- O chamado vai para `posvenda.nps_responsavel_chamado`: `gerente_da_loja` (padrão) | `vendedor` | `usuario:<uuid>`.
+- O chamado vai para `posvenda.nps_responsavel_chamado`: `responsavel_da_loja` (padrão, **D9**) | `vendedor` | `usuario:<uuid>`. A resolução segue a mesma função do §2.3; o chamado nunca nasce sem responsável.
 - O texto inicial do chamado é a nota mais o comentário.
 
 **Indicadores** (tela do módulo; ver também §2.5):
@@ -314,7 +350,7 @@ O módulo `avaliacoes` (veículos) está em preparação. A régua da Aletrini u
 - Por período, **por vendedor** (o retrato), **por loja** (Guaçu, Jaguariúna) e por categoria de produto.
 - Taxa de resposta = respostas ÷ passos de pesquisa feitos.
 - Só a **primeira resposta por negócio** entra no NPS.
-- **Campinas não existe como loja no cadastro.** **Decisão D3.**
+- **Campinas não existe como loja no cadastro.** **Decisão D3 (23/11):** não cadastrar por enquanto. Fica fora do MVP. Os indicadores mostram só as lojas cadastradas.
 
 **Fase 2:** um link público com token (o padrão de [lib/portal-token.ts](../lib/portal-token.ts)) para o próprio cliente responder. O atendente manda o link na mensagem.
 
@@ -326,7 +362,7 @@ O módulo `avaliacoes` (veículos) está em preparação. A régua da Aletrini u
 
 - **Pós-venda** (`/pos-venda`) entra no grupo "Pós-venda" que já existe, ao lado de Garantia e Assistência.
 - Fica no manifesto: `chave: 'posvenda'`, `abasConfiguracoes: ['posvenda']`, sem `requer`.
-- Recomendo o nome **"Pós-venda"**, e não "Clientes", porque **Clientes já é core** (`/clientes`), e duas telas com o mesmo nome confundem.
+- Nome **"Pós-venda"** (**D4, 23/11**), e não "Clientes", porque **Clientes já é core** (`/clientes`), e duas telas com o mesmo nome confundem.
 - A ficha do cliente melhora no core (§2.5.3).
 - Com o módulo desligado, aparece a vitrine (`/vitrine/posvenda`).
 
@@ -377,20 +413,26 @@ O módulo `avaliacoes` (veículos) está em preparação. A régua da Aletrini u
 - As colunas de tipo `ganho` e `perdido` somem por padrão.
 - O filtro "Mostrar: Abertos | Ganhos | Perdidos" troca para uma **lista** (não colunas) com data, valor e vendedor. É o que o HubSpot faz com o "Closed won".
 - **Arrastar para ganho/perdido continua possível:** uma faixa de soltar fixa no rodapé do quadro ("Ganhou" / "Perdeu") no lugar das colunas, como no Kommo.
-- **Reabrir venda:**
-  - `/api/leads/mover` recusa a saída do ganho sem a permissão `negocios.reabrir_ganho` (padrão: dono e gerente) e sem motivo.
-  - Grava `negocio_historico.acao = 'reaberto_manual'` com o estado anterior.
-  - Recalcula o ciclo de vida.
+- **Reabrir venda (D10, 23/11):** **dono e admin por enquanto**. O banco já faz isso (M1: `reabrir_negocio` exige `is_empresa_admin` e motivo, e grava `reaberto_manual` com o estado anterior).
+  - Falta a tela: o **modal que pede o motivo** ao arrastar um ganho para fora ou ao clicar em "Reabrir venda". Hoje aparece só o 409.
+  - Quando os cargos do PDV v2 existirem, a checagem passa a ser a permissão `negocios.reabrir_ganho`, ligada para Dono e Gerente. Muda só a função `reabrir_negocio`; a rota e a tela continuam iguais.
+  - Ao reabrir, o ciclo de vida é recalculado.
+- **Corrigir data da venda:** `corrigir_data_venda` (§2.3), só dono e admin, na lista de ganhos e na ficha.
 - **Campos obrigatórios do ganho** passam a ser checados também na rota, e não só na tela.
 
-**Etapa "Pós Venda" (id 38, 80 negócios abertos) — como migrar sem perder nada:**
-1. **41 negócios estão na conciliação** (faixas A/B, com pedido). A Fase 4B já os leva a ganho com a data do pedido.
+**Etapa "Pós Venda" (id 38) — como migrar sem perder nada:**
+1. **Feito em 23/11:** a 4B da conciliação levou **41** dos 80 a ganho, com a data do pedido. Nesse intervalo, outro saiu da etapa pela equipe.
    - Ao instalar o módulo, a régua é criada, mas os passos com data já vencida nascem `pulado` (motivo `retroativo`).
    - Só os passos futuros ficam na fila: tipicamente o D+330 e, para as compras de novembro, o D+30.
-2. **39 restantes** vão para uma tela de **triagem**, uma lista única que o Lucas ou o gerente decide linha a linha:
-   - **Comprou**: vai para ganho com a data informada (obrigatória) e a categoria;
-   - **Não comprou, ainda negociando**: vai para Em contato ou Stand By;
-   - **Não comprou, encerrado**: vai para Perdido com motivo.
+2. **38 restantes** (37 Guaçu, 1 Jaguariúna, todos sem responsável). **Triagem feita pelo Matheus (D11, 23/11)** numa **planilha**, e não numa tela:
+   - Arquivo: `conciliacao-pedidos/rodada2-20261123/triagem_pos_venda.csv` (dados de clientes, fora do git).
+   - Colunas: cliente, telefone, loja, criado em, última interação, resumo da conversa, se está na lista "sem registro", pedidos no grupo e a sugestão de Claude. As colunas `decisao` e `observacao` ficam para o Matheus.
+   - As decisões possíveis:
+     - **ganho com data X** → etapa Convertido, `ganho_em` = X;
+     - **aberto em etapa Y** → Em contato, Negociando ou Stand By;
+     - **perdido** com motivo.
+   - A planilha preenchida é aplicada por script, com o mesmo cuidado da 4B: backup, transação, filtro pelo status atual, parada se a contagem divergir e histórico `triagem_pos_venda`.
+   - Em quatro deles (433, 520, 970, 2636) o pedido também está no `conciliacao_revisar.csv`; vale **uma** decisão por negócio.
 3. Só quando a etapa estiver **vazia**: `funil_etapas.ativo = false`.
    - **Nunca apagar.** O `negocio_historico` aponta para ela.
    - O nome passa a "Pós Venda (antiga)", para ler o histórico sem confusão.
@@ -407,7 +449,7 @@ O módulo `avaliacoes` (veículos) está em preparação. A régua da Aletrini u
   - Usa o motor que já existe: `send_template_automacao` e as travas do Automatize (horário comercial, teto por hora, intervalo por modelo, opt-out, `automacoes_pausadas`).
   - É ligado **por empresa e por passo**: a chave `posvenda.envio_automatico` vem `false` de fábrica, e o passo precisa ter `modelo_id`.
   - **Regra da Meta:** passo automático só pode usar **modelo aprovado**. Pós-venda proativo cai quase sempre fora da janela de 24 h, porque o cliente não falou nas últimas 24 h.
-    - Os modelos são de categoria **UTILITY** (acompanhamento da compra, entrega) ou **MARKETING** (acessórios, troca). A cobrança e as regras de opt-in são diferentes. **Decisão D8.**
+    - Os modelos são de categoria **UTILITY** (acompanhamento da compra, entrega) ou **MARKETING** (acessórios, troca). A cobrança e as regras de opt-in são diferentes. **Decisão D8 (23/11): só UTILITY no começo.**
     - A pesquisa de NPS por modelo pode usar botões de resposta rápida (0–10 não cabe; uma alternativa é "Ótimo / Bom / Ruim" + link). Fica para a fase 2/3.
 - A tela de configuração mostra, em cada passo, se o modelo está aprovado **no número de cada loja** (`modelos_mensagem_wabas`). A Edge já confere isso no `send_template`.
 
@@ -465,7 +507,7 @@ Sobre a configuração:
 **Importação:**
 1. O script da conciliação (`scripts/conciliar-vendas`, que já extrai, normaliza e pula os `id_pedido` já tratados) gera o arquivo de importação.
 2. Liga ao contato só nas faixas A/B (telefone). Faixas C/D/nome ficam sem contato e aparecem numa lista "ligar ao contato".
-3. Cria contato novo **só para quem tem telefone válido** e não existe. **Decisão D5.** O contato novo não abre negócio. Se esse cliente mandar mensagem, a Edge cria negócio novo (regra 6) e a ficha já mostra o histórico.
+3. Cria contato novo **só para quem tem telefone válido** e não existe. **Decisão D5 (23/11): aprovado, na Fase 2.** O contato novo não abre negócio. Se esse cliente mandar mensagem, a Edge cria negócio novo (regra 6) e a ficha já mostra o histórico.
 
 **Sem régua retroativa:**
 - O gatilho `compra_historica` gera jornada **só com os passos cuja data ainda não passou**. Do D+1 ao D+30 já passaram para quem comprou há mais de 30 dias.
@@ -491,7 +533,9 @@ Convenções:
 |---|---|---|
 | `contato_ciclo` | `contato_id` PK FK contatos on delete cascade, `empresa_id`, `estagio` text CHECK (lead, oportunidade, cliente, recorrente, promotor, inativo), `estagio_calculado`, `ciclo_manual` text null, `manual_por` uuid, `manual_em`, `manual_motivo`, `compras_qtd` int, `primeira_compra_em` date, `ultima_compra_em` date, `valor_total` numeric, `nps_ultimo` smallint, `nps_em` timestamptz, `atualizado_em` | `(empresa_id, estagio)`, `(empresa_id, ultima_compra_em)` |
 | `compras_historicas` | ver §2.7 | `unique (empresa_id, origem, origem_ref)`, `(empresa_id, contato_id)`, `(empresa_id, telefone_e164)` |
-| `negocio_historico.acao` | novos valores: `reaberto_manual`, `ganho_restaurado` (correção do §0) | — |
+| `negocio_historico.acao` | valores já em uso desde a M1: `reaberto_manual`, `ganho_restaurado`, `novo_apos_ganho`, `arquivado`/`desarquivado`, `conciliacao_zip`. Novos: `data_venda_corrigida`, `triagem_pos_venda` | — |
+| RPC `corrigir_data_venda(bigint, date, text)` + exceção `nexus.corrigir_data_venda` no gatilho da M1 | §2.3 | — |
+| Funções `config_valor_emp` / `config_valor` / `config_salvar` (provisórias sobre `configuracoes_sistema`) | §8.1, D6 | — |
 | Função `contato_ciclo_recalcular(bigint)` + gatilho em `negocios` e `compras_historicas` | — | — |
 | `core_negocio_do_canal` (revisada) | ordem do §2.6 | — |
 | `quadro_base` / `quadro_contagens` / `quadro_pagina` | + `p_status text default 'aberto'` | índice parcial `negocios (empresa_id, funil_id, etapa_id) where status='aberto'`, se o EXPLAIN pedir |
@@ -501,15 +545,15 @@ Convenções:
 | Tabela | Colunas principais | Índices / FKs |
 |---|---|---|
 | `posvenda_cadencias` | `id`, `empresa_id`, `nome`, `ativo`, `prioridade` int, `gatilho` text CHECK, `filtros` jsonb, `ao_recomprar` text CHECK, `ancora_padrao` text CHECK, `criado_por`, `criado_em` | `(empresa_id, ativo)` |
-| `posvenda_cadencia_passos` | `id`, `empresa_id`, `cadencia_id` FK cascade, `ordem`, `dia_offset` int ≥0, `ancora`, `hora_sugerida` time, `tipo_acao` CHECK, `titulo`, `roteiro`, `modelo_id` FK modelos_mensagem null, `pesquisa_id` FK null, `responsavel` text, `tolerancia_dias` int, `pular_se` jsonb | `unique (cadencia_id, ordem)` |
+| `posvenda_cadencia_passos` | `id`, `empresa_id`, `cadencia_id` FK cascade, `ordem`, `ativo` bool (D7), `filtros` jsonb (D7), `dia_offset` int ≥0, `ancora`, `hora_sugerida` time, `tipo_acao` CHECK, `titulo`, `roteiro`, `modelo_id` FK modelos_mensagem null, `pesquisa_id` FK null, `responsavel` text, `tolerancia_dias` int, `pular_se` jsonb | `unique (cadencia_id, ordem)` |
 | `posvenda_jornadas` | `id`, `empresa_id`, `filial_id`, `contato_id` FK, `negocio_id` FK null, `compra_historica_id` FK null, `cadencia_id` FK, `ancora_em` timestamptz, `entrega_em` timestamptz null, `status` CHECK (ativa, pausada, concluida, cancelada), `motivo_fim`, `criado_em` | `(empresa_id, contato_id, status)`; CHECK de que há negócio OU compra histórica; `unique (negocio_id, cadencia_id)` |
-| `posvenda_acompanhamentos` | `id`, `empresa_id`, `filial_id`, `jornada_id` FK cascade, `passo_id` FK, `contato_id`, `negocio_id`, `responsavel_id` uuid, `previsto_para` timestamptz, `status` CHECK (pendente, feito, sem_resposta, reagendado, pulado, perdido, cancelado), `resultado` text, `observacao`, `cliente_respondeu_em`, `feito_por`, `feito_em`, `tentativas` int | **`(empresa_id, responsavel_id, previsto_para) where status='pendente'`** (a fila); `(jornada_id)` |
+| `posvenda_acompanhamentos` | `id`, `empresa_id`, `filial_id`, `jornada_id` FK cascade, `passo_id` FK, `contato_id`, `negocio_id`, `responsavel_id` uuid **NOT NULL** (D9), `previsto_para` timestamptz, `status` CHECK (pendente, feito, sem_resposta, reagendado, pulado, perdido, cancelado), `resultado` text, `observacao`, `cliente_respondeu_em`, `feito_por`, `feito_em`, `tentativas` int | **`(empresa_id, responsavel_id, previsto_para) where status='pendente'`** (a fila); `(jornada_id)` |
 | `posvenda_pesquisas` | `id`, `empresa_id`, `nome`, `tipo` CHECK (nps, csat), `pergunta`, `pergunta_comentario`, `ativo` | — |
 | `posvenda_respostas` | `id`, `empresa_id`, `filial_id`, `contato_id`, `negocio_id`, `acompanhamento_id` null, `pesquisa_id`, `nota` smallint, `comentario`, `canal`, `vendedor_id` (retrato), `respondida_em`, `registrada_por` | `(empresa_id, respondida_em)`, `(empresa_id, vendedor_id)`, `unique (negocio_id, pesquisa_id)` |
 | `posvenda_chamado_status` | `id`, `empresa_id`, `nome`, `tipo` CHECK (aberto, andamento, aguardando_cliente, aguardando_terceiro, resolvido), `ordem`, `cor`, `ativo` | — |
 | `posvenda_chamado_categorias` | `id`, `empresa_id`, `nome`, `ativo`, `responsavel_padrao` text | — |
 | `posvenda_chamado_sla` | `empresa_id`, `categoria_id` null, `prioridade`, `primeira_resposta_horas`, `resolucao_horas`, `horario_comercial` bool | `unique (empresa_id, coalesce(categoria_id,0), prioridade)` |
-| `posvenda_chamados` | `id`, `empresa_id`, `filial_id`, `numero` (sequência por empresa), `contato_id`, `negocio_id` null, `acompanhamento_id` null, `resposta_id` null (NPS baixo), `categoria_id`, `prioridade`, `status_id`, `titulo`, `descricao`, `responsavel_id`, `assistencia_garantia_id` null, `aberto_em`, `primeira_resposta_em`, `resolvido_em`, `sla_resposta_vence`, `sla_resolucao_vence`, `sla_pausado_seg` int, `origem` (manual, nps, zapintel), `criado_por` | `(empresa_id, status_id)`, `(empresa_id, responsavel_id) where resolvido_em is null`, `(contato_id)` |
+| `posvenda_chamados` | `id`, `empresa_id`, `filial_id`, `numero` (sequência por empresa), `contato_id`, `negocio_id` null, `acompanhamento_id` null, `resposta_id` null (NPS baixo), `categoria_id`, `prioridade`, `status_id`, `titulo`, `descricao`, `responsavel_id` **NOT NULL** (D9), `assistencia_garantia_id` null, `aberto_em`, `primeira_resposta_em`, `resolvido_em`, `sla_resposta_vence`, `sla_resolucao_vence`, `sla_pausado_seg` int, `origem` (manual, nps, zapintel), `criado_por` | `(empresa_id, status_id)`, `(empresa_id, responsavel_id) where resolvido_em is null`, `(contato_id)` |
 | `posvenda_chamado_eventos` | `id`, `empresa_id`, `chamado_id` FK cascade, `tipo` (status, nota, atribuicao, cliente_respondeu), `de`, `para`, `texto`, `por`, `em` | `(chamado_id, em)` |
 
 **Funções do módulo:** todas `SECURITY DEFINER`, com `search_path` fixo, `core_modulo_ligado(...,'posvenda')` e checagem de permissão.
@@ -520,61 +564,133 @@ Convenções:
 
 **Configuração:** chaves no manifesto (`configuracoes` do PDV v2 §A), módulo `posvenda`.
 - `intervalo_minimo_dias` (3), `teto_diario_por_responsavel` (25);
-- `nps_limite_detrator` (6), `nps_responsavel_chamado` (gerente_da_loja);
+- `nps_limite_detrator` (6), `nps_responsavel_chamado` (responsavel_da_loja);
 - `envio_automatico` (false), `categorias_aparelho` ([1,2,3,4]), `sem_resposta_tentar_em_dias` (2).
 - No core: `ciclo_dias_entre_compras` (7), `ciclo_nota_promotor` (9), `ciclo_validade_nps_meses` (12), `ciclo_inativo_meses` (null = desligado), `pos_venda_dias` (já existe, 30).
-- **Se o `empresa_config` do PDV v2 ainda não existir**, guardar provisoriamente em `configuracoes_sistema` (chave `posvenda`), como já se faz com `retorno_cliente`, e migrar junto com o resto. **Decisão D6.**
+- No módulo também: `responsavel_padrao` (por loja; **D9**).
+
+**Armazenamento provisório e a migração para o `empresa_config` (D6, 23/11).** Enquanto o `empresa_config` do PDV v2 não existir, as chaves ficam em `configuracoes_sistema`, a tabela que já existe com `empresa_id`, `chave` e `valor` jsonb, sem loja. As convenções são escolhidas para a migração ser mecânica.
+
+1. **Uma linha por chave**, com o nome `<modulo>.<chave>`, igual ao par `(modulo, chave)` do `empresa_config`. Exemplos: `posvenda.intervalo_minimo_dias`, `posvenda.responsavel_padrao`, `core.ciclo_dias_entre_compras`.
+   - Nunca um jsonb "saco de chaves" como o `retorno_cliente` de hoje: ele força a migração a desmontar o objeto e a conhecer cada campo.
+2. **O valor sempre no mesmo envelope:**
+
+   ```json
+   {"empresa": <valor ou null>, "lojas": {"<filial_id>": <valor>}}
+   ```
+
+   Exemplo (D9): `posvenda.responsavel_padrao` = `{"empresa": null, "lojas": {"3": "<uuid Guaçu>", "6": "<uuid Jaguariúna>"}}`.
+   - O envelope tem exatamente o formato das linhas do `empresa_config`: `filial_id` nulo é a empresa, cada loja é uma linha.
+3. **Ninguém lê `configuracoes_sistema` direto para essas chaves.** O SQL usa a função **`config_valor_emp(p_empresa, p_modulo, p_chave, p_filial)`**, `STABLE` e `SECURITY DEFINER`.
+   - Ordem de leitura: valor da loja, valor da empresa, `null`. É a mesma do `config_valor` do PDV v2 §A; o padrão fica no chamador (`coalesce` com o padrão do manifesto).
+   - Para a sessão, há o atalho `config_valor(p_modulo, p_chave, p_filial)`, que usa `get_empresa_id()`, com o mesmo nome e a mesma assinatura do PDV v2.
+   - A escrita passa só por `config_salvar(p_modulo, p_chave, p_valor, p_filial)`. Ela confere dono ou admin e o módulo ligado, e grava no envelope.
+   - O TypeScript usa um único `lib/config.ts` (`lerConfig` e `salvarConfig`), que chama essas RPCs.
+4. **Migração quando o PDV v2 Fase 1 criar o `empresa_config`.** É uma migração só, e ninguém fora dela muda:
+   1. cria `empresa_config`, se ainda não existir;
+   2. copia, para cada linha `chave like 'posvenda.%' or chave like 'core.ciclo_%'`:
+      - `(empresa_id, null, split_part(chave,'.',1), substr(chave, position('.' in chave)+1), valor->'empresa')`, se `valor->'empresa'` não for nulo;
+      - `(empresa_id, filial_id, …, valor->'lojas'->>filial_id)` para cada loja;
+   3. troca o corpo de `config_valor_emp`, `config_valor` e `config_salvar` para ler e gravar no `empresa_config`. **As assinaturas não mudam**, e por isso RPCs, telas e `lib/config.ts` não são tocados;
+   4. confere a contagem: linhas copiadas = valores de empresa + valores de loja;
+   5. deixa as linhas antigas de `configuracoes_sistema` com a chave renomeada para `_migrado.<chave>` por 30 dias, como volta, e depois apaga numa migração própria.
+   - **Requisito para o PDV v2:** manter o `config_valor_emp(p_empresa, …)`. Gatilhos e a Edge não têm sessão; o `config_valor` do §A só conhece a empresa da sessão.
+   - O `retorno_cliente.pos_venda_dias` de hoje vira `core.pos_venda_dias` nessa mesma migração, como já previsto no §2.6.
 
 **Realtime:** só `posvenda_chamados`, para o quadro. Entra em `realtime` do manifesto e é adicionada à publicação por migração.
 
 ### 8.2 Migrações em ordem
 
-| # | Migração | Lado | Depende de |
-|---|---|---|---|
-| M1 | **Correção do roteamento** (§0): `core_negocio_do_canal` passa a abrir negócio novo quando o ganho está fora da janela; restaura os 8 ganhos reabertos a partir de `negocio_historico.detalhe` (com backup e rollback) | core | — (**antes ou logo depois da Fase 4B**) |
-| M2 | `contato_ciclo` + função + gatilho + backfill | core | M1 |
-| M3 | `quadro_*` com `p_status`; checagem de campos obrigatórios e da permissão `negocios.reabrir_ganho` na rota (código) | core | — |
-| M4 | `compras_historicas` + RPC de importação (idempotente por `origem_ref`) | core | M2 |
-| M5 | Tabelas `posvenda_*` + RLS + funções + sementes (status, categorias, SLA e pesquisa NPS padrão) na instalação do módulo (`lib/modulos-instalacao.ts`) | módulo | M2 |
-| M6 | `core_negocio_do_canal` com os itens 2–3 do §2.6 (lê `posvenda_*` se o módulo estiver ligado) | core | M5 |
-| M7 | Etapa "Pós Venda": triagem (tela) e depois `ativo=false` + renomear (dado, sem DDL) | dados | 4B da conciliação + triagem |
-| M8 | Realtime de `posvenda_chamados` | módulo | M5 |
+**Já em produção (23/11/2026):**
+
+| Migração | O que fez |
+|---|---|
+| ✅ M1 `ganho_protegido` | Ganho fora da janela abre negócio novo; gatilho que trava a saída do ganho e o `ganho_em`; RPC `reabrir_negocio` |
+| ✅ M1b `ganho_arquivado_e_arquivamento` | Ganho arquivado conta na janela; arquivar e desarquivar no histórico |
+| ✅ 4A `zapintel_ganho_por_negocio` | O ZapIntel lê o status do negócio (ganho = Cliente; aberto nunca vira Cliente pela IA; selo "já é cliente") |
+
+**MVP (em ordem; cada uma com arquivo de volta e teste em transação desfeita, como a M1):**
+
+| # | Migração | O que faz | Lado | Depende de |
+|---|---|---|---|---|
+| M2 | `config_provisoria` | `config_valor_emp`, `config_valor` e `config_salvar` sobre `configuracoes_sistema`, no envelope `{empresa, lojas}` (D6). Sem dados novos | core | — |
+| M3 | `corrigir_data_venda` | RPC `corrigir_data_venda` (dono/admin, motivo, histórico `data_venda_corrigida`) e a exceção `nexus.corrigir_data_venda` no gatilho da M1, que libera só a troca de `ganho_em` com o status ganho | core | M1 |
+| M4 | `contato_ciclo` | Tabela `contato_ciclo`, função `contato_ciclo_recalcular`, gatilho em `negocios` (status, ganho_em, etapa, delete) e backfill dos 3,7 mil contatos da JM. Lê os limites por `config_valor_emp('core', 'ciclo_*')` | core | M2 |
+| M5 | `quadro_por_status` | `quadro_base`, `quadro_contagens` e `quadro_pagina` ganham `p_status` (padrão `aberto`), mais o índice parcial se o EXPLAIN pedir | core | — |
+| M6 | `posvenda_modulo` | As 10 tabelas `posvenda_*` com RLS (responsável NOT NULL), `posvenda_resolver_responsavel`, `posvenda_iniciar_jornadas` (gatilho no ganho; passos vencidos nascem `pulado`), `posvenda_registrar`, `posvenda_chamado_abrir`/`_mover` (SLA em horas corridas), reatribuição ao desativar usuário, e as sementes na instalação: status e categorias de chamado, SLA padrão, pesquisa NPS e régua "iPhone e aparelhos" com o D+90 seminovo ligado e o seguro desligado | módulo | M2, M4 |
+| M7 | `canal_le_posvenda` | `core_negocio_do_canal` com os itens 2 e 3 do §2.6 (chamado aberto ou acompanhamento pendente segura a mensagem sem abrir negócio), só com o módulo ligado | core | M6 |
+| — | Aplicar a triagem da etapa Pós Venda | Script, não migração: backup, transação, filtro pelo status atual, histórico `triagem_pos_venda`. Depois `funil_etapas.ativo = false` na etapa 38 e o nome "Pós Venda (antiga)" | dados | planilha do Matheus |
+
+**Fase 2:**
+
+| # | Migração | O que faz |
+|---|---|---|
+| M8 | `compras_historicas` | Tabela e RPC de importação idempotente (`origem_ref` = `id_pedido`), contatos só com telefone válido (D5), gatilho `compra_historica` sem régua retroativa |
+| M9 | `posvenda_realtime` | Realtime de `posvenda_chamados` para o quadro de chamados |
+| M10 | `config_para_empresa_config` | Migração das chaves provisórias para o `empresa_config`, quando o PDV v2 Fase 1 existir (§8.1, D6) |
 
 ### 8.3 MVP (o mínimo para a JM usar)
 
-1. **M1:** o ganho deixa de ser apagado. Sem isso, nada do resto se sustenta.
-2. **Quadro sem ganho/perdido** + "Reabrir venda" com permissão (M3).
-3. **Ciclo de vida** calculado (M2) e mostrado no cabeçalho da ficha do cliente e na lista de Clientes (coluna + filtro).
-4. **Módulo Pós-venda:**
-   - a régua "iPhone e aparelhos" semeada;
-   - a fila Hoje/Atrasados/Próximos com Abrir WhatsApp (texto montado), Registrar resultado, NPS manual e Reagendar;
-   - chamado simples: status semeados, categoria, responsável e SLA em horas corridas.
-5. **Campos obrigatórios no ganho** (categoria, condição, valor) configurados na etapa Convertido da JM.
-6. **Triagem e desativação da etapa "Pós Venda"** (M7).
+**Entregas, em ordem.** Cada uma vai para produção sozinha, na sequência migração → app → conferência.
 
-**Fora do MVP:** compras históricas, link público de NPS, SLA em horário comercial, indicadores por vendedor e loja (os dados já ficam gravados com o retrato desde o MVP), envio automático, a régua da Aletrini e o ZapIntel lendo o ciclo.
+0. ✅ **Feito:** M1, M1b e 4A em produção. A venda não é mais apagada, e o ZapIntel lê o ganho.
+1. **Triagem da etapa Pós Venda.** O Matheus preenche o `triagem_pos_venda.csv` e o script aplica (com backup).
+   - Não depende de código novo. Pode correr em paralelo com o resto.
+2. **Ganho com data e reabrir com motivo** (core; M2 e M3 + app):
+   - modal de ganho com **data da venda** (hoje como padrão) e os campos obrigatórios da etapa Convertido (categoria, condição novo/seminovo, valor);
+   - a rota `/api/leads/mover` aceita e valida `ganho_em` e confere os campos obrigatórios no servidor;
+   - modal de **motivo** ao tirar uma venda do ganho (dono e admin);
+   - botão **"Corrigir data da venda"** (dono e admin), que chama `corrigir_data_venda`.
+3. **Quadro só com abertos** (M5 + app): ganho e perdido viram lista filtrada, e o quadro ganha faixas de soltar "Ganhou" / "Perdeu".
+4. **Ciclo de vida** (M4 + app):
+   - estágio no cabeçalho da ficha do cliente, somando os contatos com o mesmo telefone (D2);
+   - coluna e filtro na lista de Clientes;
+   - aba Compras com os ganhos e o total gasto (corrige o "Compras = 0").
+5. **Módulo Pós-venda** (M6 e M7 + app; chave `posvenda`, menu "Pós-venda", D4):
+   - Configurações › Pós-venda:
+     - responsável padrão por loja, obrigatório para ligar o módulo (D9);
+     - régua iPhone (passos, ligar e desligar);
+     - intervalo mínimo e teto diário;
+     - limite do NPS;
+     - status, categorias e SLA de chamado.
+   - Fila `/pos-venda` em três abas: Atrasados, Hoje e Próximos 7 dias. Ações: Abrir WhatsApp com o texto montado, Registrar resultado, NPS manual, Reagendar, Pular e Abrir chamado.
+   - Chamados: lista com filtros (sem realtime), abrir e mover, SLA em horas corridas. Nota de NPS ≤ 6 abre chamado para o responsável da loja.
+   - Aba Pós-venda na ficha do cliente: jornada, NPS e chamados.
+   - Vitrine `/vitrine/posvenda` para quem não tem o módulo.
+6. **Desligar a etapa "Pós Venda"**, depois da triagem aplicada e conferida.
+
+**Fica para a Fase 2:**
+- compras históricas (M8) e contatos novos só com telefone válido (D5);
+- o público "ciclo de troca vencido";
+- réguas de Perfumes e Acessórios;
+- indicadores de NPS por período, vendedor, loja e categoria (os dados já são gravados com o retrato desde o MVP);
+- link público de NPS;
+- SLA em horário comercial;
+- realtime de chamados (M9);
+- âncora `entrega` pelo PDV v2;
+- "Aparelho atual" com IMEI e garantia;
+- migração da configuração para o `empresa_config` (M10), quando o PDV v2 Fase 1 existir;
+- cargo Gerente no "Reabrir venda" e no "Corrigir data", quando os cargos existirem (D10).
+
+**Fica para a Fase 3:**
+- envio automático **só com modelos UTILITY** (D8), com as travas do Automatize;
+- ZapIntel lendo o ciclo de vida e sugerindo chamado ou nota;
+- régua da Aletrini e primeira revisão;
+- estágio `inativo` (D12; 18 meses quando ligar) e campanha de reativação;
+- ligar o passo de seguro do D+90, que já existe desligado, quando houver parceiro (D7). É um clique de configuração, sem código.
+
+**Fora do plano por decisão:** cadastrar Campinas (D3).
 
 ### 8.4 Fases seguintes
 
-- **Fase 2:**
-  - importação das compras históricas e o público "ciclo de troca vencido";
-  - réguas de Perfumes e Acessórios;
-  - tela de indicadores (NPS por período, vendedor, loja e categoria);
-  - link público de NPS;
-  - SLA em horário comercial;
-  - âncora `entrega` ligada ao PDV v2 (`vendas.entregue_em`);
-  - ficha "Aparelho atual" com IMEI e garantia.
-- **Fase 3:**
-  - envio automático por passo com modelo aprovado (travas do Automatize);
-  - ZapIntel lendo o ciclo de vida e sugerindo chamado/nota;
-  - Aletrini: régua de veículos e primeira revisão;
-  - estágio `inativo` e a campanha de reativação de clientes.
+O detalhe da Fase 2 e da Fase 3 está no fim do §8.3. A ordem dentro de cada fase fica para quando o MVP estiver em uso.
 
 ### 8.5 Riscos
 
 | Risco | Mitigação |
 |---|---|
-| **Fazer a 4B da conciliação sem M1**: 138 vendas podem ser apagadas pela próxima mensagem de cada cliente | M1 antes da 4B, ou logo depois, com a restauração dos casos do intervalo |
+| ~~Fazer a 4B da conciliação sem M1~~ | **Resolvido:** a M1 entrou antes da 4B (23/11) |
+| Acompanhamento ou chamado sem dono (110 de 112 negócios "sem registro" e os 38 da etapa Pós Venda estão sem responsável) | Responsável padrão por loja + reserva no dono; `responsavel_id` NOT NULL (D9) |
 | Mexer em `core_negocio_do_canal` muda o recebimento de todos os canais e empresas | Migração com rollback, teste com contato de teste por canal, conferência de `negocio_historico` nas primeiras horas (zona sensível da Meta) |
 | Régua com dados ruins: 84% dos ganhos sem produto ou categoria | Campos obrigatórios no ganho (checados também no servidor) e uma régua "Geral" de reserva |
 | Fila inchada no dia da importação ou da instalação | Passos vencidos nascem `pulado`; teto diário por responsável; histórico de mais de 12 meses vai para público, não para fila |
@@ -586,19 +702,25 @@ Convenções:
 
 ---
 
-## 3. Decisões que dependem do Lucas
+## 3. Decisões do Lucas (23/11/2026)
 
-| # | Decisão | Recomendação |
-|---|---|---|
-| **D1** | Aplicar a correção M1 (ganho não reabre; restaurar os 8 ganhos apagados) **antes** da Fase 4B da conciliação? | **Sim, antes**, ou no mesmo dia, logo depois |
-| D2 | O mesmo telefone em duas lojas (dois contatos): somar na ficha ou manter separado? | Somar na ficha. O ciclo fica por contato |
-| D3 | Campinas: é uma loja que falta cadastrar ou um ponto que vende pela matriz? | Cadastrar como filial se tiver equipe e estoque próprios |
-| D4 | Nome do menu: "Pós-venda" (recomendado) ou "Clientes" (já usado pela tela core)? | "Pós-venda" |
-| D5 | Clientes históricos com telefone e sem contato: criar o contato agora (sem negócio)? | Sim, só com telefone válido |
-| D6 | Esperar o `empresa_config` do PDV v2 ou começar com a chave provisória em `configuracoes_sistema`? | Provisória, se o pós-venda vier antes do PDV v2 Fase 1 |
-| D7 | D+90 da régua de iPhone: só bateria do seminovo? A JM vende seguro? | Só seminovo; seguro só se houver parceiro |
-| D8 | Envio automático futuro: aceitar modelos MARKETING (custo e opt-in) ou só UTILITY? | Começar só com UTILITY (entrega, NPS) |
-| D9 | Responsável padrão dos passos: o vendedor do negócio ou uma pessoa fixa de pós-venda por loja? | Vendedor no D+1 e no D+330; NPS e chamado de nota baixa com o gerente da loja |
-| D10 | Quem pode "Reabrir venda"? | Dono e gerente, com motivo obrigatório |
-| D11 | Os 39 negócios de "Pós Venda" sem pedido: quem faz a triagem e até quando? | Lucas ou o gerente de Guaçu (77 dos 80 são de lá), antes de desativar a etapa |
-| D12 | Estágio `inativo`: ligar desde já? Com quantos meses? | Desligado no MVP; 18 meses quando ligar |
+| # | Pergunta | Decisão | Onde está no desenho |
+|---|---|---|---|
+| **D1** | Aplicar a M1 antes da Fase 4B? | **Aplicada.** M1 e M1b em produção em 23/11, antes da 4B; as 8 vendas restauradas | §0, §1.3, §8.2 |
+| D2 | O mesmo telefone em duas lojas (dois contatos): somar ou separar? | Ciclo de vida **por contato**, **somado na ficha pelo telefone** | §2.1 |
+| D3 | Campinas: loja a cadastrar? | **Não cadastrar por enquanto.** Fora do MVP | §2.4 |
+| D4 | Nome do menu | **"Pós-venda"** | §2.5.1 |
+| D5 | Clientes históricos sem contato: criar? | Criar contato **só com telefone válido**, na **Fase 2** | §2.7 |
+| D6 | Esperar o `empresa_config` ou chave provisória? | **Provisória em `configuracoes_sistema`**: chave `<modulo>.<chave>`, valor `{empresa, lojas}`, acesso só por `config_valor_emp`/`config_valor`/`config_salvar`, com a migração documentada | §8.1, M2, M10 |
+| D7 | D+90 da régua de iPhone | **Só seminovo** (bateria). **Seguro só com parceiro:** passo pronto e **desligado** | §2.3 |
+| D8 | Modelos do envio automático | **Só UTILITY no começo**, na Fase 3 | §2.6, §8.3 |
+| D9 | Responsável padrão dos passos | Vendedor do negócio no D+1 e no D+330; NPS e nota baixa com o **responsável da loja**. Configuração **"responsável padrão por loja"** (Guaçu e Jaguariúna), que recebe todo passo sem vendedor ou com vendedor inativo. **Nada nasce sem responsável** | §2.3, §2.4, §8.1 |
+| D10 | Quem pode "Reabrir venda"? | **Dono e admin por enquanto;** gerente quando o cargo existir | §2.5.4 |
+| D11 | Triagem dos negócios da etapa Pós Venda | **Feita pelo Matheus**, na planilha `triagem_pos_venda.csv` (38 negócios, com sugestão), aplicada por script | §2.5.4, §8.3 |
+| D12 | Estágio `inativo` | **Desligado no MVP** (18 meses quando ligar, Fase 3) | §2.1, §8.3 |
+| — | Data da venda no ganho | **Mantida no modal de ganho** (hoje como padrão). Para datas já gravadas, a RPC **`corrigir_data_venda(negocio_id, nova_data, motivo)`**, só dono e admin, com histórico. **Não usar `reabrir_negocio`** para isso | §2.3, M3 |
+
+**Ainda pendente com o Lucas:**
+- aprovar este plano (§8) antes de qualquer migração ou código do MVP;
+- marcar o `conciliacao_revisar.csv`;
+- confirmar o 5096 com a equipe.
