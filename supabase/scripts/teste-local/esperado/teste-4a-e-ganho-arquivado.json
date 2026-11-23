@@ -1,0 +1,11 @@
+{
+  "insights_ok": true,
+  "posvenda_total": 1,
+  "m1b_ganho_arquivado_na_janela": { "status": "ganho", "devolveu_o_ganho": true, "negocios_do_contato": 1 },
+  "m1b_historico_arquivamento": [
+    { "acao": "desarquivado", "por_usuario": "f47a8e4f-a428-4bf6-8a82-d43088751d2c" },
+    { "acao": "arquivado", "por_usuario": "f47a8e4f-a428-4bf6-8a82-d43088751d2c" }
+  ],
+  "abertos_ia_cliente": { "abertos_na_lista_como_customer": 0 },
+  "fila_esperando_tem_jaCliente": 0
+}

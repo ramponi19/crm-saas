@@ -1,0 +1,21 @@
+{
+  "1_ganho_dentro_janela": { "status": "ganho", "devolveu_o_ganho": true, "ganho_em_intacto": true, "negocios_do_contato": 1 },
+  "2_ganho_fora_janela": { "novo": { "status": "aberto", "etapa_id": 73, "funil_id": 10 }, "antigo": { "status": "ganho", "ganho_em_igual": true }, "criou_novo": true, "historico_reabertura_no_ganho": 0 },
+  "2b_enviada_pela_loja_ganho_antigo": { "status": "ganho", "devolveu_o_ganho": true, "negocios_do_contato": 1 },
+  "3_perdido": { "agora": { "status": "aberto", "etapa_id": 73, "perdido_em": null }, "historico": "reaberto_por_mensagem status_antes=perdido", "reabriu_o_mesmo": true },
+  "4_sem_negocio": { "novo": { "status": "aberto", "etapa_id": 73, "primeira_msg": "primeira mensagem" }, "criou": true },
+  "5_aberto": { "etapa_id": 74, "devolveu_o_aberto": true, "negocios_do_contato": 1 },
+  "6_update_ganho_para_aberto": { "barrado": true },
+  "6b_update_ganho_para_perdido": { "barrado": true },
+  "6c_trocar_ganho_em": { "barrado": true },
+  "6d_zerar_ganho_em": { "barrado": true },
+  "6e_ganho_muda_valor": { "permitido": true },
+  "7_conversao_4B": { "linhas": 1, "permitido": true, "ganho_em": "2026-09-10T15:00:00+00:00" },
+  "7b_ganho_sem_data": { "ganho_em_preenchido": true },
+  "8a_rpc_vendedor": { "barrado": true, "mensagem": "SEM_PERMISSAO: só o dono ou um administrador reabre uma venda fechada." },
+  "8b_rpc_dono_sem_motivo": { "barrado": true },
+  "8c_rpc_dono_com_motivo": { "agora": { "status": "aberto", "etapa_id": 73, "ganho_em": null }, "permitido": true, "historico": { "acao": "reaberto_manual", "por_usuario": "f47a8e4f-a428-4bf6-8a82-d43088751d2c" } },
+  "8d_marca_nao_vaza": { "barrado": true },
+  "9a_service_role_sem_juntado": { "barrado": true },
+  "9b_juntar_negocios": { "permitido": true }
+}

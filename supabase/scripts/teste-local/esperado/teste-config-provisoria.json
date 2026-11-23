@@ -1,0 +1,16 @@
+{
+  "t1_envelope_empresa": { "lojas": {}, "empresa": 5, "atualizado_por": "f47a8e4f-a428-4bf6-8a82-d43088751d2c" },
+  "t2_envelope_com_loja": { "lojas": { "1": 7 }, "empresa": 5 },
+  "t2_loja1": 7, "t2_sem_loja": 5, "t2_pela_sessao_loja1": 7, "t2_pela_sessao_empresa": 5, "t2_loja_sem_valor_cai_na_empresa": 5,
+  "t3_linha_gravada": "posvenda.responsavel_padrao", "t3_chave_inexistente": null, "t3_responsavel_loja1": "f47a8e4f-a428-4bf6-8a82-d43088751d2c", "t3_responsavel_empresa_vazio": null,
+  "t4_loja1_agora": 5, "t4_lojas_depois": {},
+  "t5_sem_valor": true,
+  "t6_chave_vazia": "CHAVE_INVALIDA", "t6_chave_invalida": "CHAVE_INVALIDA", "t6_modulo_invalido": "CHAVE_INVALIDA", "t6_loja_de_outra_empresa": "FILIAL_INVALIDA",
+  "t6b_senha": "CHAVE_PROIBIDA", "t6b_token": "CHAVE_PROIBIDA", "t6b_api_key": "CHAVE_PROIBIDA",
+  "t7_gravou_mesmo_assim": true, "t7_posvenda_desligado_na_5": true,
+  "t8_jm_pela_emp": 99, "t8_dono5_le_a_dele": null,
+  "t9_vendedora_le": 99, "t9_vendedora_grava": "SEM_PERMISSAO",
+  "t10_sem_sessao_le": null, "t10_sem_sessao_grava": "SEM_EMPRESA",
+  "t11_emp_authenticated": false, "t11_emp_anon": false, "t11_valor_authenticated": true, "t11_valor_anon": false, "t11_salvar_authenticated": true, "t11_salvar_anon": false,
+  "t12_chaves_antigas_iguais": true
+}

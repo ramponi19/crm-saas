@@ -20,7 +20,9 @@
     "check:modulos": "node scripts/check-modulos.mjs",
     "check:segmento-modulo": "node scripts/check-segmento-modulo.mjs",
     "check:gravacao": "node scripts/check-gravacao.mjs",
-    "check:datas": "node scripts/check-datas.mjs"
+    "check:datas": "node scripts/check-datas.mjs",
+    "test:local": "node --import ./tests/alias.mjs --experimental-test-module-mocks --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --test --test-concurrency=1 tests/integracao/*.test.ts",
+    "teste-local": "bash scripts/teste-local.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

@@ -865,6 +865,21 @@ O detalhe da Fase 2 e da Fase 3 está no fim do §8.3. A ordem dentro de cada fa
 ---
 
 ### 8.6.1 Ritual de deploy (REGRA, decisão do Lucas em 23/11/2026)
+
+**O banco local do ritual é DESCARTÁVEL** (decisão do Lucas, 23/11/2026): o banco local dele (projeto `guiuzbcqkvelqcuogxtd`, portas 543xx, com a cópia de dados reais) fica parado como está e **não** é usado nem resetado.
+
+**`bash scripts/teste-local.sh`** (ou `npm run teste-local`) faz os passos 1 e 2 sozinho:
+1. sobe um Supabase local NOVO (projeto `teste-local`, portas 561xx) com **as migrações da branch**, do zero;
+2. semente **só fictícia**:
+   - `supabase/scripts/teste-local/semente.sql`, com o esqueleto da produção e os mesmos ids (empresas 1 "JM de teste" e 5, lojas, funis, etapas, categorias, usuários `@teste.invalid` com senha só local);
+   - mais a demonstração `supabase/scripts/demo/preview-demonstracao.sql`;
+3. roda cada `supabase/scripts/testes/teste-*.sql`, numa transação desfeita, e compara com `supabase/scripts/teste-local/esperado/<nome>.json`:
+   - cada chave do esperado tem de vir igual;
+   - teste sem esperado conta como falha;
+4. roda `npm run test:local` (`tests/integracao/*.test.ts`): as rotas de verdade, com sessão real dos usuários de teste, gravando no banco local;
+5. desmonta (`stop --no-backup`) e apaga a pasta temporária, dê certo ou não. Com `MANTER=1`, deixa no ar para o `npm run dev` apontar para ele.
+- **Saída:** "tudo verde — pode seguir para a produção" ou o número de etapas com falha. Com falha, **não** se vai para a produção.
+- **Migração nova:** vem com o `teste-*.sql` e o `esperado/*.json` dela, no mesmo commit.
 1. **Migração no Supabase local primeiro**, junto com o `teste-*.sql` dela.
 2. **`npm run test:local` passando** (rotas e RPCs gravando no banco local). Mudança de tela: conferida no `npm run dev` contra o local.
 3. **Produção:** migração pelo `apply_migration` do MCP, com IOwait conferido, volta e trava por hash (sem `\r`).

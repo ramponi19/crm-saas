@@ -1,0 +1,17 @@
+{
+  "t1_negocio": { "etapa": 76, "status": "ganho", "ganho_em": "2026-10-15T15:00:00+00:00", "meio_dia_sp": true },
+  "t1_retorno": { "ok": true, "ganho_em_novo": "2026-10-15T15:00:00+00:00", "ganho_em_anterior": "2026-11-20T18:00:00+00:00" },
+  "t1_historico": { "acao": "data_venda_corrigida", "detalhe": { "motivo": "venda foi em 15/10 pelo pedido do grupo", "data_nova": "2026-10-15", "data_anterior": "2026-11-20" }, "por_usuario": "f47a8e4f-a428-4bf6-8a82-d43088751d2c" },
+  "t1_marca_limpa_depois": "",
+  "t1b_admin": { "status": "ganho", "ganho_em": "2026-11-05T15:00:00+00:00" },
+  "t2_motivo_nulo": "MOTIVO_OBRIGATORIO", "t2_motivo_vazio": "MOTIVO_OBRIGATORIO", "t2_motivo_curto": "MOTIVO_OBRIGATORIO",
+  "t3_vendedora": "SEM_PERMISSAO", "t3_outra_empresa": "NEGOCIO_NAO_ENCONTRADO", "t3_426_intacto": true,
+  "t4_aberto": "NAO_E_GANHO",
+  "t5_futura": "DATA_FUTURA", "t5_antes_2024": "DATA_ANTIGA", "t5_igual": "DATA_IGUAL", "t5_nula": "DATA_INVALIDA", "t5_hoje_instante_atual": true,
+  "t6_so_status": "GANHO_PROTEGIDO", "t6_zerar_data": "GANHO_PROTEGIDO", "t6_etapa_junto": "GANHO_PROTEGIDO", "t6_status_junto": "GANHO_PROTEGIDO",
+  "t6_outro_negocio_mesma_transacao": "GANHO_PROTEGIDO", "t6_a_intacto": { "data": "2024-01-02", "etapa": 76, "status": "ganho" },
+  "t7_update_direto": "GANHO_PROTEGIDO",
+  "t8_permissoes": { "anon": false, "authenticated": true, "gatilho_authenticated": false },
+  "t9_entrar_no_ganho": { "status": "ganho", "ganho_em_preenchido": true }, "t9_reabrir": { "status": "aberto", "ganho_em": null },
+  "t10_sem_funcao": true, "t10_gancho_chamado": true
+}
