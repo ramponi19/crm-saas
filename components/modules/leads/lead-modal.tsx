@@ -16,6 +16,10 @@ import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import type { CardDoLead } from '@/lib/card-do-lead'
 import { Lead, Usuario, type KanbanColumn, type Motivo, ganhoColId, CAMPOS_QUALIFICACAO } from './types'
 import { MotivoPerdaModal } from './motivo-perda-modal'
+import { GanhoModal, type VendaDoModal } from './ganho-modal'
+import { ReabrirVendaModal } from './reabrir-venda-modal'
+import { CorrigirDataModal } from './corrigir-data-modal'
+import { useSouAdmin } from './use-sou-admin'
 import { PaineisDaVertical } from './paineis-vertical'
 import type { PerfilDoLead } from '@/lib/empresa-config'
 import { LeadChamadasPanel } from './lead-chamadas-panel'
@@ -34,7 +38,7 @@ import { useRouter } from 'next/navigation'
 import { Input, Select, Textarea, Button, IconButton, Badge, ConfirmDialog, Modal, notify } from '@/components/ui'
 import { useLockScroll, useEscape } from '@/components/ui/overlay'
 import { useFuso } from '@/components/fuso-provider'
-import { agora as agoraNoRelogio, formatarData, formatarDataHora, formatarDiaMes } from '@/lib/datas'
+import { agora as agoraNoRelogio, diaNoFuso, formatarData, formatarDataHora, formatarDiaMes } from '@/lib/datas'
 
 interface LeadModalProps {
   /**
@@ -531,6 +535,20 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
   /** Etapa de perda escolhida, esperando motivo + justificativa. */
   const [perdaPendente, setPerdaPendente] = useState<string | null>(null)
   const [salvandoPerda, setSalvandoPerda] = useState(false)
+  /**
+   * Venda fechada (23/11/2026, Entrega A do pós-venda): entrar no ganho pede data, categoria,
+   * condição e valor (`ganhoPendente` = etapa de ganho escolhida; `converter` = veio do botão
+   * "Converter em cliente"). Sair do ganho pede o motivo (só dono/admin).
+   */
+  const [ganhoPendente, setGanhoPendente] = useState<{ etapa: string; converter: boolean } | null>(null)
+  const [salvandoGanho, setSalvandoGanho] = useState(false)
+  const [erroGanho, setErroGanho] = useState<{ campo?: string; erro: string } | null>(null)
+  const [reabrirPendente, setReabrirPendente] = useState<string | null>(null)
+  const [salvandoReabrir, setSalvandoReabrir] = useState(false)
+  const [motivoReabertura, setMotivoReabertura] = useState<string | null>(null)
+  const [corrigindoData, setCorrigindoData] = useState(false)
+  const souAdmin = useSouAdmin(usuarios)
+  const etapaEhGanho = (slug: string | null | undefined) => columns.find((c) => c.id === (slug || 'novo'))?.tipo === 'ganho'
 
   /**
    * Config da assinatura do atendente. A bolha do CRM mostra a MESMA linha que
@@ -1163,6 +1181,10 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
 
   async function mudarFunil(id: number) {
     if (id === funilAtual) return
+    if (etapaEhGanho(form.status || lead.kanban_status)) {
+      notify.warn('Venda fechada', 'Para trocar de funil, reabra a venda antes (mude a etapa; só dono ou administrador).')
+      return
+    }
     const destino = funis.find((f) => f.id === id)
     setTrocandoFunil(true)
     try {
@@ -1186,6 +1208,18 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
   async function mudarEtapa(novo: string) {
     if (novo === (form.status || lead.kanban_status || 'novo')) return
     const alvo = columns.find((c) => c.id === novo)
+    const saindoDoGanho = etapaEhGanho(form.status || lead.kanban_status) && alvo?.tipo !== 'ganho'
+
+    // Venda fechada só sai do ganho com motivo, e só dono/admin (o banco confere de novo).
+    if (saindoDoGanho) {
+      if (!souAdmin) { notify.warn('Venda fechada', 'Só o dono ou um administrador reabre uma venda.'); return }
+      setReabrirPendente(novo)
+      return
+    }
+    // Entrar no ganho pede os dados da venda antes de mover.
+    if (alvo?.tipo === 'ganho' && !etapaEhGanho(form.status || lead.kanban_status)) {
+      setErroGanho(null); setGanhoPendente({ etapa: novo, converter: false }); return
+    }
 
     // Perdido: não move nada até saber o motivo. Se o vendedor cancelar, o
     // select volta para a etapa real — nada de card em limbo.
@@ -1236,6 +1270,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
           motivo_perda_id: motivoId,
           perdido_em: new Date().toISOString(),
           ...(justificativa ? { observacoes: obsNova } : {}),
+          ...(motivoReabertura ? { motivo_reabertura: motivoReabertura } : {}),
         }),
       })
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? 'Falha ao registrar a perda')
@@ -1244,6 +1279,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
       onUpdate({ ...lead, kanban_status: perdaPendente, motivo_perda_id: motivoId, observacoes: obsNova })
       notify.ok('Lead marcado como perdido', motivos.find((m) => m.id === motivoId)?.label)
       setPerdaPendente(null)
+      setMotivoReabertura(null)
     } catch (e) {
       notify.bad('Não foi possível registrar a perda', e instanceof Error ? e.message : undefined)
     } finally {
@@ -1317,7 +1353,66 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
     })
   }
 
-  async function handleConvert() {
+  /** Ganho pelo seletor de etapa ou pela conversão: a venda informada vai junto. */
+  async function confirmarGanho(venda: VendaDoModal) {
+    if (!ganhoPendente) return
+    if (ganhoPendente.converter) { setSalvandoGanho(true); await handleConvert(venda); setSalvandoGanho(false); return }
+    setSalvandoGanho(true)
+    try {
+      const r = await fetch('/api/leads/mover', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: lead.id, kanban_status: ganhoPendente.etapa, venda }),
+      })
+      const j = await r.json().catch(() => ({})) as { error?: string; codigo?: string; campo?: string }
+      if (!r.ok) {
+        if (j.codigo === 'GANHO_DADOS') { setErroGanho({ campo: j.campo, erro: j.error ?? 'Confira os dados da venda.' }); return }
+        throw new Error(j.error ?? 'Falha ao marcar a venda')
+      }
+      setForm((f) => ({ ...f, status: ganhoPendente.etapa }))
+      const novo = await recarregar()
+      onUpdate(novo?.lead ?? { ...lead, kanban_status: ganhoPendente.etapa })
+      notify.ok('Venda registrada', columns.find((c) => c.id === ganhoPendente.etapa)?.label)
+      setGanhoPendente(null)
+    } catch (e) {
+      notify.bad('Não foi possível marcar a venda', e instanceof Error ? e.message : undefined)
+      setGanhoPendente(null)
+    } finally {
+      setSalvandoGanho(false)
+    }
+  }
+
+  async function confirmarReabrir(motivo: string) {
+    if (!reabrirPendente) return
+    const alvo = columns.find((c) => c.id === reabrirPendente)
+    // Indo para a perda: guarda o motivo da reabertura e pede o da perda.
+    if (alvo?.tipo === 'perdido') { setMotivoReabertura(motivo); setPerdaPendente(reabrirPendente); setReabrirPendente(null); return }
+    setSalvandoReabrir(true)
+    try {
+      const r = await fetch('/api/leads/mover', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: lead.id, kanban_status: reabrirPendente, motivo_reabertura: motivo }),
+      })
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? 'Falha ao reabrir a venda')
+      setForm((f) => ({ ...f, status: reabrirPendente }))
+      const novo = await recarregar()
+      onUpdate(novo?.lead ?? { ...lead, kanban_status: reabrirPendente })
+      notify.ok('Venda reaberta', alvo?.label)
+      setReabrirPendente(null)
+    } catch (e) {
+      notify.bad('Não foi possível reabrir a venda', e instanceof Error ? e.message : undefined)
+    } finally {
+      setSalvandoReabrir(false)
+    }
+  }
+
+  function iniciarConversao() {
+    // Já é venda fechada: converte sem pedir a venda de novo.
+    if (etapaEhGanho(form.status || lead.kanban_status)) { void handleConvert(); return }
+    setErroGanho(null)
+    setGanhoPendente({ etapa: ganhoColId(columns), converter: true })
+  }
+
+  async function handleConvert(venda?: VendaDoModal) {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { notify.bad('Não autenticado'); setSaving(false); return }
@@ -1339,10 +1434,19 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
     // igual) e a marca de conversão no negócio, pela rota do card.
     // As duas respostas são conferidas (04/11/2026): UPDATE barrado pela RLS volta
     // 403 e a tela diz o que não foi gravado, em vez de comemorar.
-    const rMover = await fetch('/api/leads/mover', {
+    const jaEraVenda = etapaEhGanho(form.status || lead.kanban_status)
+    const rMover = jaEraVenda ? new Response('{}') : await fetch('/api/leads/mover', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ leadId: lead.id, kanban_status: ganhoColId(columns) }),
+      body: JSON.stringify({ leadId: lead.id, kanban_status: ganhoColId(columns), venda }),
     })
+    // Dado da venda recusado: o modal continua aberto, com o erro no campo; o cliente já existe.
+    if (!rMover.ok && rMover.status === 422) {
+      const j = await rMover.clone().json().catch(() => ({})) as { error?: string; campo?: string }
+      setSaving(false)
+      setErroGanho({ campo: j.campo, erro: j.error ?? 'Confira os dados da venda.' })
+      return
+    }
+    setGanhoPendente(null)
     const rMarca = await fetch(`/api/leads/${lead.id}/card`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ convertido_em: cliente.id }),
@@ -1456,7 +1560,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
               Fundir contato
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={handleConvert} disabled={saving} icon={<UserCheck size={15} strokeWidth={1.7} />}>
+          <Button variant="outline" size="sm" onClick={iniciarConversao} disabled={saving} icon={<UserCheck size={15} strokeWidth={1.7} />}>
             Converter em cliente
           </Button>
           <IconButton aria-label="Excluir lead" variant="danger" onClick={() => setConfirmDel(true)} disabled={saving}>
@@ -1513,6 +1617,15 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
               {columns.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </Select>
             {movendoEtapa && <p className="text-[11.5px] text-ink-3">movendo…</p>}
+            {/* Venda fechada: a data da venda e, para dono/admin, o caminho para corrigi-la. */}
+            {etapaEhGanho(form.status || lead.kanban_status) && (
+              <div className="flex items-center justify-between gap-2 text-[12.5px] text-ink-2">
+                <span>Venda em <strong className="text-ink">{lead.ganho_em ? formatarData(lead.ganho_em, undefined, '—', fuso) : '—'}</strong></span>
+                {souAdmin && (
+                  <Button variant="ghost" size="sm" onClick={() => setCorrigindoData(true)}>Corrigir data da venda</Button>
+                )}
+              </div>
+            )}
             <Select label="Responsável" value={form.responsavel} onChange={(e) => set('responsavel', e.target.value)}>
               <option value="">Sem responsável</option>
               {usuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
@@ -1932,7 +2045,40 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
           motivos={motivos}
           loading={salvandoPerda}
           onConfirm={confirmarPerda}
-          onCancel={() => setPerdaPendente(null)}
+          onCancel={() => { setPerdaPendente(null); setMotivoReabertura(null) }}
+        />
+      )}
+
+      {ganhoPendente && (
+        <GanhoModal
+          leadNome={form.nome || lead.nome || ''}
+          valorInicial={lead.valor_estimado ?? null}
+          criadoEm={lead.created_at ? diaNoFuso(new Date(lead.created_at), fuso) : null}
+          confirmar={ganhoPendente.converter ? 'Converter em cliente' : 'Marcar como venda'}
+          rotuloUsado={perfil.rotuloUsado}
+          loading={salvandoGanho || saving}
+          erroServidor={erroGanho}
+          onConfirm={confirmarGanho}
+          onCancel={() => { setGanhoPendente(null); setErroGanho(null) }}
+        />
+      )}
+
+      {reabrirPendente && (
+        <ReabrirVendaModal
+          leadNome={form.nome || lead.nome || ''}
+          loading={salvandoReabrir}
+          onConfirm={confirmarReabrir}
+          onCancel={() => setReabrirPendente(null)}
+        />
+      )}
+
+      {corrigindoData && (
+        <CorrigirDataModal
+          leadId={lead.id}
+          leadNome={form.nome || lead.nome || ''}
+          ganhoEm={lead.ganho_em ?? null}
+          onClose={() => setCorrigindoData(false)}
+          onCorrigido={async () => { const novo = await recarregar(); if (novo?.lead) onUpdate(novo.lead) }}
         />
       )}
 

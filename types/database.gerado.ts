@@ -3482,6 +3482,18 @@ isOneToOne: true
 "reabrir_negocio":
 { Args: { "p_motivo": string,"p_negocio": number }; Returns: Json
                            },
+"config_salvar":
+{ Args: { "p_chave": string,"p_filial"?: number,"p_modulo": string,"p_valor": Json }; Returns: Json
+                           },
+"config_valor":
+{ Args: { "p_chave": string,"p_filial"?: number,"p_modulo": string }; Returns: Json
+                           },
+"config_valor_emp":
+{ Args: { "p_chave": string,"p_empresa": number,"p_filial"?: number,"p_modulo": string }; Returns: Json
+                           },
+"corrigir_data_venda":
+{ Args: { "p_motivo": string,"p_negocio": number,"p_nova_data": string }; Returns: Json
+                           },
 "refresh_status_atrasados":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },

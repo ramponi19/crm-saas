@@ -61,6 +61,11 @@ export async function POST(req: Request) {
       const { data } = await q.limit(1)
       etapa = (data?.[0] as { id: number; tipo: string | null } | undefined) ?? null
       if (etapaPedida && !etapa) return NextResponse.json({ error: 'Etapa não é do funil escolhido' }, { status: 400 })
+      // Venda fechada exige data, categoria, condição e valor de cada venda (23/11/2026): a planilha
+      // não entra direto numa etapa de ganho — importa numa etapa aberta e marca cada venda depois.
+      if (etapa?.tipo === 'ganho') {
+        return NextResponse.json({ error: 'Não dá para importar direto numa etapa de venda fechada. Escolha uma etapa aberta e marque cada venda com a data e o valor dela.', codigo: 'GANHO_DADOS' }, { status: 400 })
+      }
     }
   }
   const responsavelId = typeof b?.responsavelId === 'string' && b.responsavelId ? b.responsavelId : null

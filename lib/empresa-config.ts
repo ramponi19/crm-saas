@@ -44,6 +44,8 @@ export interface Vocabulario {
   interesse?: string
   /** Quem é atendido ("Paciente"). */
   contato?: string
+  /** A condição "usado" do item vendido, no modal de venda fechada. Padrão "Usado". */
+  usado?: string
   agenda?: RotulosAgenda
 }
 
@@ -284,6 +286,8 @@ export interface PerfilDoLead {
   interesse: string
   agendaVisitas: boolean
   textoLivre: boolean
+  /** Rótulo da condição "usado" no modal de venda fechada (vocabulário da empresa; padrão "Usado"). */
+  rotuloUsado: string
 }
 
 export type { PainelDoLead }
@@ -301,6 +305,7 @@ export function perfilDoLead(cfg: ConfigEmpresa): PerfilDoLead {
     // Só os painéis de vertical trocam o autocomplete do catálogo por texto livre: reservar do
     // estoque e orçar (painéis desde 17/11/2026) são do varejo, que continua no catálogo.
     textoLivre: paineis.some((p) => PAINEIS_DE_TEXTO_LIVRE.has(p)),
+    rotuloUsado: cfg.vocabulario.usado ?? 'Usado',
   }
 }
 

@@ -12,6 +12,7 @@ import { formatCurrency } from '@/lib/utils'
 import { formatarData } from '@/lib/datas'
 import { avisoDocumento, documentoMudou } from '@/lib/documento'
 import { MotivoPerdaModal } from '@/components/modules/leads/motivo-perda-modal'
+import { GanhoModal, type VendaDoModal } from '@/components/modules/leads/ganho-modal'
 import {
   TIPO_NEGOCIO, STATUS_APROVACAO, ORIGENS_IMOB, TIPOS_IMOVEL, CARACTERISTICAS,
   rotuloTipoNegocio, statusAprovacao,
@@ -118,6 +119,10 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, motiv
   /** Etapa de perda escolhida, esperando o motivo (o mesmo modal do quadro). */
   const [perdaPendente, setPerdaPendente] = useState<string | null>(null)
   const [salvandoPerda, setSalvandoPerda] = useState(false)
+  /** Venda fechada (23/11/2026): entrar na etapa de ganho pede data, categoria, condição e valor. */
+  const [ganhoPendente, setGanhoPendente] = useState<string | null>(null)
+  const [salvandoGanho, setSalvandoGanho] = useState(false)
+  const [erroGanho, setErroGanho] = useState<{ campo?: string; erro: string } | null>(null)
 
   const vazio = {
     nome: '', cpf_cnpj: '', telefone: '', email: '',
@@ -275,10 +280,17 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, motiv
    * Etapa de PERDA pede o motivo antes (o mesmo modal do quadro): a rota recusa perda
    * sem motivo, e sem a pergunta aqui o botão só devolvia erro.
    */
-  async function moverEtapa(id: string, extra?: { motivo_perda_id: number; perdido_em: string; justificativa?: string }) {
+  async function moverEtapa(id: string, extra?: { motivo_perda_id?: number; perdido_em?: string; justificativa?: string; venda?: VendaDoModal }) {
     if (leadId == null) return false
     if (!extra && id !== etapaAtual && etapas.find((e) => e.id === id)?.tipo === 'perdido') {
       setPerdaPendente(id)
+      return false
+    }
+    // Entrar no ganho pede a venda antes (a rota recusa sem ela: 422 GANHO_DADOS).
+    const atualEhGanho = etapas.find((e) => e.id === etapaAtual)?.tipo === 'ganho'
+    if (!extra?.venda && id !== etapaAtual && !atualEhGanho && etapas.find((e) => e.id === id)?.tipo === 'ganho') {
+      setErroGanho(null)
+      setGanhoPendente(id)
       return false
     }
     const antes = etapaAtual
@@ -288,11 +300,21 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, motiv
     }).catch(() => null)
     if (!r?.ok) {
       setEtapaAtual(antes)
-      notify.bad('Não foi possível mover', ((await r?.json().catch(() => null)) as { error?: string } | null)?.error)
+      const j = ((await r?.json().catch(() => null)) as { error?: string; codigo?: string; campo?: string } | null)
+      if (j?.codigo === 'GANHO_DADOS') { setErroGanho({ campo: j.campo, erro: j.error ?? 'Confira os dados da venda.' }); return false }
+      notify.bad('Não foi possível mover', j?.error)
       return false
     }
-    notify.ok(extra ? 'Lead marcado como perdido' : 'Etapa atualizada')
+    notify.ok(extra?.venda ? 'Venda registrada' : extra ? 'Lead marcado como perdido' : 'Etapa atualizada')
     return true
+  }
+
+  async function confirmarGanho(venda: VendaDoModal) {
+    if (!ganhoPendente) return
+    setSalvandoGanho(true)
+    const ok = await moverEtapa(ganhoPendente, { venda })
+    setSalvandoGanho(false)
+    if (ok) setGanhoPendente(null)
   }
 
   async function confirmarPerda(motivoId: number, observacao: string) {
@@ -551,6 +573,15 @@ export default function ClienteModalImob({ cliente, isNew, etapas, equipe, motiv
           loading={salvandoPerda}
           onConfirm={confirmarPerda}
           onCancel={() => setPerdaPendente(null)}
+        />
+      )}
+      {ganhoPendente && (
+        <GanhoModal
+          leadNome={cliente?.nome ?? ''}
+          loading={salvandoGanho}
+          erroServidor={erroGanho}
+          onConfirm={confirmarGanho}
+          onCancel={() => { setGanhoPendente(null); setErroGanho(null) }}
         />
       )}
     </Modal>

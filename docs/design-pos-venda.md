@@ -283,6 +283,25 @@ O comportamento de hoje vai contra a regra "negócio ganho vira histórico, não
   - **Tela:** o botão "Corrigir data da venda" aparece na lista de ganhos e na aba Compras da ficha, só para dono e admin.
   - **Primeiro caso:** o 5096, se a equipe confirmar que a venda é a de 15/10.
 
+**Caminhos que marcam ganho (Entrega A, 23/11/2026).** Todos passam a exigir a venda ou a recusam:
+
+| Caminho | Como trata data, categoria, condição e valor |
+|---|---|
+| Quadro (arrastar para a etapa de ganho) | Abre o modal "Venda fechada"; a rota `/api/leads/mover` valida de novo (422 `GANHO_DADOS`) |
+| Ficha do lead (seletor de etapa) | Mesmo modal e mesma rota |
+| Ficha do lead ("Converter em cliente") | Mesmo modal antes de converter; se o lead já é venda, converte sem pedir de novo |
+| Ficha imobiliária (mover etapa) | Mesmo modal e mesma rota |
+| Excluir etapa levando os leads para uma etapa de ganho (`/api/funil`) | **Recusado** quando há lead que não é venda (ganho em lote não tem os dados) |
+| Importação de planilha numa etapa de ganho (`/api/importacao`) | **Recusada**: importa numa etapa aberta e marca cada venda depois |
+| Lead novo numa etapa de ganho (`/api/leads`, agendamento online) | **Recusado** antes de criar o contato |
+| Edge / mensagem do cliente (`core_negocio_do_canal`) | Nunca marca ganho (só abre, reabre ou cria aberto) |
+| PDV, ZapIntel, automações | Hoje não marcam ganho. Quando o PDV ganhar o negócio (`crm.venda_ganha_negocio`), preenche data, categoria, condição e valor **a partir da venda** |
+| Conciliação (scripts) | Grava a data do pedido e o valor; sem categoria e condição (o grupo de pedidos não as tem) |
+
+- O que a tela grava: `ganho_em` (data da venda: meio-dia no fuso; hoje = instante atual), `valor_estimado` = valor da venda e `negocios.dados.venda` = `{data, categoria_id, condicao, valor, registrada_por, registrada_em}`.
+- **Categoria:** a lista ativa de `estoque_categorias` da empresa. Empresa sem categoria cadastrada não é cobrada.
+- **Condição:** valores `novo` / `seminovo`. O rótulo do segundo é **vocabulário da empresa** (`vocabulario.usado`, padrão "Usado"), porque "seminovo" é termo do segmento de celular e a trava do build não deixa termo de segmento no núcleo. Para a JM ler "Seminovo", basta gravar `vocabulario.usado = "Seminovo"` na configuração dela.
+
 ### Recompra no meio da régua
 
 - **`substituir`** (padrão nas réguas de aparelho): a compra nova da mesma régua, ou de régua com prioridade maior ou igual, **cancela os passos pendentes** da jornada antiga (`status = cancelado`, motivo `recompra`) e começa a nova do zero.
