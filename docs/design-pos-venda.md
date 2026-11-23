@@ -663,7 +663,7 @@ Convenções:
 | M3 | `corrigir_data_venda` | RPC `corrigir_data_venda` (dono/admin, motivo, histórico `data_venda_corrigida`) e a exceção `nexus.corrigir_data_venda` no gatilho da M1, que libera só a troca de `ganho_em` com o status ganho | core | M1 |
 | M4 | `contato_ciclo` | Tabela `contato_ciclo`, função `contato_ciclo_recalcular`, gatilho em `negocios` (status, ganho_em, etapa, delete) e backfill dos 3,7 mil contatos da JM. Lê os limites por `config_valor_emp('core', 'ciclo_*')` | core | M2 |
 | M5 | `quadro_por_status` | `quadro_base`, `quadro_contagens` e `quadro_pagina` ganham `p_status` (padrão `aberto`), mais o índice parcial se o EXPLAIN pedir | core | — |
-| M6 | `posvenda_modulo` | As 10 tabelas `posvenda_*` com RLS (responsável NOT NULL), `posvenda_resolver_responsavel`, `posvenda_iniciar_jornadas` (gatilho no ganho; passos vencidos nascem `pulado`), `posvenda_registrar`, `posvenda_chamado_abrir`/`_mover` (SLA em horas corridas), reatribuição ao desativar usuário, `posvenda_reancorar_jornada(bigint)` (o gancho que a M3 já chama), e as sementes na instalação: status e categorias de chamado, SLA padrão, pesquisa NPS e régua "iPhone e aparelhos" com o D+90 seminovo ligado e o seguro desligado | módulo | M2, M4 |
+| M6 | `posvenda_modulo` | As 10 tabelas `posvenda_*` com RLS (responsável NOT NULL), `posvenda_resolver_responsavel`, `posvenda_iniciar_jornadas` (gatilho no ganho; passos vencidos nascem `pulado`), `posvenda_registrar`, `posvenda_chamado_abrir`/`_mover` (SLA em horas corridas), reatribuição ao desativar usuário, `posvenda_reancorar_jornada(bigint)` (o gancho que a M3 já chama), e as sementes na instalação: status e categorias de chamado, SLA padrão, pesquisa NPS e régua "iPhone e aparelhos" com o D+90 seminovo ligado e o seguro desligado | módulo | M2 (não depende mais da M4: ordem A → C → B) |
 | M7 | `canal_le_posvenda` | `core_negocio_do_canal` com o item 2 do §2.6: só **chamado aberto** ou **acompanhamento vencido ou de hoje dentro de `posvenda.janela_acompanhamento_dias` (3)** segura a mensagem sem abrir negócio. Passo futuro nunca segura. Só com o módulo ligado; o resto é a M1. Os testes do §2.6 vêm junto, com destaque para o D+330 agendado e a recompra | core | M6 |
 | — | Aplicar a triagem da etapa Pós Venda | Script, não migração: backup, transação, filtro pelo status atual, histórico `triagem_pos_venda`. Depois `funil_etapas.ativo = false` na etapa 38 e o nome "Pós Venda (antiga)" | dados | planilha do Matheus |
 
@@ -682,9 +682,29 @@ Convenções:
 | Entrega | Conteúdo |
 |---|---|
 | **A** | M2 + M3 + modal de ganho (data da venda, categoria, condição e valor, com validação no servidor) + modal de motivo ao reabrir + botão "Corrigir data da venda" (itens 2 abaixo) |
-| **B** | M4 + M5 + telas do ciclo de vida e quadro só com abertos (itens 3 e 4) |
-| **C** | M6 + M7 + `/pos-venda` + Configurações › Pós-venda + aba Pós-venda na ficha (item 5). A vitrine vem por último, dentro da C ou depois |
+| **B** | M4 + M5 + telas do ciclo de vida e quadro só com abertos (itens 3 e 4). **Depois da C** |
+| **C** | M6 + M7 + `/pos-venda` + Configurações › Pós-venda + aba Pós-venda na ficha (item 5). A vitrine vem por último, dentro da C ou depois. **Antes da B; só com o staging pronto** |
 | Fora das entregas | Triagem (item 1), em paralelo, e o desligamento da etapa (item 6), só depois da triagem aplicada |
+
+**Ordem nova (decisão do Lucas, 23/11/2026): A → C → B.**
+- ✅ **A em produção** em 23/11: M2, M3 e app, com o deploy `2b00174f`.
+- **C vem antes de B**, e começa só **depois do staging pronto** (§8.6).
+- O que muda na C para funcionar **sem a M4 (ciclo de vida) e sem a M5 (quadro só com abertos)**:
+
+| Ponto da C | Plano antigo (dependia de B) | Plano novo (sem M4/M5) |
+|---|---|---|
+| Disparo da jornada no ganho | Pelo `contato_ciclo_recalcular` (M4) ou por gatilho próprio | **Gatilho próprio** em `negocios` (`posvenda_negocio_ganho`, AFTER INSERT/UPDATE OF status, ganho_em), só com o módulo ligado: entrar no ganho chama `posvenda_iniciar_jornadas` |
+| Venda reaberta (`reabrir_negocio`) | Recalculava o ciclo | O mesmo gatilho **cancela** os passos pendentes da jornada (`cancelado`, motivo `venda_reaberta`); os feitos ficam |
+| Data da venda corrigida (M3) | Reancora e recalcula o ciclo | Só reancora: `posvenda_reancorar_jornada(bigint)`, o gancho que a M3 já chama |
+| Régua: categoria e condição | Campos obrigatórios na etapa de ganho | Já existem: `negocios.dados.venda.categoria_id` e `.condicao` (Entrega A). Ganho antigo, sem `dados.venda`, usa a régua "Geral" |
+| NPS | Ia para `contato_ciclo.nps_ultimo` e dava o selo de promotor | Fica só em `posvenda_respostas`. Sem selo de promotor até a B; a M4 lê as respostas já gravadas no backfill |
+| Recompra no meio da régua | Lia o estágio "recorrente" | Lê as jornadas ativas do contato e os ganhos em `negocios` (não precisa do ciclo) |
+| Fila `/pos-venda` | Mostrava o estágio do cliente no cartão | Mostra a compra (produto, data, valor, vendedor, loja) e os NPS anteriores. Sem estágio |
+| Ficha do cliente | Cabeçalho com estágio, mais a aba Pós-venda | Só a **aba Pós-venda** (jornada, NPS, chamados), pelo provedor do módulo. Cabeçalho com estágio, aba Compras e total gasto ficam na B |
+| Quadro do funil | Ganho e perdido fora das colunas (M5) | Sem mudança: Convertido e Perdido continuam colunas. A C não depende disso |
+| Roteamento (M7) | — | Igual: não usa nem M4 nem M5 |
+
+- **Dependências finais:** M6 depende só da M2 (configuração) e da Entrega A (`dados.venda`). A M7 depende da M6. A M4 (na B) passa a ler `posvenda_respostas` para o NPS. A M5 continua independente.
 
 0. ✅ **Feito:** M1, M1b e 4A em produção. A venda não é mais apagada, e o ZapIntel lê o ganho.
 1. **Triagem da etapa Pós Venda.** O Matheus preenche o `triagem_pos_venda.csv` e o script aplica (com backup).
@@ -781,7 +801,7 @@ O detalhe da Fase 2 e da Fase 3 está no fim do §8.3. A ordem dentro de cada fa
 - **Contra, hoje:** o branch é montado **só pelas migrações do repositório** mais `seed.sql`, e a produção não bate com o histórico do repositório. Até o passo 2 da opção A estar resolvido, o branch nasceria diferente da produção. Além disso, cada PR pagaria o tempo de subir e popular um banco novo.
 - **Caminho natural:** fazer a opção A agora. Quando o esquema do repositório reproduzir a produção, avaliar trocar o staging fixo pelo branching.
 
-**Decisão do Lucas pendente:** opção A ou B, e quando (antes de começar a Entrega C). **Nada foi executado.**
+**Decisão do Lucas (23/11/2026): opção A**, projeto `crm-saas-staging` em São Paulo, compute Micro. Regras: só dados fictícios; Edge sem credenciais da Meta (nada no staging envia mensagem real); variáveis de Preview da Vercel apontando para o staging, com segredos de teste. Avisar o Lucas antes de criar o projeto (custo confirmado) e antes de trocar as variáveis da Vercel.
 
 ---
 
@@ -804,7 +824,7 @@ O detalhe da Fase 2 e da Fase 3 está no fim do §8.3. A ordem dentro de cada fa
 | — | Data da venda no ganho | **Mantida no modal de ganho** (hoje como padrão). Para datas já gravadas, a RPC **`corrigir_data_venda(negocio_id, nova_data, motivo)`**, só dono e admin, com histórico. **Não usar `reabrir_negocio`** para isso | §2.3, M3 |
 
 **Ainda pendente com o Lucas:**
-- escolher o ambiente de teste separado (§8.6, opção A ou B) antes da Entrega C;
+- ok para criar o staging (§8.6, opção A) e, depois, para trocar as variáveis de Preview da Vercel;
 - aprovar este plano (§8) antes de qualquer migração ou código do MVP;
 - marcar o `conciliacao_revisar.csv`;
 - confirmar o 5096 com a equipe.
