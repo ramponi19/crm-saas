@@ -55,7 +55,19 @@ async function tudo(tabela, colunas, filtro = (q) => q) {
 }
 
 // ---------- base (so SELECT) ----------
-const pedidos = JSON.parse(fs.readFileSync(path.join(PASTA, 'pedidos_extraidos.json'), 'utf8'))
+const todosPedidos = JSON.parse(fs.readFileSync(path.join(PASTA, 'pedidos_extraidos.json'), 'utf8'))
+// Pedidos ja conciliados numa rodada anterior (negocio_historico acao 'conciliacao_zip', detalhe.id_pedido,
+// "a + b" quando dois pedidos foram para o mesmo negocio) ficam de fora: o id_pedido e estavel entre exports
+// do grupo (sha1 de data|autor|posicao na mensagem).
+const jaConciliados = new Set()
+for (let de = 0; ; de += 1000) {
+  const { data, error } = await sb.from('negocio_historico').select('id, id_pedido:detalhe->>id_pedido')
+    .eq('empresa_id', EMPRESA).eq('acao', 'conciliacao_zip').order('id').range(de, de + 999)
+  if (error) throw new Error('conciliados: ' + error.message)
+  for (const h of data) for (const i of String(h.id_pedido || '').split(' + ')) if (i) jaConciliados.add(i.trim())
+  if (data.length < 1000) break
+}
+const pedidos = todosPedidos.filter((p) => !jaConciliados.has(p.id_pedido))
 const [funis, etapas, filiais, contatos, idents, negocios, conversas] = await Promise.all([
   tudo('funis', 'id, nome, interno', (q) => q.eq('empresa_id', EMPRESA)),
   tudo('funil_etapas', 'id, slug, label, tipo, funil_id', (q) => q.eq('empresa_id', EMPRESA)),
@@ -317,7 +329,7 @@ const por = (arr, k) => arr.reduce((o, x) => ((o[x[k]] = (o[x[k]] || 0) + 1), o)
 const filaAbertos = negocios.filter((n) => n.status === 'aberto' && n.ativo && !interno(n)).length
 console.log(JSON.stringify({
   base: { contatos: contatos.length, negocios: negocios.length, abertos_na_fila: filaAbertos, abertos_arquivados: negocios.filter((n) => n.status === 'aberto' && !n.ativo && !interno(n)).length, fichas: perfis.length },
-  pedidos: pedidos.length,
+  pedidos: todosPedidos.length, ja_conciliados_pulados: todosPedidos.length - pedidos.length, pedidos_nesta_rodada: pedidos.length,
   atualizar: atualizar.length, atualizar_por_faixa: por(atualizar, 'faixa'),
   revisar: revisar.length, revisar_por_faixa: por(revisar, 'faixa'),
   ja_ganhos_ignorados: jaGanhos.length,
