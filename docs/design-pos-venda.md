@@ -240,6 +240,12 @@ O comportamento de hoje vai contra a regra "negócio ganho vira histórico, não
    - É preciso levar a checagem também para a rota `/api/leads/mover`. Hoje ela só existe na tela.
 3. Sem categoria: aplica-se a régua "Geral" da empresa, se existir.
 
+**Data da venda no modal de ganho (decisão do Lucas, 23/11/2026).** O modal que abre ao marcar ganho (arrastar para a etapa de ganho, botão no card ou PDV sem venda ligada) pede, além dos campos obrigatórios acima, a **data da venda**: campo de data com **hoje** como padrão, que não aceita data futura. É essa data que vai para `ganho_em`, e não o instante do clique.
+- **Motivo:** a equipe registra o ganho dias depois da venda. Com `ganho_em` = clique, a régua de pós-venda (D+1, D+7…) começa atrasada e a janela da Edge (`pos_venda_dias`) fica deslocada: a mensagem do cliente cai em pós-venda quando já devia abrir negócio novo, ou o contrário. Exemplo real: o 5096 foi marcado ganho em 23/11, com pedido no grupo em 15/10 (a confirmar com a equipe).
+- **Hora:** data passada grava meio-dia no fuso da empresa; hoje grava o instante atual.
+- **Servidor:** a rota `/api/leads/mover` aceita `ganho_em` no corpo, recusa data futura ou anterior à criação do negócio por mais de 30 dias (tolerância para venda registrada antes do lead) e, sem o campo, usa agora (compatível com os clientes antigos).
+- **Correção depois:** trocar a data de um ganho já gravado continua só pelo caminho de exceção (`reabrir_negocio` ou uma RPC própria de "corrigir data da venda", com motivo e registro em `negocio_historico`), porque o gatilho da M1 trava `ganho_em`.
+
 ### Recompra no meio da régua
 
 - **`substituir`** (padrão nas réguas de aparelho): a compra nova da mesma régua, ou de régua com prioridade maior ou igual, **cancela os passos pendentes** da jornada antiga (`status = cancelado`, motivo `recompra`) e começa a nova do zero.
