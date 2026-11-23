@@ -27,6 +27,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { timingSafeEqual } from "node:crypto";
 import { bancoIndisponivel, chaveMid, contaDoEvento, ErroDeBanco, ErroDeGravacao, esquecer, hashCorpo, jaRecebido, LIMITE_GRANDE, primeiraEntrega, tamanhoCorpo } from "./reenvio.ts";
 import { conferirCanalDeResposta, destinoNaConta, type TipoCanal } from "./canal-resposta.ts";
+import { direcaoNoHistorico, numeroDoCanalNoEvento } from "./historico.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -1343,7 +1344,13 @@ async function guardarBruto(canal: Canal, tipo: string, value: unknown) {
 //      TODA conversa vira lead: reativa o inativo se houver, cria se não houver.
 //      O lead criado recebe ultima_mensagem_at da última mensagem REAL, então
 //      conversa antiga afunda na lista e não atropela o atendimento do dia.
-async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]) {
+/**
+ * `numeroDoCanal` = `value.metadata.display_phone_number` do evento (23/11/2026). O conserto de 13/10 lia o número
+ * da loja em `bloco.metadata`, que só traz `phase`, `progress` e `chunk_order`: o número saía vazio, a comparação
+ * nunca batia e o histórico continuou entrando TODO como "recebida" (Aletrini: 2.082 mensagens da loja, 19/11).
+ * Conferido no cofre: `payload.metadata.display_phone_number` = o número do canal; `payload.history[].metadata` não o tem.
+ */
+async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[], numeroDoCanal: string) {
   let importadas = 0, criados = 0, reativados = 0, falhas = 0, ignorados = 0;
   let progresso: number | null = null;
 
@@ -1394,9 +1401,7 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
          * `display_phone_number` é o número do canal que está sincronizando;
          * `from` igual a ele significa que a mensagem saiu daqui.
          */
-        const numeroDaLoja = String(meta?.display_phone_number ?? "").replace(/\D/g, "");
-        const remetente = String(m.from ?? "").replace(/\D/g, "");
-        const doNegocio = !!numeroDaLoja && remetente === numeroDaLoja;
+        const doNegocio = direcaoNoHistorico(numeroDoCanal || String(meta?.display_phone_number ?? ""), m.from) === "enviada";
         // O histórico não traz arquivo (vem depois, por outro evento), mas o rótulo
         // precisa ser legível: `[${tipo}]` cru virava "[errors]" e "[edit]" no chat
         // — nome interno do payload da Meta na cara de quem atende.
@@ -2354,7 +2359,8 @@ serve(async (req: Request) => {
             // corpo do webhook não existia em lugar nenhum para reprocessar.
             await guardarBruto(canal, "history", value);
             const h = value?.history as Record<string, unknown>[] | undefined;
-            if (h) await importarHistorico(canal, h);
+            // O número da loja vem nos metadados do EVENTO (value.metadata), não nos de cada bloco do histórico.
+            if (h) await importarHistorico(canal, h, numeroDoCanalNoEvento(value));
             // Mesmo campo "history", outra forma: aviso só com as mídias.
             const soltas = value?.messages as Record<string, unknown>[] | undefined;
             if (soltas?.length) await enriquecerMidiaDoHistorico(canal, soltas);
