@@ -57,7 +57,7 @@ export function GanhoModal({ leadNome, valorInicial, criadoEm, confirmar = 'Marc
     if (!empresa?.id) return
     let vivo = true
     createClient().from('estoque_categorias').select('id, nome')
-      .eq('empresa_id', empresa.id).eq('ativo', true).order('nome')
+      .eq('empresa_id', empresa.id).eq('ativo', true).order('ordem').order('nome')
       .then(({ data: cats }) => { if (vivo) setCategorias(((cats ?? []) as { id: number; nome: string }[])) })
     return () => { vivo = false }
   }, [empresa?.id])
