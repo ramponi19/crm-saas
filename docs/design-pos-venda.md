@@ -299,8 +299,8 @@ O comportamento de hoje vai contra a regra "negócio ganho vira histórico, não
 | Conciliação (scripts) | Grava a data do pedido e o valor; sem categoria e condição (o grupo de pedidos não as tem) |
 
 - O que a tela grava: `ganho_em` (data da venda: meio-dia no fuso; hoje = instante atual), `valor_estimado` = valor da venda e `negocios.dados.venda` = `{data, categoria_id, condicao, valor, registrada_por, registrada_em}`.
-- **Categoria:** a lista ativa de `estoque_categorias` da empresa. Empresa sem categoria cadastrada não é cobrada.
-- **Condição:** valores `novo` / `seminovo`. O rótulo do segundo é **vocabulário da empresa** (`vocabulario.usado`, padrão "Usado"), porque "seminovo" é termo do segmento de celular e a trava do build não deixa termo de segmento no núcleo. Para a JM ler "Seminovo", basta gravar `vocabulario.usado = "Seminovo"` na configuração dela.
+- **Categoria:** a lista ativa de `estoque_categorias` da empresa, na `ordem` dela (a JM: iPhone, iPad, MacBook, Watch, Acessórios, Perfumes, Outros). Empresa sem categoria cadastrada não é cobrada.
+- **Condição:** valores `novo` / `seminovo`. O rótulo do segundo é **vocabulário da empresa** (`vocabulario.usado`, padrão "Usado"), porque "seminovo" é termo do segmento de celular e a trava do build não deixa termo de segmento no núcleo. Gravado em 23/11/2026 para a JM e para a "Nexus Demonstração" (`empresa_menu.itens.base.vocabulario.usado = "Seminovo"`).
 
 ### Recompra no meio da régua
 
@@ -753,6 +753,36 @@ O detalhe da Fase 2 e da Fase 3 está no fim do §8.3. A ordem dentro de cada fa
 | Contato duplicado por loja divide o histórico do mesmo cliente | A ficha soma pelo telefone (D2); a fusão de contatos já existe (`lib/fusao-contatos.ts`) |
 | Dependência do motor de configuração do PDV v2 | Chave provisória em `configuracoes_sistema` (D6) |
 
+### 8.6 Pendência de infraestrutura antes da Entrega C: ambiente de teste separado
+
+**O problema (conferido em 23/11/2026).** Os previews da Vercel usam as **mesmas** variáveis do Supabase que a produção. `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` têm o alvo "production + preview".
+- Testar num link de preview grava no banco real: marcar venda, reabrir, mover lead.
+- O preview também recebe segredos de produção: `META_APP_SECRET`, `CHANNEL_ENCRYPTION_KEY`, `WEBHOOK_VERIFY_TOKEN`, `PAYMENT_ENCRYPTION_KEY`, `CRON_SECRET`.
+- Até a Entrega B dá para conviver com isso, testando com lead de teste ou na empresa "Nexus Demonstração". A Entrega C não dá: ela cria jornadas, acompanhamentos e chamados em massa ao instalar o módulo, e muda o roteamento de toda mensagem que chega (M7). Testar isso no banco real é testar em produção.
+
+**Opção A (recomendada): projeto Supabase de staging.**
+- **Custo:** cerca de **US$ 10 por mês**, que é o compute Micro de mais um projeto (US$ 0,01344/h). A organização está no plano **Pro**: os US$ 10 de créditos de compute já cobrem a produção e não cobrem um segundo projeto. Disco até 8 GB e egress do teste cabem na cota.
+- **Passos:**
+  1. Criar o projeto `crm-saas-staging` em `sa-east-1`, com compute Micro, na mesma organização.
+  2. **Esquema:** aplicar as migrações do repositório (`supabase db push` contra o staging) e comparar com a produção pela listagem de tabelas, funções, políticas e gatilhos (`supabase db diff` e/ou `pg_dump --schema-only` dos dois). A produção não tem o histórico completo do repositório: o que faltar entra como migração de acerto. O mesmo problema já apareceu no Supabase local.
+  3. **Dados só fictícios:** a semente da demonstração (`supabase/scripts/demo/preview-demonstracao.sql`) mais uma empresa "JM de teste" com as mesmas etapas, categorias e vocabulário da JM. **Nunca** copiar cliente real (LGPD).
+  4. **Usuários de teste** no Auth do staging: dono, admin e vendedor em duas lojas. As senhas ficam com o Lucas, ou num arquivo local fora do git.
+  5. **Edge Functions** publicadas no staging, sem credenciais reais da Meta: o webhook da Meta continua só na produção. Para testar o recebimento, usar a Edge local ou a Graph falsa do e2e. Os crons do staging ficam desligados, ou ligados só os que estiverem em teste.
+  6. **Vercel:** separar as variáveis do alvo "Preview" das de "Production".
+     - As três do Supabase passam a apontar para o staging.
+     - Os segredos (Meta, canal, pagamento, cron, Anthropic) passam a ter valores de teste ou ficam vazios no preview.
+     - A produção não muda.
+  7. **Rotina de migração:** cada migração vai primeiro para o staging e é testada no preview. Só depois vai para a produção, com o mesmo ritual de hoje (IOwait, volta, md5).
+- **Tempo estimado:** cerca de 1 dia, a maior parte no passo 2 (fechar a diferença de esquema).
+
+**Opção B: Supabase Branching** (um branch por PR, integrado ao GitHub e à Vercel).
+- **Custo:** sem taxa fixa; US$ 0,01344 por hora enquanto o branch existe (Micro), fora dos créditos e fora do teto de gasto. Um branch efêmero por PR custa centavos por dia. Um branch persistente custa os mesmos ~US$ 10 por mês da opção A.
+- **A favor:** cada PR ganha um banco limpo, e a integração com a Vercel preenche as variáveis do preview sozinha.
+- **Contra, hoje:** o branch é montado **só pelas migrações do repositório** mais `seed.sql`, e a produção não bate com o histórico do repositório. Até o passo 2 da opção A estar resolvido, o branch nasceria diferente da produção. Além disso, cada PR pagaria o tempo de subir e popular um banco novo.
+- **Caminho natural:** fazer a opção A agora. Quando o esquema do repositório reproduzir a produção, avaliar trocar o staging fixo pelo branching.
+
+**Decisão do Lucas pendente:** opção A ou B, e quando (antes de começar a Entrega C). **Nada foi executado.**
+
 ---
 
 ## 3. Decisões do Lucas (23/11/2026)
@@ -774,6 +804,7 @@ O detalhe da Fase 2 e da Fase 3 está no fim do §8.3. A ordem dentro de cada fa
 | — | Data da venda no ganho | **Mantida no modal de ganho** (hoje como padrão). Para datas já gravadas, a RPC **`corrigir_data_venda(negocio_id, nova_data, motivo)`**, só dono e admin, com histórico. **Não usar `reabrir_negocio`** para isso | §2.3, M3 |
 
 **Ainda pendente com o Lucas:**
+- escolher o ambiente de teste separado (§8.6, opção A ou B) antes da Entrega C;
 - aprovar este plano (§8) antes de qualquer migração ou código do MVP;
 - marcar o `conciliacao_revisar.csv`;
 - confirmar o 5096 com a equipe.
