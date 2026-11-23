@@ -103,6 +103,12 @@ export interface ObjecaoIA { rotulo: string; evidencia: string; desfecho: string
 export interface PerfilIA {
   /** O mesmo vocabulário da lista, para a tela reusar o `Badge`. */
   classificacao: Classification
+  /**
+   * Selo "já é cliente" (23/11/2026, 4A): a IA viu compra na conversa, mas o NEGÓCIO está aberto
+   * (recompra). A classe vira a de quem ainda está negociando e o vendedor vê o selo. Ver
+   * `ajustarAoNegocio`.
+   */
+  jaCliente?: boolean
   score: number
   riscoPerda: number
   /** Rótulo curto de como esta pessoa compra. Livre — não é mais um enum. */
@@ -622,6 +628,7 @@ function validar(bruto: unknown): PerfilIA | null {
 
   return {
     classificacao,
+    ...(o.jaCliente === true ? { jaCliente: true } : {}),
     score: numero(o.score, 50),
     riscoPerda: numero(o.riscoPerda, 0),
     perfil: texto(o.perfil, TETO.perfil) || '—',
@@ -685,6 +692,31 @@ export async function gerarPerfil(opts: {
     return { ok: false, status: 502, erro: 'A IA respondeu fora do formato. Tente de novo.' }
   }
   return { ok: true, perfil, ms: Date.now() - t0, modelo: r.modelo }
+}
+
+/**
+ * A CLASSE É DO NEGÓCIO, NÃO DA CONVERSA (23/11/2026, Fase 4A da conciliação de vendas).
+ *
+ * O CRM é a fonte da verdade sobre venda fechada:
+ *   - negócio GANHO → 'customer', diga a IA o que disser;
+ *   - negócio ABERTO que a IA leu como 'customer' (a conversa mostra uma compra antiga) → 'followup'
+ *     com o selo `jaCliente`: é recompra em andamento e precisa continuar na fila do vendedor;
+ *   - perdido, ou status desconhecido, fica como a IA classificou.
+ * Vale para a ficha que se grava e para a que se lê (a guardada pode ser de antes do ganho).
+ */
+export function ajustarAoNegocio(perfil: PerfilIA, status: string | null | undefined): PerfilIA {
+  if (status === 'ganho') {
+    const { jaCliente: _semSelo, ...resto } = perfil
+    return { ...resto, classificacao: 'customer' }
+  }
+  if (status === 'aberto' && perfil.classificacao === 'customer') return { ...perfil, classificacao: 'followup', jaCliente: true }
+  return perfil
+}
+
+/** Status do negócio para `ajustarAoNegocio`; nulo se não deu para ler (a ficha fica como está). */
+export async function statusDoNegocio(db: SupabaseClient, empresaId: number, negocioId: number): Promise<string | null> {
+  const { data } = await db.from('negocios').select('status').eq('empresa_id', empresaId).eq('id', negocioId).maybeSingle()
+  return (data as { status?: string } | null)?.status ?? null
 }
 
 export interface PerfilGuardado {

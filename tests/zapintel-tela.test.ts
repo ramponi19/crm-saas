@@ -46,7 +46,7 @@ mock.module('@/lib/zapintel/ficha', { namedExports: { montarFicha: () => ({}) } 
 mock.module('@/lib/zapintel/produtos-da-ficha', { namedExports: { produtosDaFicha: async () => undefined } })
 mock.module('@/lib/zapintel/papel', { namedExports: { papelDaEmpresa: async () => 'Vendedor' } })
 mock.module('@/lib/zapintel/travou', { namedExports: { ondeTravou: () => null } })
-mock.module('@/lib/zapintel/perfil', { namedExports: { lerPerfil: async () => null, marcaDaConversa: () => ({}) } })
+mock.module('@/lib/zapintel/perfil', { namedExports: { lerPerfil: async () => null, marcaDaConversa: () => ({}), ajustarAoNegocio: (p: unknown) => p, statusDoNegocio: async () => null } })
 mock.module('@/lib/zapintel/ia', { namedExports: { iaDoCrmLigada: async () => true } })
 
 const { GET: conversa } = await import('@/app/zapintel/api/conversa/route')

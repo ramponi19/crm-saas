@@ -204,6 +204,7 @@ export default function FichaDoLead() {
           {ia && classe && urg && (
             <div className="fc-selos">
               <span className="fc-tag" style={{ color: corDoTexto(classe), borderColor: classe.cor }}>{classe.nome}</span>
+              {ia.jaCliente && <span className="fc-tag" style={{ color: "var(--green)", borderColor: "var(--green)" }}>já é cliente</span>}
               <span className="fc-urg" style={{ color: urg.cor }}><span style={{ background: urg.cor }} /> urgência {urg.nome.toLowerCase()}</span>
               {ia.perfil && <span className="fc-perfil">{ia.perfil}</span>}
             </div>

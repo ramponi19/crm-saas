@@ -30,6 +30,8 @@ interface LeadLinha {
   leadId: number; nome: string | null; telefone: string | null; origem: string | null; origemId: string | null;
   loja: string | null; classificacao: Classe; urgencia: Urgencia; score: number | null; rotulo: string | null;
   proximaAcao: string | null; temAnalise: boolean; desatualizada: boolean; comprou: boolean; esperando: boolean;
+  /** Negócio aberto de quem já comprou (a IA viu compra ou o contato tem venda fechada): recompra. */
+  jaCliente?: boolean;
   ultimaDoCliente: string | null; ultimaMensagem: string; primeiraMensagem: string; mensagens: number;
   sinais: number; objecoes: number; alertas: number;
 }
@@ -291,6 +293,7 @@ function Linha({ l, agora }: { l: LeadLinha; agora: number }) {
         <div className="lv-selos">
           {l.esperando && <Selo cor="var(--red)"><Clock size={10} /> esperando {ha(l.ultimaDoCliente, agora).replace("há ", "")}</Selo>}
           {l.comprou && <Selo cor="var(--green)">venda registrada</Selo>}
+          {l.jaCliente && <Selo cor="var(--green)">já é cliente</Selo>}
           {l.alertas > 0 && <Selo cor="var(--yellow)"><AlertTriangle size={10} /> {l.alertas} {l.alertas === 1 ? "pendência" : "pendências"}</Selo>}
           {l.desatualizada && <Selo cor="var(--muted)">conversa andou</Selo>}
           {!l.temAnalise && l.classificacao !== "sem_resposta" && <Selo cor="var(--purple-l)"><Sparkles size={10} /> sem análise</Selo>}
