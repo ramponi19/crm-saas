@@ -2771,14 +2771,14 @@ isOneToOne: false
                   ]
                 },"transmissoes": {
                   Row: {
-                    "agendada_para": string | null,"canal_tipo": string,"concluida_em": string | null,"created_at": string,"criado_por": string | null,"empresa_id": number,"filial_id": number | null,"filtro": NonNullable<Json>,"id": number,"iniciada_em": string | null,"modelo_id": number,"nome": string,"parametros": NonNullable<Json>,"pausada_em": string | null,"publico_id": number | null,"status": string,"total": number,"updated_at": string
+                    "agendada_para": string | null,"canal_id": number | null,"canal_tipo": string,"concluida_em": string | null,"created_at": string,"criado_por": string | null,"empresa_id": number,"filial_id": number | null,"filtro": NonNullable<Json>,"id": number,"iniciada_em": string | null,"modelo_id": number,"nome": string,"parametros": NonNullable<Json>,"pausada_em": string | null,"publico_id": number | null,"status": string,"total": number,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "agendada_para"?: string | null,"canal_tipo"?: string,"concluida_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id": number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"iniciada_em"?: string | null,"modelo_id": number,"nome": string,"parametros"?: NonNullable<Json>,"pausada_em"?: string | null,"publico_id"?: number | null,"status"?: string,"total"?: number,"updated_at"?: string
+                    "agendada_para"?: string | null,"canal_id"?: number | null,"canal_tipo"?: string,"concluida_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id": number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"iniciada_em"?: string | null,"modelo_id": number,"nome": string,"parametros"?: NonNullable<Json>,"pausada_em"?: string | null,"publico_id"?: number | null,"status"?: string,"total"?: number,"updated_at"?: string
                   }
                   Update: {
-                    "agendada_para"?: string | null,"canal_tipo"?: string,"concluida_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"iniciada_em"?: string | null,"modelo_id"?: number,"nome"?: string,"parametros"?: NonNullable<Json>,"pausada_em"?: string | null,"publico_id"?: number | null,"status"?: string,"total"?: number,"updated_at"?: string
+                    "agendada_para"?: string | null,"canal_id"?: number | null,"canal_tipo"?: string,"concluida_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"iniciada_em"?: string | null,"modelo_id"?: number,"nome"?: string,"parametros"?: NonNullable<Json>,"pausada_em"?: string | null,"publico_id"?: number | null,"status"?: string,"total"?: number,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -3427,6 +3427,9 @@ isOneToOne: true
                            },
 "mensagem_registrar":
 { Args: { "p_canal_id": number,"p_dados": Json,"p_empresa": number,"p_external_id": string }; Returns: number
+                           },
+"modelo_aprovado_no_canal":
+{ Args: { "p_canal": number,"p_empresa": number,"p_modelo": number }; Returns: boolean
                            },
 "modelo_aprovado_na_loja":
 { Args: { "p_empresa": number,"p_filial": number,"p_modelo": number,"p_qualquer_loja"?: boolean }; Returns: boolean
