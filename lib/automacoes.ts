@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { cabecalhosEdgeInterna, urlEdgeWebhook } from '@/lib/edge-interna'
 import { recusadaPelaMeta } from '@/lib/canais/falha-meta'
-import { aprovadoNaLoja } from '@/lib/canais/modelos-waba'
+import { aprovadoNaLoja, aprovadosNoCanal, whatsappDoClienteNaLoja } from '@/lib/canais/modelos-waba'
 import { moduloEstaLigado } from '@/lib/modulo-ligado'
 import {
   agendarPara, horarioValido, modeloRecente, proximoHorario, tetoAtingido, type Horario,
@@ -136,7 +136,8 @@ async function criarTarefa(db: Db, e: Execucao, a: AutomacaoRow, neg: NegocioMin
 
 /** Envio do modelo pela Edge (caminho de serviço; a Edge confere de novo o aprovado). */
 async function enviarModeloPelaEdge(e: Execucao, a: AutomacaoRow, neg: NegocioMin,
-  modelo: { id: number; nome: string; idioma: string; corpo: string | null }, telefone: string): Promise<number | null> {
+  modelo: { id: number; nome: string; idioma: string; corpo: string | null }, telefone: string,
+  canalId: number | null): Promise<number | null> {
   const url = urlEdgeWebhook('send_template_automacao')
   const parametros = ((a.config?.parametros as string[] | undefined) ?? []).map((p) => render(String(p), neg.nome))
   const previa = (modelo.corpo ?? '').replace(/\{\{(\d+)\}\}/g, (_, n) => parametros[Number(n) - 1] ?? '')
@@ -146,6 +147,8 @@ async function enviarModeloPelaEdge(e: Execucao, a: AutomacaoRow, neg: NegocioMi
     body: JSON.stringify({
       leadId: neg.id, number: telefone, modelo: modelo.nome, idioma: modelo.idioma, parametros, previa,
       modeloId: modelo.id, automacaoId: a.id, execucaoId: e.id,
+      // O número em que o cliente falou por último nesta loja; a Edge confere (empresa, loja, ativo).
+      ...(canalId ? { canalId } : {}),
     }),
     signal: AbortSignal.timeout(30_000),
   })
@@ -202,10 +205,16 @@ export async function executarUma(db: Db, e: Execucao, agora = new Date()): Prom
     const { data: m } = await db.from('modelos_mensagem').select('id, nome, idioma, corpo, status').eq('id', a.modelo_id ?? 0).maybeSingle()
     const modelo = m as { id: number; nome: string; idioma: string; corpo: string | null; status: string } | null
     if (!modelo) return { resultado: 'pulada', motivo: 'modelo apagado' }
-    // Aprovado NO NÚMERO que envia por esta loja (11/11/2026: a Meta aprova por WABA; o status
-    // da empresa é só resumo). Mesma regra de canal da Edge: o da loja, senão o último de qualquer loja.
-    if (!(await aprovadoNaLoja(db, e.empresa_id, modelo.id, neg.filial_id, true))) {
-      return { resultado: 'pulada', motivo: 'modelo não aprovado no WhatsApp da loja deste negócio' }
+    // Aprovado NO NÚMERO que envia (11/11/2026: a Meta aprova por WABA; o status da empresa é só
+    // resumo). Desde 23/11/2026 o número é o da CONVERSA: o WhatsApp em que o cliente falou por
+    // último nesta loja (com dois números na loja, não o conectado por último). Sem conversa por
+    // WhatsApp: a regra da loja de antes (o da loja, senão o último de qualquer loja).
+    const doCliente = neg.contato_id ? await whatsappDoClienteNaLoja(db, e.empresa_id, neg.contato_id, neg.filial_id) : null
+    const aprovado = doCliente
+      ? (await aprovadosNoCanal(db, e.empresa_id, doCliente.wabaId)).ids.includes(modelo.id)
+      : await aprovadoNaLoja(db, e.empresa_id, modelo.id, neg.filial_id, true)
+    if (!aprovado) {
+      return { resultado: 'pulada', motivo: doCliente ? 'modelo não aprovado no número em que o cliente fala com a loja' : 'modelo não aprovado no WhatsApp da loja deste negócio' }
     }
     const { data: c } = await db.from('contatos').select('id, telefone, telefone_e164, ativo, opt_out_em').eq('id', neg.contato_id ?? 0).maybeSingle()
     const contato = c as { id: number; telefone: string | null; telefone_e164: string | null; ativo: boolean | null; opt_out_em: string | null } | null
@@ -242,7 +251,7 @@ export async function executarUma(db: Db, e: Execucao, agora = new Date()): Prom
       return { resultado: 'adiada', motivo: 'teto de 50 envios automáticos por hora', quando: new Date(agora.getTime() + 15 * 60_000) }
     }
 
-    const mensagemId = await enviarModeloPelaEdge(e, a, neg, modelo, telefone)
+    const mensagemId = await enviarModeloPelaEdge(e, a, neg, modelo, telefone, doCliente?.canalId ?? null)
     return { resultado: 'executada', mensagemId }
   }
 

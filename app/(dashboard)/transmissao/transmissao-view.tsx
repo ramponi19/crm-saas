@@ -14,6 +14,8 @@ type Status = 'rascunho' | 'agendada' | 'enviando' | 'pausada' | 'concluida' | '
 interface Transmissao {
   id: number; nome: string; filial_id: number | null; modelo_id: number; status: Status; filtro: FiltroPublico
   publico_id?: number | null
+  /** Número que envia (23/11/2026); nulo nas anteriores: o WhatsApp da loja. */
+  canal_id?: number | null
   parametros: string[]; agendada_para: string | null; iniciada_em: string | null; concluida_em: string | null
   total: number; created_at: string
 }
@@ -22,7 +24,10 @@ interface Numeros {
   respondidas: number; falhas: number; puladas: number
 }
 // aprovado_em: lojas (id, ou 'null' = empresa sem loja) cujo NÚMERO tem o modelo aprovado (11/11/2026).
-interface Modelo { id: number; nome: string; idioma: string; categoria: string; corpo: string; status: string; aprovado_em?: string[] }
+// aprovado_wabas (23/11/2026): as contas da Meta em que está aprovado — filtra pelo NÚMERO escolhido.
+interface Modelo { id: number; nome: string; idioma: string; categoria: string; corpo: string; status: string; aprovado_em?: string[]; aprovado_wabas?: string[] }
+/** WhatsApp da empresa que a sessão enxerga (23/11/2026). */
+interface CanalWa { id: number; filial_id: number | null; waba_id: string | null; ativo: boolean; rotulo: string }
 interface Loja { id: number; nome: string }
 interface Funil { id: number; nome: string; padrao: boolean }
 interface Etapa { id: number; funil_id: number; label: string }
@@ -34,6 +39,7 @@ interface Dados {
   funis: Funil[]; etapas: Etapa[]; form: Form | null
   avisosPagamento?: AvisoPagamento[]
   publicos?: PublicoOpcao[] | null
+  canais?: CanalWa[]
 }
 interface Previa { total: number; aptos: number; opt_out: number; bloqueado: number; sem_telefone: number; modelo_7_dias: number; amostra: { nome: string | null; final: string }[] }
 
@@ -80,6 +86,7 @@ export function TransmissaoView() {
 
   const porId = new Map(dados.numeros.map((n) => [Number(n.transmissao_id), n]))
   const lojaNome = new Map(dados.lojas.map((l) => [l.id, l.nome]))
+  const canalNome = new Map((dados.canais ?? []).map((c) => [c.id, c.rotulo]))
   const modeloNome = new Map(dados.modelos.map((m) => [m.id, m.nome]))
 
   return (
@@ -110,7 +117,7 @@ export function TransmissaoView() {
                         <Badge tone={TOM[t.status]} dot>{ROTULO[t.status]}</Badge>
                       </div>
                       <div className="mt-0.5 truncate text-[11.5px] text-ink-3">
-                        {(t.filial_id && lojaNome.get(t.filial_id)) || 'Loja única'} · {modeloNome.get(t.modelo_id) ?? 'modelo'} ·{' '}
+                        {(t.filial_id && lojaNome.get(t.filial_id)) || 'Loja única'}{t.canal_id && canalNome.get(t.canal_id) ? ` · ${canalNome.get(t.canal_id)}` : ''} · {modeloNome.get(t.modelo_id) ?? 'modelo'} ·{' '}
                         {t.status === 'agendada' && t.agendada_para ? `para ${formatarDataHora(t.agendada_para, undefined, '', fuso)}` : formatarDataHora(t.created_at, undefined, '', fuso)}
                       </div>
                     </div>
@@ -163,9 +170,18 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
   const lojas = dados.form?.lojas ?? []
   const [nome, setNome] = useState('')
   const [loja, setLoja] = useState<number | ''>(lojas.length === 1 ? lojas[0].id : '')
-  // Só o que está aprovado NO NÚMERO da loja escolhida: a Meta aprova por conta de WhatsApp.
+  // O NÚMERO QUE ENVIA (23/11/2026): os WhatsApp ativos da loja escolhida (ou da rede). Com um só,
+  // é ele; com dois ou mais, escolher é obrigatório — senão a lista sairia pelo conectado por último.
+  const numerosDaLoja = (dados.canais ?? []).filter((c) => c.ativo && (!loja || c.filial_id == null || c.filial_id === loja))
+  const [canalEscolhido, setCanalId] = useState<number | ''>('')
+  const canal = numerosDaLoja.length === 1 ? numerosDaLoja[0] : (numerosDaLoja.find((c) => c.id === canalEscolhido) ?? null)
+  const precisaNumero = numerosDaLoja.length > 1
+  // Só o que está aprovado NO NÚMERO que envia: a Meta aprova por conta de WhatsApp. Sem número
+  // escolhido ainda, a regra da loja (o mesmo de antes).
   const chaveLoja = loja ? String(loja) : 'null'
-  const aprovados = dados.modelos.filter((m) => (m.aprovado_em ?? []).includes(chaveLoja))
+  const aprovados = dados.modelos.filter((m) => (canal
+    ? (m.aprovado_wabas ?? []).includes(canal.waba_id ?? '')
+    : (m.aprovado_em ?? []).includes(chaveLoja)))
   const [modeloEscolhido, setModeloId] = useState<number | ''>(aprovados[0]?.id ?? '')
   // Trocou a loja e o modelo escolhido não existe no número dela: vale o primeiro que existe.
   const modeloId: number | '' = aprovados.some((m) => m.id === modeloEscolhido) ? modeloEscolhido : (aprovados[0]?.id ?? '')
@@ -205,13 +221,13 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
 
   const nomes = useNomesDoFiltro(dados.funis, dados.etapas)
 
-  const pronta = !!nome.trim() && !!modelo && (!precisaLoja || !!loja) && parametros.slice(0, nVars).filter((p) => p?.trim()).length === nVars
+  const pronta = !!nome.trim() && !!modelo && (!precisaLoja || !!loja) && (!precisaNumero || !!canal) && parametros.slice(0, nVars).filter((p) => p?.trim()).length === nVars
   const agendarPara = quando === 'agendar' ? instanteLocal(dia, hora, fuso) : null
 
   async function salvar(disparar: boolean) {
     setSalvando(true)
     try {
-      const { id } = await post({ op: 'criar', nome, filial_id: loja || null, modelo_id: modeloId, parametros: parametros.slice(0, nVars), filtro, publico_id: publico?.id ?? null })
+      const { id } = await post({ op: 'criar', nome, filial_id: loja || null, canal_id: canal?.id ?? null, modelo_id: modeloId, parametros: parametros.slice(0, nVars), filtro, publico_id: publico?.id ?? null })
       if (disparar) {
         const j = await post({ op: 'disparar', id, ...(agendarPara ? { agendar_para: agendarPara.toISOString() } : {}) })
         notify.ok(j.status === 'agendada' ? 'Transmissão agendada.' : 'Transmissão disparada.', `${j.contatos} contatos na lista.`)
@@ -228,9 +244,16 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
           <div className="grid gap-3 sm:grid-cols-2">
             <Input label="Nome (só para a loja)" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Retorno de quem sumiu — novembro" maxLength={120} />
             {precisaLoja && (
-              <Select label="Loja (o WhatsApp que envia)" value={loja} onChange={(e) => { setLoja(Number(e.target.value) || ''); setParametros([]); setPublicoId('') }}>
+              <Select label="Loja (o WhatsApp que envia)" value={loja} onChange={(e) => { setLoja(Number(e.target.value) || ''); setParametros([]); setPublicoId(''); setCanalId('') }}>
                 <option value="">Escolha a loja</option>
                 {lojas.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
+              </Select>
+            )}
+            {precisaNumero && (!precisaLoja || !!loja) && (
+              <Select label="Número que envia" value={canalEscolhido} data-transmissao-numero
+                onChange={(e) => { setCanalId(Number(e.target.value) || ''); setParametros([]) }}>
+                <option value="">Escolha o número</option>
+                {numerosDaLoja.map((c) => <option key={c.id} value={c.id}>{c.rotulo}</option>)}
               </Select>
             )}
           </div>
@@ -240,6 +263,8 @@ function NovaTransmissao({ dados, fuso, fechar, pronto }: { dados: Dados; fuso: 
             {(!precisaLoja || !!loja) && <AvisoPagamentoMeta avisos={dados.avisosPagamento} filial={precisaLoja ? (loja || null) : undefined} />}
             {precisaLoja && !loja ? (
               <p className="text-[12.5px] text-ink-3">Escolha a loja: cada número de WhatsApp tem os seus modelos aprovados.</p>
+            ) : precisaNumero && !canal ? (
+              <p className="text-[12.5px] text-ink-3">Esta loja tem mais de um número de WhatsApp: escolha por qual a transmissão sai (cada número tem os seus modelos aprovados).</p>
             ) : aprovados.length === 0 ? (
               <p className="text-[12.5px] text-warn">Nenhum modelo aprovado pela Meta no WhatsApp desta loja. Crie (ou sincronize) e espere a aprovação em Automações → Modelos.</p>
             ) : (
@@ -402,7 +427,7 @@ function Acompanhamento({ id, dados, fuso, voltar, recarregarLista }: { id: numb
             <Badge tone={TOM[t.status]} dot data-status={t.status}>{ROTULO[t.status]}</Badge>
           </div>
           <p className="mt-1 text-[12px] text-ink-3">
-            {loja?.nome ?? 'Loja única'} · modelo {modelo?.nome ?? `#${t.modelo_id}`} · {publicoNome ? `público ${publicoNome}: ` : ''}{descreverFiltro(t.filtro ?? {}, nomes)}
+            {loja?.nome ?? 'Loja única'}{t.canal_id ? ` · pelo ${(dados.canais ?? []).find((c) => c.id === t.canal_id)?.rotulo ?? 'número escolhido'}` : ''} · modelo {modelo?.nome ?? `#${t.modelo_id}`} · {publicoNome ? `público ${publicoNome}: ` : ''}{descreverFiltro(t.filtro ?? {}, nomes)}
             {t.status === 'agendada' && t.agendada_para ? ` · começa em ${formatarDataHora(t.agendada_para, undefined, '', fuso)}` : ''}
           </p>
         </div>

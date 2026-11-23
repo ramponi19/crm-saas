@@ -1,7 +1,7 @@
 import { NextResponse, after } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { aprovadoNaLoja, aprovadosPorLoja } from '@/lib/canais/modelos-waba'
+import { aprovadoNaLoja, aprovadosNoCanal, aprovadosPorLoja, finalDoNumero } from '@/lib/canais/modelos-waba'
 import { avisosDePagamento } from '@/lib/canais/saude-whatsapp'
 import { exigirModuloLigado, moduloEstaLigado } from '@/lib/modulo-ligado'
 import { CHAVE_CONFIG, TETO_MAX, filtroImpossivel, normalizarFiltro, tetoValido, variaveisDoModelo } from '@/lib/transmissao/filtro'
@@ -51,7 +51,7 @@ export async function GET() {
   const { supabase, empresaId, admin } = c
 
   const { data: lista, error } = await supabase.from('transmissoes')
-    .select('id, nome, filial_id, modelo_id, status, filtro, publico_id, parametros, agendada_para, iniciada_em, pausada_em, concluida_em, total, created_at')
+    .select('id, nome, filial_id, canal_id, modelo_id, status, filtro, publico_id, parametros, agendada_para, iniciada_em, pausada_em, concluida_em, total, created_at')
     .eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(100)
   if (error) return recusa(error.message, 500)
   const ids = (lista ?? []).map((t) => t.id as number)
@@ -72,6 +72,17 @@ export async function GET() {
     avisosDePagamento(svc, empresaId).catch((e) => { console.error('avisosDePagamento:', e); return [] }),
   ])
   const aprovadoEm = (id: number) => [...porLoja].filter(([, ids]) => ids.has(id)).map(([k]) => k)
+  // NÚMERO QUE ENVIA (23/11/2026): os WhatsApp ativos que a sessão enxerga (RLS: os da loja dele e
+  // os da rede) e em que WABA cada modelo está aprovado — a tela escolhe o número e filtra por ele.
+  const [{ data: canaisWa }, { data: wabasAprovadas }] = await Promise.all([
+    supabase.from('canais').select('id, filial_id, nome_exibicao, external_id, waba_id, status')
+      .eq('empresa_id', empresaId).eq('tipo', 'whatsapp').order('conectado_em', { ascending: false }),
+    supabase.from('modelos_mensagem_wabas').select('modelo_id, waba_id').eq('empresa_id', empresaId).eq('status', 'aprovado'),
+  ])
+  const canais = ((canaisWa ?? []) as { id: number; filial_id: number | null; nome_exibicao: string | null; external_id: string | null; waba_id: string | null; status: string }[])
+    .map((c) => ({ id: c.id, filial_id: c.filial_id, waba_id: c.waba_id, ativo: c.status === 'ativo', rotulo: `WhatsApp ·${finalDoNumero(c.nome_exibicao, c.external_id)}` }))
+  const wabasDoModelo = (id: number) => ((wabasAprovadas ?? []) as { modelo_id: number; waba_id: string }[])
+    .filter((w) => Number(w.modelo_id) === id).map((w) => w.waba_id)
 
   let form = null
   if (admin) {
@@ -102,11 +113,12 @@ export async function GET() {
   return NextResponse.json({
     admin,
     publicos,
+    canais,
     transmissoes: lista ?? [],
     numeros: numeros ?? [],
     lojas: lojas ?? [],
     modelos: (modelos ?? []).filter((m) => admin || ids.length === 0 || (lista ?? []).some((t) => t.modelo_id === m.id))
-      .map((m) => ({ ...m, aprovado_em: aprovadoEm(m.id as number) })),
+      .map((m) => ({ ...m, aprovado_em: aprovadoEm(m.id as number), aprovado_wabas: wabasDoModelo(m.id as number) })),
     funis: funis ?? [],
     etapas: etapas ?? [],
     form,
@@ -167,9 +179,26 @@ export async function POST(req: Request) {
       const { data: m } = await supabase.from('modelos_mensagem').select('id, corpo, status')
         .eq('empresa_id', empresaId).eq('id', Number(b.modelo_id) || 0).maybeSingle()
       if (!m) return recusa('Escolha um modelo.')
-      // Aprovado NO NÚMERO da loja que envia (o status da empresa é só um resumo).
-      if (!(await aprovadoNaLoja(createServiceClient(), empresaId, m.id as number, loja.filial ?? null))) {
-        return recusa('Este modelo não está aprovado pela Meta no WhatsApp desta loja.')
+      // O NÚMERO QUE ENVIA (23/11/2026). Os WhatsApp ativos desta loja (ou da rede): com um só, é
+      // ele; com dois ou mais, a tela tem de escolher — senão a lista sairia pelo conectado por
+      // último. Sem nenhum: segue sem número (o disparo recusa, como antes).
+      const svcC = createServiceClient()
+      let qNum = svcC.from('canais').select('id, waba_id').eq('empresa_id', empresaId).eq('tipo', 'whatsapp').eq('status', 'ativo')
+      if (loja.filial != null) qNum = qNum.or(`filial_id.eq.${Number(loja.filial)},filial_id.is.null`)
+      const { data: daLoja } = await qNum
+      const numeros = (daLoja ?? []) as { id: number; waba_id: string | null }[]
+      let canal: { id: number; waba_id: string | null } | null = numeros.length === 1 ? numeros[0] : null
+      if (numeros.length > 1) {
+        canal = numeros.find((c) => c.id === Number(b.canal_id)) ?? null
+        if (!canal) return recusa('Esta loja tem mais de um número de WhatsApp: escolha por qual a transmissão sai.')
+      }
+      // Aprovado NO NÚMERO que envia (o status da empresa é só um resumo).
+      const aprovado = canal
+        ? (await aprovadosNoCanal(svcC, empresaId, canal.waba_id)).ids.includes(m.id as number)
+        : await aprovadoNaLoja(svcC, empresaId, m.id as number, loja.filial ?? null)
+      if (!aprovado) {
+        // Com um número só na loja, "o WhatsApp desta loja" já diz qual (a mensagem de antes).
+        return recusa(numeros.length > 1 ? 'Este modelo não está aprovado pela Meta neste número de WhatsApp.' : 'Este modelo não está aprovado pela Meta no WhatsApp desta loja.')
       }
       const parametros = (Array.isArray(b.parametros) ? b.parametros : []).map((p) => String(p ?? '').trim().slice(0, 200))
       const pede = variaveisDoModelo(m.corpo as string)
@@ -185,7 +214,7 @@ export async function POST(req: Request) {
       const impossivel = filtroImpossivel(filtro)
       if (impossivel) return recusa(impossivel)
       const { data, error } = await supabase.from('transmissoes').insert({
-        empresa_id: empresaId, filial_id: loja.filial, nome, modelo_id: m.id, parametros, filtro, publico_id: publicoId, criado_por: user.id,
+        empresa_id: empresaId, filial_id: loja.filial, canal_id: canal?.id ?? null, nome, modelo_id: m.id, parametros, filtro, publico_id: publicoId, criado_por: user.id,
       } as never).select('id').single()
       if (error) return recusa(error.message, error.code === '42501' ? 403 : 400)
       return NextResponse.json({ id: data.id })
@@ -196,7 +225,7 @@ export async function POST(req: Request) {
       if (quando && (Number.isNaN(quando.getTime()) || quando.getTime() < Date.now() - 60_000)) return recusa('A data do agendamento já passou.')
       // A lista é da loja e sai pelo WhatsApp DELA: sem número conectado, nem começa (a Edge
       // recusaria cada envio). Canal sem loja (o da empresa inteira) vale para todas.
-      const { data: tx } = await supabase.from('transmissoes').select('filial_id, publico_id, status').eq('id', id).eq('empresa_id', empresaId).maybeSingle()
+      const { data: tx } = await supabase.from('transmissoes').select('filial_id, canal_id, publico_id, status').eq('id', id).eq('empresa_id', empresaId).maybeSingle()
       if (!tx) return recusa('Transmissão não encontrada.', 404)
       // Veio de um público: a lista é a regra dele como está agora (o rascunho pode ser de antes).
       if (tx.publico_id && tx.status === 'rascunho') {
@@ -207,9 +236,15 @@ export async function POST(req: Request) {
         if (eF || !upd?.length) return recusa(eF?.message ?? 'Não deu para atualizar a lista pelo público.', 409)
       }
       let qCanal = createServiceClient().from('canais').select('id').eq('empresa_id', empresaId).eq('tipo', 'whatsapp').eq('status', 'ativo')
-      if (tx.filial_id != null) qCanal = qCanal.or(`filial_id.eq.${Number(tx.filial_id)},filial_id.is.null`)
+      // Com número escolhido, é ele que tem de estar conectado (23/11/2026).
+      if (tx.canal_id != null) qCanal = qCanal.eq('id', Number(tx.canal_id))
+      else if (tx.filial_id != null) qCanal = qCanal.or(`filial_id.eq.${Number(tx.filial_id)},filial_id.is.null`)
       const { data: canais } = await qCanal.limit(1)
-      if (!canais?.length) return recusa('Esta loja não tem WhatsApp conectado. Conecte em Configurações → Canais.', 409)
+      if (!canais?.length) {
+        return recusa(tx.canal_id != null
+          ? 'O número escolhido para esta transmissão está desconectado. Reconecte em Configurações → Canais.'
+          : 'Esta loja não tem WhatsApp conectado. Conecte em Configurações → Canais.', 409)
+      }
       const { data: n, error } = await supabase.rpc('transmissao_montar', { p_transmissao: id })
       if (error) return recusa(error.message, error.code === '42501' ? 403 : 400)
       const agora = new Date().toISOString()

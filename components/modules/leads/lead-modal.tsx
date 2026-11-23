@@ -690,7 +690,8 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
       // Só o aprovado NO NÚMERO que envia pela loja deste negócio (11/11/2026: a Meta aprova por
       // WABA) + o aviso de conta sem forma de pagamento desse número.
       setAvisosPagamento([])
-      const r = await fetch(`/api/modelos?negocio=${lead.id}`)
+      // Do número escolhido no "Responder por" (23/11/2026); sem WhatsApp escolhido, o da loja.
+      const r = await fetch(`/api/modelos?negocio=${lead.id}${canalEscolhido?.tipo === 'whatsapp' ? `&canal=${canalEscolhido.canalId}` : ''}`)
       const j = await r.json()
       if (!r.ok) throw new Error(j.error)
       const aprovados = new Set<number>((j.envio?.aprovados ?? []) as number[])

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireEmpresaRoleApi, requireOwnerOrAdminApi } from '@/lib/owner'
 import { createServiceClient } from '@/lib/supabase/service'
 import { metaConfigurada } from '@/lib/canais/meta'
-import { aprovadosNoNumeroDaLoja, criarEmTodosOsNumeros, numerosWhatsApp, sincronizarModelos } from '@/lib/canais/modelos-waba'
+import { aprovadosNoCanal, aprovadosNoNumeroDaLoja, criarEmTodosOsNumeros, numerosWhatsApp, sincronizarModelos } from '@/lib/canais/modelos-waba'
 import { avisosDePagamento } from '@/lib/canais/saude-whatsapp'
 
 /**
@@ -10,6 +10,8 @@ import { avisosDePagamento } from '@/lib/canais/saude-whatsapp'
  * WhatsApp da empresa (11/11/2026: o status é por WABA; `numeros` diz onde cada um está aprovado).
  * `?negocio=ID` (envio manual pela Comunicação / card do lead): `envio` diz quais modelos estão
  * aprovados NO NÚMERO que envia pela loja daquele negócio e o aviso de pagamento desse número.
+ * `&canal=ID` (23/11/2026): o número ESCOLHIDO ("Responder por" do card, canal da conversa na
+ * Comunicação) — tem de ser WhatsApp ativo desta empresa e da loja do negócio (ou da rede).
  */
 export async function GET(req: Request) {
   try {
@@ -38,17 +40,30 @@ export async function GET(req: Request) {
       const { data: neg } = await supabase.from('negocios').select('id, filial_id').eq('id', negocioId).eq('empresa_id', empresaId).maybeSingle()
       if (!neg) return NextResponse.json({ error: 'Negócio não encontrado.' }, { status: 404 })
       const filial = (neg as { filial_id: number | null }).filial_id ?? null
+      const canalId = Number(new URL(req.url).searchParams.get('canal')) || null
+      let wabaDoCanal: string | null | undefined
+      if (canalId) {
+        // Pela RLS de quem pede: canal de outra loja que ele não enxerga = não acha.
+        const { data: c } = await supabase.from('canais').select('id, tipo, status, filial_id, waba_id')
+          .eq('id', canalId).eq('empresa_id', empresaId).maybeSingle()
+        const canal = c as { tipo: string; status: string; filial_id: number | null; waba_id: string | null } | null
+        if (!canal || canal.tipo !== 'whatsapp' || canal.status !== 'ativo' || (canal.filial_id != null && canal.filial_id !== filial)) {
+          return NextResponse.json({ error: 'Este número não envia por esta loja.' }, { status: 409 })
+        }
+        wabaDoCanal = canal.waba_id
+      }
       const [{ wabaId, ids }, avisos] = await Promise.all([
-        aprovadosNoNumeroDaLoja(svc, empresaId, filial),
+        wabaDoCanal !== undefined ? aprovadosNoCanal(svc, empresaId, wabaDoCanal) : aprovadosNoNumeroDaLoja(svc, empresaId, filial),
         avisosDePagamento(svc, empresaId).catch((e) => { console.error('avisosDePagamento:', e); return [] }),
       ])
       envio = { filial_id: filial, aprovados: ids, avisosPagamento: wabaId ? avisos.filter((a) => a.waba_id === wabaId) : [] }
     }
 
-    // Nome do número = as lojas que enviam por ele (o waba_id não diz nada ao lojista).
+    // Nome do número = a loja que envia por ele e o FINAL do número (o waba_id não diz nada ao
+    // lojista). Com dois números na mesma loja, só o nome da loja não dizia qual (23/11/2026).
     const nomeLoja = new Map(((filiais ?? []) as { id: number; nome: string }[]).map((f) => [f.id, f.nome]))
     const rotulo = new Map(numeros.map((n) => [n.wabaId,
-      n.filiais.map((f) => (f == null ? 'Empresa' : nomeLoja.get(f) ?? `Loja ${f}`)).join(', ')]))
+      n.filiais.map((f, i) => `${f == null ? 'Empresa' : nomeLoja.get(f) ?? `Loja ${f}`} ·${n.finais[i]}`).join(', ')]))
     const modelos = (data ?? []).map((m) => ({
       ...m,
       numeros: numeros.map((n) => {

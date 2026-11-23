@@ -279,7 +279,8 @@ export function ConversaPainel({
     try {
       // Só o que está aprovado NO NÚMERO que envia pela loja deste negócio (11/11/2026: a Meta
       // aprova por WABA) + o aviso de conta sem forma de pagamento desse número.
-      const r = await fetch(`/api/modelos?negocio=${negocio.id}`)
+      // Do número desta conversa (23/11/2026); conversa antiga sem canal: o da loja.
+      const r = await fetch(`/api/modelos?negocio=${negocio.id}${conversa?.canal?.tipo === 'whatsapp' && conversa.canal_id ? `&canal=${conversa.canal_id}` : ''}`)
       const j = await r.json()
       if (!r.ok) throw new Error(j.error)
       const aprovados = new Set<number>((j.envio?.aprovados ?? []) as number[])
