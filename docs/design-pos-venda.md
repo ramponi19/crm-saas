@@ -820,6 +820,47 @@ O detalhe da Fase 2 e da Fase 3 está no fim do §8.3. A ordem dentro de cada fa
 
 **Decisão do Lucas (23/11/2026): opção A**, projeto `crm-saas-staging` em São Paulo, compute Micro. Regras: só dados fictícios; Edge sem credenciais da Meta (nada no staging envia mensagem real); variáveis de Preview da Vercel apontando para o staging, com segredos de teste. Avisar o Lucas antes de criar o projeto (custo confirmado) e antes de trocar as variáveis da Vercel.
 
+### 8.7 Pendências para depois do staging (registradas em 23/11/2026, nada feito ainda)
+
+**O incidente que motivou esta seção.** A Entrega A foi para a produção gravando `negocios.dados.venda`, e o gatilho `core_validar_dados` recusa toda chave de `dados` que não seja campo personalizado nem comece com `_`. Marcar venda pela tela falhava. Ninguém chegou a usar entre o deploy (21h16 UTC) e a correção `20261123000700_dados_venda_reservada` (aplicada às ~22h40 UTC). Os testes de rota simulam o banco e não pegaram.
+
+**1. `corrigir_data_venda` atualiza também `dados.venda.data` (decisão do Lucas).**
+- Hoje a RPC muda só o `ganho_em`. No teste de 23/11, o negócio 7757 ficou com `ganho_em` em 01/10 e `dados.venda.data` em 15/11.
+- Na mesma transação da RPC: `dados = jsonb_set(dados, '{venda,data}', to_jsonb(p_data::text))` quando `dados ? 'venda'`. O histórico `data_venda_corrigida` continua guardando as duas datas.
+- Teste novo: depois de corrigir, `dados.venda.data` = dia local do `ganho_em`. A divergência fica impossível por construção.
+
+**2. Testes de rota que gravam no banco rodam também contra o staging (proposta).**
+- **Suíte de integração**, `tests/integracao/*.test.ts`, rodada por `npm run test:staging`. Ela não importa a rota: chama o **preview da Vercel** do mesmo commit, que depois do passo 6 do §8.6 usa o banco do staging, com sessões reais dos usuários de teste (dono, admin e vendedor de duas lojas).
+  - As senhas ficam em `.env.staging.local`, fora do git. O script faz login pelo Auth do staging e guarda os cookies.
+  - Confere o resultado no banco do staging com a service_role do staging, nunca a da produção.
+- **Cobertura mínima:** todo caminho que grava em `negocios`, `contatos` ou `dados` e já quebrou ou é crítico.
+  - Marcar venda pelo quadro, pela ficha e pelo "Converter em cliente": com e sem dados, futura, categoria de outra empresa.
+  - Corrigir data e reabrir: dono e admin passam; vendedor recebe 403.
+  - Criar lead com produto, reserva, importação, juntar negócios.
+- **Isolamento:** cada teste cria os próprios leads na empresa "JM de teste" e os arquiva no fim. Uma vez por semana a semente é refeita.
+- **No ritual de deploy**, antes do cherry-pick para a `main`:
+  - migração aplicada primeiro no staging, com o `teste-*.sql` dela rodado lá;
+  - `npm run test:staging` verde contra o preview do commit.
+  - Sem os dois, não há push para a `main`. Depois de estável, vira um check do GitHub no PR.
+- **Custo:** zero além do staging. Cada rodada leva cerca de 1 a 2 minutos.
+
+**3. Achados do teste funcional de 23/11 (empresa 5), aguardando decisão.**
+- **a. A tela esconde "Reabrir venda" e "Corrigir data da venda" do superadmin impersonando.** O banco aceita, porque `is_empresa_admin` cobre o superadmin. O hook `useSouAdmin` procura o usuário na lista da equipe, onde ele não está. Correção: o hook pergunta ao banco, com `is_empresa_admin(get_empresa_id())`. Para o dono e o admin reais, a tela já está certa.
+- **b. A venda reaberta continua com `dados.venda`.** O 7758 voltou para Negociando com a venda antiga no `dados`. Uma nova entrada no ganho sobrescreve, mas até lá o negócio aberto carrega uma venda. Opções:
+  - `reabrir_negocio` move a chave para `dados._venda_reaberta`;
+  - ou quem lê (M6, relatórios) só considera `dados.venda` com `status = 'ganho'`.
+- **c. O banco não exige `dados.venda` no ganho.** Pela API direta, sem tela, um vendedor marca ganho sem `dados.venda`; testado em transação desfeita. Também consegue editar `dados.venda`. A exigência hoje está só na rota.
+  - Opção para a Entrega C: o gatilho de ganho exige `dados.venda` quando a mudança vem de um JWT de usuário, com exceção das RPCs do sistema (PDV, canal, conciliação).
+  - Na mesma linha, `dados.venda` só pode mudar pela rota ou por RPC.
+- **d. Campo de valor do modal.** Ele vem preenchido com o valor do negócio, e digitar acrescenta ao fim ("4590" + "4590,00"). Selecionar tudo ao focar resolve.
+
+**4. Riscos latentes do mesmo gatilho (varredura de 23/11; hoje nenhum ativo).**
+- `imoveis_perfil_espelho` (gatilho em `imoveis_perfis_busca`) grava `busca_*` em `contatos.dados`. Nenhuma empresa tem esses campos nem o módulo Imóveis. O primeiro perfil de busca salvo vai falhar. Antes de ligar Imóveis para alguém: instalar os campos com o módulo, ou mover as chaves para `_busca`.
+- `produto_interessado` é gravado sem conferir o campo pela criação de lead, pela reserva, pelos portais e pela rota imob. Só a importação confere. Hoje o campo está ativo nas 3 empresas.
+- O gatilho confere **todas** as chaves do `dados`, não só a nova. Se um campo for apagado ou desligado com dados já gravados (o `aplicarPreset` com `substituir` apaga os campos de módulo), qualquer gravação de `dados` naquele negócio ou contato falha, inclusive marcar venda.
+  - Opção: o gatilho valida só as chaves que mudaram (`new.dados` × `old.dados`);
+  - ou apagar o campo exige limpar a chave antes.
+
 ---
 
 ## 3. Decisões do Lucas (23/11/2026)
