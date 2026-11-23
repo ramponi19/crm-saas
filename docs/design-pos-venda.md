@@ -822,6 +822,14 @@ O detalhe da Fase 2 e da Fase 3 está no fim do §8.3. A ordem dentro de cada fa
 
 ### 8.7 Pendências para depois do staging (registradas em 23/11/2026, nada feito ainda)
 
+**Prioridade decidida pelo Lucas (23/11/2026):**
+1. **Agora:** achado (d), o campo de valor do modal substitui o valor, nunca acrescenta. Vai para a produção junto com o arquivo da migração 0700.
+2. **Depois do staging:** o gatilho `core_validar_dados` confere só as chaves que mudaram, comparando com o valor anterior, e inclui `produto_interessado` na conferência. Teste no staging antes da produção.
+3. **Entrega C:**
+   - (b) ao reabrir uma venda, `dados.venda` vai para o histórico e sai do negócio;
+   - (c) avaliar exigir `dados.venda` no banco na entrada em ganho e restringir quem edita `dados.venda` depois de gravado.
+4. **Quando der:** (a) o botão do superadmin (o hook precisa perguntar ao banco; não é mudança de uma linha) e o perfil de busca do módulo Imóveis.
+
 **O incidente que motivou esta seção.** A Entrega A foi para a produção gravando `negocios.dados.venda`, e o gatilho `core_validar_dados` recusa toda chave de `dados` que não seja campo personalizado nem comece com `_`. Marcar venda pela tela falhava. Ninguém chegou a usar entre o deploy (21h16 UTC) e a correção `20261123000700_dados_venda_reservada` (aplicada às ~22h40 UTC). Os testes de rota simulam o banco e não pegaram.
 
 **1. `corrigir_data_venda` atualiza também `dados.venda.data` (decisão do Lucas).**
@@ -829,7 +837,12 @@ O detalhe da Fase 2 e da Fase 3 está no fim do §8.3. A ordem dentro de cada fa
 - Na mesma transação da RPC: `dados = jsonb_set(dados, '{venda,data}', to_jsonb(p_data::text))` quando `dados ? 'venda'`. O histórico `data_venda_corrigida` continua guardando as duas datas.
 - Teste novo: depois de corrigir, `dados.venda.data` = dia local do `ganho_em`. A divergência fica impossível por construção.
 
-**2. Testes de rota que gravam no banco rodam também contra o staging (proposta).**
+**2. Testes de rota que gravam no banco rodam também contra o staging. APROVADO pelo Lucas em 23/11/2026; é REGRA a partir do staging pronto.**
+- **Regra do deploy:**
+  1. A migração vai primeiro para o staging.
+  2. `npm run test:staging` passa contra o preview do commit.
+  3. Só então a `main`.
+- Nenhuma exceção sem o ok do Lucas. Até o staging existir, vale o ritual de hoje (checagens, IOwait, volta anotada) mais o teste funcional na empresa "Nexus Demonstração".
 - **Suíte de integração**, `tests/integracao/*.test.ts`, rodada por `npm run test:staging`. Ela não importa a rota: chama o **preview da Vercel** do mesmo commit, que depois do passo 6 do §8.6 usa o banco do staging, com sessões reais dos usuários de teste (dono, admin e vendedor de duas lojas).
   - As senhas ficam em `.env.staging.local`, fora do git. O script faz login pelo Auth do staging e guarda os cookies.
   - Confere o resultado no banco do staging com a service_role do staging, nunca a da produção.
