@@ -134,6 +134,7 @@ select (select count(*) from vendas_vendas) vendas,
 
 > Bom dia, pessoal! Atualizamos o sistema de vendas à noite. **Antes da primeira venda, fechem e abram de novo todas as abas do Nexus** (ou Ctrl+F5 em cada uma), no computador e no celular. O que mudou:
 > - a encomenda só é entregue com o saldo pago: o "Finalizar" do Histórico agora abre o recebimento;
+> - **encomenda sem pagamento registrado só pode ser entregue depois de registrar o pagamento no sistema.** Se o cliente já pagou por fora (Pix, cartão, dinheiro), registrem esse pagamento no recebimento **antes** de entregar;
 > - a venda de balcão só fecha com o pagamento completo (aparece "Falta R$ X" até fechar);
 > - o ajuste de valor e custo na lista de encomendas só aparece em encomenda; venda já fechada não muda de valor.
 >
@@ -143,4 +144,15 @@ select (select count(*) from vendas_vendas) vendas,
 
 - Anotar o deploy novo e o de volta no `estado-atual`.
 - Tirar a reserva do número `20261125000100` do `.claude/sessoes-locais.json`.
+- **Mudança pequena logo depois do deploy** (decidida em 24/11; branch nova a partir da `main`, com testes): o **painel e os relatórios** passam a contar a venda pelo mês da **conclusão**, `coalesce(concluida_em, data_venda)`, igual à comissão, com as encomendas em aberto mostradas à parte. Leitores conhecidos que filtram por `data_venda`:
+  - `lib/painel/metricas.ts`;
+  - `app/(dashboard)/financeiro/page.tsx`;
+  - `app/(dashboard)/(gestao)/visao-geral/page.tsx`;
+  - `app/(dashboard)/metas/page.tsx`;
+  - `lib/ranking.ts`;
+  - `lib/assistente/ferramentas.ts`;
+  - relatórios.
+
+  Usar `lib/vendas-mes.ts`. Fica de fora a mediana de preço do PDV, que é referência de preço, não período.
+- **Pendência:** `tools/rebuild-local.sh` fecha o Docker Desktop e roda `wsl --shutdown`, o que derruba a pilha de outra sessão. Corrigir depois do deploy: desligar só a própria pilha e não fechar Docker/WSL com outra pilha de pé (regra `isolamento-sessoes-locais`).
 - A branch `docs/roteiro-reconstrucao` precisa de rebase sobre a `main` nova. Os documentos do PDV existem nas duas: ao rebasear, os commits copiados da branch do hotfix somem, e o da revisão 3 se aplica por cima.
