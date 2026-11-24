@@ -1199,6 +1199,22 @@ async function registrarRecebida(canal: Canal, p: {
 
   if (msgId == null) { console.log("msg duplicada ignorada:", p.externalId); return; }
 
+  // "NÃO QUERO RECEBER OFERTAS" (24/11/2026; migração 20261124001900). O banco decide (texto do botão da empresa,
+  // só WhatsApp) e marca o contato; na primeira vez devolve a confirmação, que sai já, pelo mesmo número — o toque
+  // acabou de abrir a janela de 24 h. Falha aqui NUNCA derruba o recebimento (a mensagem já está gravada).
+  if (canal.tipo === "whatsapp") {
+    try {
+      const { data: so, error: eSo } = await db.rpc("core_sem_ofertas_pelo_botao", { p_mensagem: msgId });
+      const r = so as { marcado?: boolean; confirmacao?: string | null; telefone?: string | null; negocio_id?: number | null } | null;
+      if (eSo) console.error("sem ofertas:", msgId, eSo.message);
+      else if (r?.marcado && r.confirmacao && r.telefone) {
+        await enviarWhatsApp(canal, { number: r.telefone, text: r.confirmacao, leadId: r.negocio_id != null ? String(r.negocio_id) : undefined });
+      }
+    } catch (e) {
+      console.error("sem ofertas (confirmação):", msgId, e instanceof Error ? e.message : String(e));
+    }
+  }
+
   /**
    * O contador de não lidas e a última mensagem da conversa NÃO são mexidos
    * aqui — quem mantém é o gatilho em `mensagens`, disparado pelo insert acima.

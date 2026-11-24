@@ -8,7 +8,7 @@ import { Badge, Button, Input, Select, Textarea, Tabs, notify } from '@/componen
 import { cn } from '@/lib/utils'
 import { montarMensagem, rotuloDoPasso } from '@/lib/posvenda/fila'
 import {
-  AVISO_SEM_MODELO, CATEGORIAS_MODELO, DIA_JANELA_PROVAVELMENTE_FECHADA, MENSAGEM_NEUTRO_PADRAO, MENSAGEM_PROMOTOR_PADRAO, ROTULO_CATEGORIA,
+  AVISO_SEM_MODELO, BOTAO_SEM_OFERTAS_PADRAO, CATEGORIAS_MODELO, CONFIRMACAO_SEM_OFERTAS_PADRAO, DIA_JANELA_PROVAVELMENTE_FECHADA, MENSAGEM_NEUTRO_PADRAO, MENSAGEM_PROMOTOR_PADRAO, ROTULO_CATEGORIA,
   categoriasPermitidas, passoPrecisaDeModelo,
 } from '@/lib/posvenda/config'
 
@@ -274,6 +274,9 @@ function Parametros({ dados }: { dados: DadosConfigPosVenda }) {
   const [janela, setJanela] = useState(String(p.janela_acompanhamento_dias?.empresa ?? 3))
   const [promotor, setPromotor] = useState(String(p.mensagem_promotor?.empresa ?? ''))
   const [neutro, setNeutro] = useState(String(p.mensagem_neutro?.empresa ?? ''))
+  const so = (p['core.sem_ofertas']?.empresa ?? null) as { botoes?: string[]; confirmacao?: string } | null
+  const [botoesSo, setBotoesSo] = useState((so?.botoes ?? [BOTAO_SEM_OFERTAS_PADRAO]).join('\n'))
+  const [confirmaSo, setConfirmaSo] = useState(so?.confirmacao ?? CONFIRMACAO_SEM_OFERTAS_PADRAO)
   const [links, setLinks] = useState<Record<string, string>>(() => Object.fromEntries(dados.lojas.map((l) => [String(l.id), String(p.link_avaliacao?.lojas?.[String(l.id)] ?? '')])))
   const [ocupado, setOcupado] = useState<string | null>(null)
   async function salvar(chave: string, valor: unknown, filialId?: number) {
@@ -340,6 +343,23 @@ function Parametros({ dados }: { dados: DadosConfigPosVenda }) {
             <Textarea label="Mensagem para quem deu 7 ou 8" rows={2} placeholder={MENSAGEM_NEUTRO_PADRAO} value={neutro} onChange={(e) => setNeutro(e.target.value)} wrapperClassName="flex-1" />
             <Button size="sm" disabled={neutro.trim().length < 3} loading={ocupado === 'mensagem_neutro'} onClick={() => salvar('mensagem_neutro', neutro)}>Salvar</Button>
           </div>
+        </div>
+      </div>
+      <div className="border-b border-line-soft py-4">
+        <div className="text-[13.5px] font-medium text-ink">“Não quero receber ofertas”</div>
+        <p className="mb-2 text-[12px] text-ink-3">
+          Quando o cliente toca um destes botões num modelo do WhatsApp, o Nexus marca o contato como sem ofertas (para de enviar modelos de
+          Marketing; os de Utilidade continuam) e responde na hora com a confirmação. Use o mesmo texto do botão criado na Meta. Variável: {'{{nome}}'}.
+        </p>
+        <div className="flex flex-col gap-2">
+          <Textarea label="Textos dos botões (um por linha)" rows={2} value={botoesSo} onChange={(e) => setBotoesSo(e.target.value)} />
+          <Textarea label="Confirmação enviada ao cliente" rows={2} value={confirmaSo} onChange={(e) => setConfirmaSo(e.target.value)} />
+          <Button size="sm" className="self-start" loading={ocupado === 'sem_ofertas'} onClick={async () => {
+            setOcupado('sem_ofertas')
+            const r = await gravar({ acao: 'sem_ofertas', botoes: botoesSo.split('\n'), confirmacao: confirmaSo })
+            setOcupado(null)
+            if (r.ok) { notify.ok('Salvo'); router.refresh() }
+          }}>Salvar</Button>
         </div>
       </div>
       <div className="py-4">

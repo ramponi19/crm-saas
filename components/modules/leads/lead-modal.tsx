@@ -25,6 +25,7 @@ import type { PerfilDoLead } from '@/lib/empresa-config'
 import { LeadChamadasPanel } from './lead-chamadas-panel'
 import { LeadCadenciaPanel } from './lead-cadencia-panel'
 import { LeadPosVendaPanel } from './lead-posvenda-panel'
+import { ContatoSemOfertas } from './contato-sem-ofertas'
 import { LeadOrcamentoPanel } from '@/components/modules/orcamentos/lead-orcamento-panel'
 import { LeadReservaPanel } from '@/components/modules/estoque/lead-reserva-panel'
 import { ProdutoAutocomplete } from './produto-autocomplete'
@@ -1674,6 +1675,8 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
               )
             })}
 
+            {/* "Não quero receber ofertas" (core): só barra modelo de Marketing. */}
+            {card?.contatoId && <ContatoSemOfertas contatoId={card.contatoId} />}
             <EtiquetasPanel negocioId={lead.id} ids={lead.etiqueta_ids ?? []}
               onMudou={(ids) => { onUpdate({ ...lead, etiqueta_ids: ids }); setVersaoHist((v) => v + 1) }} />
             {empresa?.id && <LeadAcoesPanel leadId={lead.id} empresaId={empresa.id} agendaVisitas={perfil.agendaVisitas} />}
