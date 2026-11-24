@@ -28,6 +28,7 @@ import { timingSafeEqual } from "node:crypto";
 import { bancoIndisponivel, chaveMid, contaDoEvento, ErroDeBanco, ErroDeGravacao, esquecer, hashCorpo, jaRecebido, LIMITE_GRANDE, primeiraEntrega, tamanhoCorpo } from "./reenvio.ts";
 import { conferirCanalDeResposta, destinoNaConta, type TipoCanal } from "./canal-resposta.ts";
 import { direcaoNoHistorico, numeroDoCanalNoEvento } from "./historico.ts";
+import { negocioArquivadoDoEco, negocioAtivoDoEco } from "./eco.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -1287,7 +1288,7 @@ async function registrarEcho(
     const contatoId = await contatoDaIdentidade(canal.empresa_id, origem, destinatario);
     if (!contatoId) return;
     const daLojaEcho = await negociosNaLoja(canal.empresa_id, contatoId, canal.filial_id);
-    let negocioId = (daLojaEcho.find((n) => n.ativo && n.status === "aberto") ?? daLojaEcho.find((n) => n.ativo))?.id ?? null;
+    let negocioId = negocioAtivoDoEco(daLojaEcho);
     if (!negocioId && canal.filial_id != null) {
       const conhecido = (await negociosNaLoja(canal.empresa_id, contatoId, null)).some((n) => n.ativo);
       if (conhecido) {
@@ -1300,6 +1301,8 @@ async function registrarEcho(
         negocioId = (data as number | null) ?? null;
       }
     }
+    // Só negócios ARQUIVADOS nesta loja: grava na conversa, preso ao mais recente da loja, sem reabrir (eco.ts).
+    if (!negocioId) negocioId = negocioArquivadoDoEco(daLojaEcho);
     if (!negocioId) return;
     const { id: msgId, erro, fora } = await registrarMensagem(canal.empresa_id, canal.id, mid, {
       lead_id: negocioId, direcao: "enviada", conteudo: texto, origem, lida: true, tipo, midia_url: midiaUrl,
