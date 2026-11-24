@@ -13,5 +13,5 @@
   "t7_update_direto": "GANHO_PROTEGIDO",
   "t8_permissoes": { "anon": false, "authenticated": true, "gatilho_authenticated": false },
   "t9_entrar_no_ganho": { "status": "ganho", "ganho_em_preenchido": true }, "t9_reabrir": { "status": "aberto", "ganho_em": null },
-  "t10_sem_funcao": true, "t10_gancho_chamado": true
+  "t10_funcao_existe": true, "t10_gancho_chamado": true
 }

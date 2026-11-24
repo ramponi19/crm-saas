@@ -317,13 +317,15 @@ O comportamento de hoje vai contra a regra "negócio ganho vira histórico, não
 
 ### Recompra no meio da régua
 
-- **`substituir`** (padrão nas réguas de aparelho): a compra nova da mesma régua, ou de régua com prioridade maior ou igual, **cancela os passos pendentes** da jornada antiga (`status = cancelado`, motivo `recompra`) e começa a nova do zero.
-- **`manter`** (padrão em acessório e perfume): as duas jornadas correm juntas, mas valem as regras anti-excesso abaixo.
-- **`pausar`**: a antiga congela e volta quando a nova termina. É raro; fica para casos especiais.
+**Regra do Lucas (24/11/2026), implementada na C3** (substitui o `substituir`/`manter`/`pausar` por régua):
+- Venda nova da **mesma categoria** cancela, com o motivo `recompra`, **só os passos de ciclo de troca** (`posvenda_cadencia_passos.ciclo_troca`, o D+330) pendentes das jornadas anteriores do cliente. Os outros passos da jornada anterior continuam.
+- Venda de **outra categoria** (acessório depois de iPhone, iPad depois de iPhone) não cancela nada.
+- **Uma jornada por venda.** O passo igual (mesmo tipo de ação, mesmo cliente, mesmo dia), vindo de duas vendas, não duplica: o segundo nasce `juntado`, apontando para o primeiro. Se o primeiro sai da fila (cancelado ou pulado), o juntado volta a ser pendente.
+- Venda reaberta e ganha de novo: **jornada nova**. A antiga fica cancelada; há só uma jornada **ativa** por negócio e régua.
 
 **Regras anti-excesso** (chaves da empresa):
 - `posvenda.intervalo_minimo_dias`, padrão 3: no máximo 1 contato proativo por cliente nesse intervalo. Os passos que colidem são empurrados para depois.
-- Várias compras no mesmo dia geram **uma jornada**: a da régua de maior prioridade.
+- Várias compras no mesmo dia geram uma jornada **por venda** (24/11), com os passos iguais juntados (ver acima).
 - O teto diário por responsável (`posvenda.teto_diario_por_responsavel`, padrão 25) segura a fila em dia de importação em massa (§2.7).
 
 ### Sugestão inicial — JM (dados semeados, tudo editável)

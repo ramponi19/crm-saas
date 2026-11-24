@@ -105,12 +105,12 @@ begin
   update negocios set status = 'ganho', etapa_id = 76 where id = ab;
   insert into _r select 't9_entrar_no_ganho', jsonb_build_object('status', status, 'ganho_em_preenchido', ganho_em is not null) from negocios where id = ab;
 
-  -- 10. o gancho do pós-venda (M6): sem a função, nada; com ela, é chamada com o negócio
-  insert into _r values ('t10_sem_funcao', to_jsonb(to_regprocedure('public.posvenda_reancorar_jornada(bigint)') is null));
-  execute 'create function public.posvenda_reancorar_jornada(p bigint) returns void language sql as $f$ insert into pg_temp._h values (p) $f$';
+  -- 10. o gancho do pós-venda: a função existe desde a C3 (20261124000400); trocada aqui por uma que só anota a
+  --     chamada (mesmo retorno), para provar que a RPC a chama com o negócio. A transação inteira é desfeita.
+  insert into _r values ('t10_funcao_existe', to_jsonb(to_regprocedure('public.posvenda_reancorar_jornada(bigint)') is not null));
+  execute 'create or replace function public.posvenda_reancorar_jornada(p_negocio bigint) returns int language sql as $f$ insert into pg_temp._h values (p_negocio) returning 1 $f$';
   r := corrigir_data_venda(a, '2026-10-20', 'teste do gancho do pós-venda');
   insert into _r values ('t10_gancho_chamado', to_jsonb((select array_agg(negocio) from _h) = array[a]));
-  execute 'drop function public.posvenda_reancorar_jornada(bigint)';
 end $teste$;
 
 -- 11. volta: o arquivo de volta tira a RPC e devolve o gatilho ao corpo da M1 (o próprio arquivo confere o md5)
