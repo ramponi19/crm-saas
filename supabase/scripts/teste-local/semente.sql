@@ -27,7 +27,14 @@ select '00000000-0000-0000-0000-000000000000', u.id::uuid, 'authenticated', 'aut
     ('f4ec6a87-103a-4ff3-b533-8347b028daf0', 'vendedora.jm@teste.invalid', 'Vendedora JM de teste'),
     ('f47a8e4f-a428-4bf6-8a82-d43088751d2c', 'dono.demo@teste.invalid', 'Dono Demonstração'),
     ('96867cc0-8331-4c79-be63-09a313b35ea0', 'admin.demo@teste.invalid', 'Admin Demonstração'),
-    ('0e5e0000-0000-4000-8000-000000000001', 'vendedor.demo@teste.invalid', 'Vendedor Demonstração')
+    ('0e5e0000-0000-4000-8000-000000000001', 'vendedor.demo@teste.invalid', 'Vendedor Demonstração'),
+    -- equipe da JM de teste para a roleta do pós-venda (C2): matriz 3 (2 de loja + 1 sem loja), Jaguariúna 6, 2 admins
+    ('0e5e0000-0000-4000-8000-000000000101', 'vendedor.matriz1@teste.invalid', 'Vendedor Matriz Um'),
+    ('0e5e0000-0000-4000-8000-000000000102', 'vendedor.matriz2@teste.invalid', 'Vendedor Matriz Dois'),
+    ('0e5e0000-0000-4000-8000-000000000103', 'vendedor.semloja@teste.invalid', 'Vendedor Sem Loja'),
+    ('0e5e0000-0000-4000-8000-000000000104', 'vendedor.jag2@teste.invalid', 'Vendedor Jaguariuna Dois'),
+    ('0e5e0000-0000-4000-8000-000000000201', 'admin.a@teste.invalid', 'Administrador A'),
+    ('0e5e0000-0000-4000-8000-000000000202', 'admin.b@teste.invalid', 'Administrador B')
   ) u(id, email, nome)
 on conflict (id) do nothing;
 
@@ -103,7 +110,13 @@ insert into empresa_usuarios (empresa_id, usuario_id, role, ativo, filial_id) va
   (1, 'f4ec6a87-103a-4ff3-b533-8347b028daf0', 'vendedor', true, 6),
   (5, 'f47a8e4f-a428-4bf6-8a82-d43088751d2c', 'owner', true, null),
   (5, '96867cc0-8331-4c79-be63-09a313b35ea0', 'admin', true, null),
-  (5, '0e5e0000-0000-4000-8000-000000000001', 'vendedor', true, 1)
+  (5, '0e5e0000-0000-4000-8000-000000000001', 'vendedor', true, 1),
+  (1, '0e5e0000-0000-4000-8000-000000000101', 'vendedor', true, 3),
+  (1, '0e5e0000-0000-4000-8000-000000000102', 'vendedor', true, 3),
+  (1, '0e5e0000-0000-4000-8000-000000000103', 'vendedor', true, null),
+  (1, '0e5e0000-0000-4000-8000-000000000104', 'vendedor', true, 6),
+  (1, '0e5e0000-0000-4000-8000-000000000201', 'admin', true, null),
+  (1, '0e5e0000-0000-4000-8000-000000000202', 'admin', true, null)
 on conflict do nothing;
 
 -- ── JM de teste: alguns clientes e negócios INVENTADOS (o 426 é o ganho que o teste da M3 usa) ────

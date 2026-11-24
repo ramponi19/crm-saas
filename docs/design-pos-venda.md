@@ -965,10 +965,20 @@ Cada etapa segue o ritual do §8.6.1: migração e teste no banco local descart�
   - Jaguariúna: 2 vendedores ativos.
 - Nenhum está sem loja.
 
-**Perguntas antes do código:**
-1. **Negócio com um administrador como responsável (7 ganhos).** O passo fica com ele (regra a, "responsável ativo") ou vai para a roleta da loja (o administrador não é "vendedor")?
-2. **Vendedor marcado como "ausente" no dia da distribuição.** Proposta: continua na roleta, porque o passo é para dias depois.
-3. **Teto diário por responsável.** Quando estoura, o passo vai para o dia seguinte do mesmo responsável. A alternativa é passar para o próximo da roleta.
+**Respostas do Lucas (24/11/2026), que valem para a C2. Plano C1–C8 aprovado:**
+1. **Administrador como responsável do ganho (7 na JM):** os passos de acompanhamento vão para a **roleta da loja**. Administradores recebem só:
+   - NPS até 6;
+   - chamados;
+   - o caso de loja sem vendedor ativo.
+   - Na regra (a), "vendedor do negócio" é `role = 'vendedor'`.
+2. **Vendedor ausente** (`empresa_usuarios.ausente`): fica **fora da roleta**.
+   - Os passos dele que **vencem durante a ausência** vão para a roleta da loja. A reavaliação roda na hora do vencimento.
+   - Os passos com data **depois da volta** continuam com ele.
+3. **Teto diário estourado** (`posvenda.teto_diario`, por responsável e dia):
+   - Passo de cliente do **próprio vendedor** (regra a): fica com ele, no **dia útil seguinte**. O dia útil é o mesmo do calendário do PDV v2 (§N da especificação): a chave `calendario.dias_semana_uteis` (padrão de segunda a sexta; a JM pode incluir o sábado), sem feriados até o calendário do core existir. A função `posvenda_proximo_dia_util` será trocada pelo `proximo_dia_util` do core quando ele vier.
+   - Passo que veio da **roleta**: vai para o **próximo da roleta da mesma loja** que tenha vaga no dia.
+   - Se todos estiverem cheios, o passo vai para o dia útil seguinte com a roleta.
+- Cada acompanhamento guarda a **origem** do responsável (`vendedor`, `padrao_loja`, `roleta`, `administradores`, `dono`, `manual`). É ela que decide o caminho do teto e da ausência.
 
 ---
 
