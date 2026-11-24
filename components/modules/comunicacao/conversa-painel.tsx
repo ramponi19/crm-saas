@@ -30,11 +30,18 @@ type ItemLinha =
   | { tipo: 'nota'; em: number; n: NotaInbox }
   | { tipo: 'otimista'; em: number; o: Otimista }
 
-type ModeloAprovado = { id: number; nome: string; idioma: string; corpo: string }
+type ModeloAprovado = { id: number; nome: string; idioma: string; corpo: string; categoria?: string | null }
+
+/**
+ * Rascunho que outra tela manda pela URL (24/11/2026, fila do pós-venda): `texto` já escrito no campo de envio (quem
+ * envia é a pessoa) e `modelo` = 'utilidade' para abrir os modelos aprovados de Utilidade quando a janela de 24 h do
+ * WhatsApp está fechada (D8 do pós-venda: só UTILITY no começo).
+ */
+export type RascunhoDaConversa = { texto?: string | null; modelo?: 'utilidade' | null }
 
 export function ConversaPainel({
-  conversaId, inicial, empresaId, meuId, usuarios, etapas, funilPadrao, motivos, perfil, onVoltar, onAbrirConversa,
-}: InboxProps & { conversaId: number; inicial: ConversaInbox | null; onVoltar: () => void; onAbrirConversa: (id: number) => void }) {
+  conversaId, inicial, empresaId, meuId, usuarios, etapas, funilPadrao, motivos, perfil, onVoltar, onAbrirConversa, rascunho,
+}: InboxProps & { conversaId: number; inicial: ConversaInbox | null; onVoltar: () => void; onAbrirConversa: (id: number) => void; rascunho?: RascunhoDaConversa | null }) {
   const fuso = useFuso()
   const supabase = useMemo(() => createClient(), [])
   const { assinar, aoReconectar } = useTempoReal()
@@ -49,7 +56,7 @@ export function ConversaPainel({
   const [outrasLojas, setOutrasLojas] = useState<{ filialId: number; nome: string }[]>([])
   const [conversaAtual, setConversaAtual] = useState<number | null>(null)
   const [modo, setModo] = useState<'responder' | 'nota'>('responder')
-  const [texto, setTexto] = useState('')
+  const [texto, setTexto] = useState(rascunho?.texto ?? '')
   const [enviando, setEnviando] = useState(false)
   const [tarefaAberta, setTarefaAberta] = useState(false)
   const [tarefa, setTarefa] = useState({ titulo: '', vencimento: '' })
@@ -59,6 +66,8 @@ export function ConversaPainel({
   const [modelos, setModelos] = useState<ModeloAprovado[] | null>(null)
   const [avisosPagamento, setAvisosPagamento] = useState<AvisoPagamento[]>([])
   const [modelo, setModelo] = useState<ModeloAprovado | null>(null)
+  const [soUtilidade, setSoUtilidade] = useState(false)
+  const rascunhoAplicado = useRef(false)
   const [params, setParams] = useState<string[]>([])
   const fimRef = useRef<HTMLDivElement>(null)
   const arquivoRef = useRef<HTMLInputElement>(null)
@@ -183,6 +192,14 @@ export function ConversaPainel({
   const janelaFechada = canal === 'whatsapp' && (!ultimaDoCliente || agora - ultimaDoCliente > JANELA_WHATSAPP_MS)
   const podeResponder = !!canal && !!negocio && !janelaFechada
 
+  // Veio da fila do pós-venda com a janela fechada: abre os modelos de Utilidade uma vez, quando o negócio carregou.
+  useEffect(() => {
+    if (rascunhoAplicado.current || rascunho?.modelo !== 'utilidade' || !negocio || !janelaFechada) return
+    rascunhoAplicado.current = true
+    abrirModelos(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só quando o negócio chega; abrirModelos lê o estado atual
+  }, [negocio, janelaFechada])
+
   /** Responder ASSUME o lead livre (a mesma regra do card): quem respondeu primeiro fica com ele. */
   async function assumirSeLivre() {
     if (!negocio || negocio.responsavel_id) return
@@ -273,8 +290,9 @@ export function ConversaPainel({
     }
   }
 
-  async function abrirModelos() {
+  async function abrirModelos(utilidade = false) {
     if (!negocio) return
+    setSoUtilidade(utilidade)
     setModelosAbertos(true); setModelo(null); setParams([]); setModelos(null); setAvisosPagamento([])
     try {
       // Só o que está aprovado NO NÚMERO que envia pela loja deste negócio (11/11/2026: a Meta
@@ -284,7 +302,7 @@ export function ConversaPainel({
       const j = await r.json()
       if (!r.ok) throw new Error(j.error)
       const aprovados = new Set<number>((j.envio?.aprovados ?? []) as number[])
-      setModelos(((j.modelos ?? []) as ModeloAprovado[]).filter((m) => aprovados.has(m.id)))
+      setModelos(((j.modelos ?? []) as ModeloAprovado[]).filter((m) => aprovados.has(m.id) && (!utilidade || m.categoria === 'UTILITY')))
       setAvisosPagamento((j.envio?.avisosPagamento ?? []) as AvisoPagamento[])
     } catch {
       setModelos([]); notify.bad('Não foi possível carregar os modelos.')
@@ -422,7 +440,7 @@ export function ConversaPainel({
             <AbaEscrita ativa={modo === 'responder'} onClick={() => setModo('responder')}><Send size={12} /> Responder</AbaEscrita>
             <AbaEscrita ativa={modo === 'nota'} onClick={() => setModo('nota')}><StickyNote size={12} /> Nota interna</AbaEscrita>
             {canal === 'whatsapp' && (
-              <button onClick={abrirModelos} disabled={!negocio} className="ml-auto text-[11.5px] font-medium text-accent hover:underline disabled:opacity-50">Enviar modelo</button>
+              <button onClick={() => abrirModelos()} disabled={!negocio} className="ml-auto text-[11.5px] font-medium text-accent hover:underline disabled:opacity-50">Enviar modelo</button>
             )}
           </div>
           {modo === 'responder' && !canal ? (
@@ -433,7 +451,7 @@ export function ConversaPainel({
           ) : modo === 'responder' && janelaFechada ? (
             <div className="flex flex-wrap items-center gap-2 rounded-control bg-warn-soft px-3 py-2 text-[12px] text-warn">
               <Clock size={14} /> O cliente não escreve há mais de 24 h: o WhatsApp só aceita um modelo aprovado.
-              <button className="font-semibold underline" onClick={abrirModelos}>Enviar modelo</button>
+              <button className="font-semibold underline" onClick={() => abrirModelos()}>Enviar modelo</button>
             </div>
           ) : (
             <div className={cn('flex items-end gap-2 rounded-control border px-2 py-1.5', modo === 'nota' ? 'border-warn/40 bg-warn-soft/40' : 'border-line bg-card')}>
@@ -468,7 +486,9 @@ export function ConversaPainel({
         ) : modelos.length === 0 ? (
           <div className="flex flex-col gap-3">
             <AvisoPagamentoMeta avisos={avisosPagamento} />
-            <p className="text-[13px] text-ink-3" data-sem-modelo-no-numero>Nenhum modelo aprovado pela Meta no WhatsApp desta loja. Crie (ou sincronize) e espere a aprovação em Modelos.</p>
+            <p className="text-[13px] text-ink-3" data-sem-modelo-no-numero>{soUtilidade
+              ? 'Nenhum modelo de Utilidade aprovado pela Meta no WhatsApp desta loja. Crie (ou sincronize) em Modelos e espere a aprovação.'
+              : 'Nenhum modelo aprovado pela Meta no WhatsApp desta loja. Crie (ou sincronize) e espere a aprovação em Modelos.'}</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">

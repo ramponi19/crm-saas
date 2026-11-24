@@ -288,6 +288,11 @@ export interface PerfilDoLead {
   textoLivre: boolean
   /** Rótulo da condição "usado" no modal de venda fechada (vocabulário da empresa; padrão "Usado"). */
   rotuloUsado: string
+  /**
+   * Aba Pós-venda no card (C7, 24/11/2026): a linha do módulo em empresa_modulos, a mesma que as RPCs conferem.
+   * Enquanto o módulo está em preparação, a conta do menu o dá como desligado; por isso lê a linha (lib/posvenda/ligado.ts).
+   */
+  posvenda: boolean
 }
 
 export type { PainelDoLead }
@@ -306,6 +311,7 @@ export function perfilDoLead(cfg: ConfigEmpresa): PerfilDoLead {
     // estoque e orçar (painéis desde 17/11/2026) são do varejo, que continua no catálogo.
     textoLivre: paineis.some((p) => PAINEIS_DE_TEXTO_LIVRE.has(p)),
     rotuloUsado: cfg.vocabulario.usado ?? 'Usado',
+    posvenda: moduloLigado(cfg.modulos, 'posvenda'),
   }
 }
 
