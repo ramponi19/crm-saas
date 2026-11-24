@@ -182,7 +182,13 @@ export async function POST(req: Request) {
      */
     ganho_em: status === 'ganho' ? (n.status === 'ganho' && n.ganho_em ? n.ganho_em : (ganhoEmNovo ?? agora)) : null,
   }
-  if (!etapaRow) patch.dados = { ...(n.dados ?? {}), _lead: { ...dadosLead, kanban_status: etapa } }
+  if (!etapaRow) {
+    // Reabrindo, a RPC já tirou a venda do negócio (C4): o `dados` lido antes dela não a traz de volta
+    // (o banco recusaria — VENDA_SO_POR_RPC, 24/11/2026).
+    const base: Record<string, unknown> = { ...((n.dados ?? {}) as Record<string, unknown>) }
+    if (reabrindoVenda) delete base.venda
+    patch.dados = { ...base, _lead: { ...dadosLead, kanban_status: etapa } }
+  }
   // A venda informada: valor do negócio e `dados.venda` (data, categoria, condição, valor, quem e quando).
   if (dadosVenda) {
     patch.valor_estimado = valorVenda
