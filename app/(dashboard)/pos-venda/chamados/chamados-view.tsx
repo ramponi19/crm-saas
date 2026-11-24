@@ -132,7 +132,7 @@ function Cartao({ c, status, equipe, podeRepassar, meu, responsavel, aberto, alt
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px]">
           <Badge tone={pr.tone}>{pr.rotulo}</Badge>
           <span className={cn(prazo.tone === 'bad' ? 'text-bad' : prazo.tone === 'warn' ? 'text-warn' : prazo.tone === 'ok' ? 'text-ok' : 'text-ink-3')}>{prazo.texto}</span>
-          <span className="text-ink-3">· {meu ? 'com você' : responsavel}</span>
+          <span className="text-ink-3">{meu ? 'com você' : responsavel}</span>
         </div>
       </button>
       {aberto && (
