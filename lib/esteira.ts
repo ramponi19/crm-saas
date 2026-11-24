@@ -18,6 +18,18 @@ import { fusoDaEmpresa } from './fuso-empresa'
 export interface ConfigDevolucao { ativo: boolean; minutos: number }
 export const DEVOLUCAO_PADRAO: ConfigDevolucao = { ativo: true, minutos: 30 }
 
+/** Como o responsável atual chegou ao negócio (negocio_atribuir grava em dados._lead.posse; 24/11/2026). */
+export interface Posse { acao?: string; para?: string; em?: string }
+
+/**
+ * Atribuição MANUAL fica fora da devolução automática (24/11/2026, regra universal): 'atribuir' ou 'transferir'
+ * (dono ou administrador na tela, ou script com motivo) é uma decisão de alguém — não volta sozinha para a esteira.
+ * Pegar e distribuir (roleta) continuam com o prazo normal. Só vale para a posse do responsável ATUAL.
+ */
+export function posseManual(responsavelId: string | null | undefined, posse: Posse | null | undefined): boolean {
+  return !!responsavelId && !!posse && posse.para === responsavelId && (posse.acao === 'atribuir' || posse.acao === 'transferir')
+}
+
 interface LeadDono {
   id: number; responsavel_id: string; responsavel_desde: string | null
   created_at: string | null; devolucoes: number | null
@@ -27,7 +39,8 @@ interface LeadDono {
 const SELECT_DONO: string = 'id, contato_id, filial_id, responsavel_id, created_at, devolucoes, dados, etapa:funil_etapas!etapa_id!inner(slug)'
 type NegocioDono = {
   id: number; contato_id: number; filial_id: number | null; responsavel_id: string
-  created_at: string | null; devolucoes: number | null; dados: { _lead?: { responsavel_desde?: string | null } } | null
+  created_at: string | null; devolucoes: number | null
+  dados: { _lead?: { responsavel_desde?: string | null; posse?: Posse | null } } | null
 }
 
 /** Evita varrer a cada render do servidor quando várias abas abrem juntas. */
@@ -75,9 +88,10 @@ export async function devolverLeadsSemResposta(
     : await base
   const negocios = (linhas ?? []) as unknown as NegocioDono[]
   if (!negocios.length) return { devolvidos: 0, avaliados: 0 }
-  const leads: (LeadDono & { contato_id: number; filial_id: number | null })[] = negocios.map((n) => ({
+  const leads: (LeadDono & { contato_id: number; filial_id: number | null; manual: boolean })[] = negocios.map((n) => ({
     id: n.id, contato_id: n.contato_id, filial_id: n.filial_id, responsavel_id: n.responsavel_id,
     responsavel_desde: n.dados?._lead?.responsavel_desde ?? null, created_at: n.created_at, devolucoes: n.devolucoes,
+    manual: posseManual(n.responsavel_id, n.dados?._lead?.posse),
   }))
 
   // Última mensagem de cada lado, por lead: a conversa do contato na loja, só no
@@ -99,6 +113,7 @@ export async function devolverLeadsSemResposta(
 
   const vencidos: number[] = []
   for (const l of leads) {
+    if (l.manual) continue // atribuição manual: não volta sozinha
     const marco = marcoDeCobranca(l, ultima.get(l.id))
     if (!marco) continue
     if (minutosUteis(new Date(marco), new Date(agora), horario, fuso) >= cfg.minutos) vencidos.push(l.id)

@@ -1,0 +1,11 @@
+{
+  "1a_atribuir": "atribuir",
+  "1a_para_e_o_atual": true,
+  "1b_pegar": "pegar",
+  "1c_devolver_tira": true,
+  "1c_ativo_continua": true,
+  "1d_distribuir": "distribuir",
+  "1e_transferir": "transferir",
+  "1e_historico": "transferir",
+  "2_backfill": { "atribuido_antes_fica_manual": "atribuir", "pegado_antes_sem_marca": true }
+}
