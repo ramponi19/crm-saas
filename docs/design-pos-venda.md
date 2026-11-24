@@ -959,6 +959,14 @@ Cada etapa segue o ritual do §8.6.1: migração e teste no banco local descart�
 | C7 | **App** | Configurações › Pós-venda: réguas, limite do NPS, status/categorias/SLA dos chamados, `responsavel_padrao` **opcional** por loja e aviso de loja sem vendedor ativo. Fila `/pos-venda` (Atrasados, Hoje, 7 dias e as ações). Aba Pós-venda na ficha. Lista de chamados. NPS manual | `test:local`: ganho pela rota cria a jornada com o responsável certo; vendedor só vê a própria fila; NPS ≤ 6 abre chamado para um administrador. Tela no `npm run dev` contra o local |
 | C8 | **Ligar na JM** | Depois da triagem dos 38 e com o ok do Lucas sobre a simulação: Central de Módulos → instala → `posvenda_ativar_existentes` | conferência na Nexus Demonstração antes; na JM, contagens iguais às da simulação |
 
+**C6 — simulação por responsável (24/11/2026, só leitura; `scripts/posvenda/simular-responsaveis.mjs`):**
+- Premissas: ativação em 25/11/2026; régua Aparelhos (D+1, D+7 NPS, D+30, D+90 seminovo, D+330) e Geral (D+7 NPS, D+330); tudo manual (sem envio automático); vendas novas = as 8 semanas de 28/09 a 22/11 repetidas (21,8 vendas/semana); NPS até 6 = 10% dos D+7, para os administradores; chamados fora (sem base).
+- Base: 290 ganhos → 290 jornadas, 460 passos futuros; 0 junções e 0 cancelamentos por recompra.
+- Próximos 3 meses (13 semanas): 62 passos/semana na empresa. Matriz: 13 a 16 por vendedor por semana (maior semana 31, maior dia 12). Jaguariúna: ~2 por vendedor por semana. Administradores: ~1 por semana cada.
+- Pico jun–out/2027 (22 semanas): 80 passos/semana (maior semana 117). Matriz: 17 a 21 por vendedor por semana (maior semana 34, maior dia 13). O teto diário de 25 nunca é atingido.
+- **Achado:** a conta da revisão da Meta é vendedor ativo sem loja e entra na roleta da matriz (≈13 a 18 passos/semana). Sem ela, os 3 vendedores da matriz ficam com 17 a 21 por semana agora e 22 a 28 no pico (maior dia 17). Decidir antes da C8.
+- Jaguariúna recebe pouco porque quase todos os ganhos são da matriz (Jaguariúna tem ~1,5 venda/semana).
+
 **Números de hoje para a D9 (JM, 290 ganhos):**
 - 35 têm vendedor ativo e ficam com ele.
 - 7 estão com um administrador como responsável.
