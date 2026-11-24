@@ -46,7 +46,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       .order('previsto_para', { ascending: true }).limit(60),
     s.from('posvenda_respostas').select('id, nota, comentario, respondida_em, negocio_id')
       .eq('empresa_id', empresaId).eq('contato_id', neg.contato_id).order('respondida_em', { ascending: false }).limit(10),
-    s.from('posvenda_chamados')
+    // Chamados pela sessão: a RLS mostra ao vendedor do cliente, em leitura, e ao responsável e administradores (2400).
+    semTipo(supabase).from('posvenda_chamados')
       .select('id, numero, titulo, prioridade, aberto_em, resolvido_em, sla_resolucao_vence, status:posvenda_chamado_status!status_id(nome, tipo)')
       .eq('empresa_id', empresaId).eq('contato_id', neg.contato_id).order('aberto_em', { ascending: false }).limit(10),
     s.from('posvenda_chamado_categorias').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('id'),

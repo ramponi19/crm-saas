@@ -18,8 +18,10 @@ export type SituacaoPrazo = { tone: 'bad' | 'warn' | 'neutro' | 'ok'; texto: str
  * Vencido = atrasado (vermelho); vence nas próximas 4 h = atenção (amarelo).
  */
 export function situacaoDoPrazo(c: { resolvido_em: string | null; primeira_resposta_em: string | null
-  sla_resposta_vence: string | null; sla_resolucao_vence: string | null }, agora: Date, formatar: (iso: string) => string): SituacaoPrazo {
+  sla_resposta_vence: string | null; sla_resolucao_vence: string | null; sla_pausado_desde?: string | null }, agora: Date, formatar: (iso: string) => string): SituacaoPrazo {
   if (c.resolvido_em) return { tone: 'ok', texto: 'resolvido' }
+  // Aguardando o cliente (ou terceiro, se a empresa ligou): o relógio está parado desde então.
+  if (c.sla_pausado_desde) return { tone: 'neutro', texto: `prazo pausado desde ${formatar(c.sla_pausado_desde)}` }
   const resposta = !c.primeira_resposta_em
   const vence = resposta ? c.sla_resposta_vence : c.sla_resolucao_vence
   if (!vence) return { tone: 'neutro', texto: 'sem prazo' }

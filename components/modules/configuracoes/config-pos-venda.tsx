@@ -511,6 +511,7 @@ function Parametros({ dados }: { dados: DadosConfigPosVenda }) {
   const [cats, setCats] = useState<string[]>(categoriasPermitidas(p.categorias_modelo?.empresa))
   const [teto, setTeto] = useState(String(p.teto_diario?.empresa ?? 30))
   const [sla, setSla] = useState(String(p.sla_horas?.empresa ?? 'loja_aberta'))
+  const [pausaTerceiro, setPausaTerceiro] = useState(p.sla_pausa_terceiro?.empresa === true)
   const [nota, setNota] = useState(String(p.nps_limite_chamado?.empresa ?? 6))
   const [janela, setJanela] = useState(String(p.janela_acompanhamento_dias?.empresa ?? 3))
   const [promotor, setPromotor] = useState(String(p.mensagem_promotor?.empresa ?? ''))
@@ -564,6 +565,15 @@ function Parametros({ dados }: { dados: DadosConfigPosVenda }) {
           <option value="loja_aberta">Só com a loja aberta (horário)</option><option value="corridas">Horas corridas</option>
         </Select>
         <Button size="sm" loading={ocupado === 'sla_horas'} onClick={() => salvar('sla_horas', sla)}>Salvar</Button>
+      </div>
+      <div className={linha}>
+        <div className="min-w-0">
+          <label className="flex items-center gap-2 text-[13.5px] font-medium text-ink">
+            <input type="checkbox" checked={pausaTerceiro} onChange={(e) => setPausaTerceiro(e.target.checked)} /> “Aguardando terceiro” também pausa o prazo
+          </label>
+          <p className="text-[12px] text-ink-3">“Aguardando cliente” sempre pausa. Ligue se a espera pela assistência ou pelo fornecedor não deve contar no prazo do chamado.</p>
+        </div>
+        <Button size="sm" loading={ocupado === 'sla_pausa_terceiro'} onClick={() => salvar('sla_pausa_terceiro', pausaTerceiro)}>Salvar</Button>
       </div>
       <div className={linha}>
         <Input label="Nota que abre chamado (até)" type="number" value={nota} onChange={(e) => setNota(e.target.value)} wrapperClassName="sm:w-64" />
