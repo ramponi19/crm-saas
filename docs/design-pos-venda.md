@@ -244,18 +244,31 @@ O comportamento de hoje vai contra a regra "negócio ganho vira histórico, não
 - `titulo` e `roteiro`: texto com variáveis `{nome}`, `{produto}`, `{vendedor}`, `{loja}`, `{data_compra}`.
 - `modelo_id` (modelo aprovado da Meta, opcional; usado fora da janela de 24 h).
 - `pesquisa_id` (quando `tipo_acao = pesquisa`).
-- `responsavel`: `vendedor_do_negocio` | `responsavel_do_contato` | `responsavel_da_loja` | `usuario:<uuid>`.
+- `responsavel`: `acompanhamento` (vendedor do negócio, senão padrão opcional da loja, senão roleta da loja) | `administradores` | `usuario:<uuid>` (D9 revista em 24/11).
 
-**Responsável padrão por loja (D9, 23/11).** É a configuração `posvenda.responsavel_padrao`, com um usuário por loja; na JM, um para Guaçu (3) e um para Jaguariúna (6).
-- **Nenhum acompanhamento ou chamado nasce sem responsável.** A função `posvenda_resolver_responsavel(p_empresa, p_filial, p_regra, p_negocio)` decide nesta ordem:
-  1. a regra do passo (o vendedor do negócio, o responsável do contato ou um usuário fixo), **desde que** o usuário esteja ativo na empresa (`empresa_usuarios.ativo`) e veja a loja;
-  2. senão (sem vendedor, vendedor inativo ou sem acesso à loja), o **responsável padrão da loja** do negócio;
-  3. senão, o responsável padrão da empresa (valor sem loja da mesma chave);
-  4. senão, o **dono** da empresa. É a última rede: o dono sempre existe.
-- `responsavel_id` é **NOT NULL** em `posvenda_acompanhamentos` e `posvenda_chamados`.
-- **Instalação:** o módulo só liga com o responsável padrão preenchido para cada loja ativa. A tela de configuração mostra quem está vazio.
-- **Responsável desligado da empresa:** ao desativar um usuário em `empresa_usuarios`, os passos pendentes e os chamados abertos dele vão para o responsável padrão da loja, pela mesma função. Fica o registro em `posvenda_chamado_eventos`, e no acompanhamento a observação "reatribuído".
-- **Nos passos da régua da JM:** D+1 e D+330 ficam com o `vendedor_do_negocio`. NPS e o chamado de nota baixa ficam com o `responsavel_da_loja`.
+**Responsável (D9 revista pelo Lucas em 24/11/2026; substitui o "responsável padrão por loja" obrigatório).**
+- **Loja do negócio** = `negocios.filial_id`, herdada do contato ou do canal quando o negócio nasce.
+  - Conferido em 24/11: dos 290 ganhos da JM, **nenhum** está sem loja (273 na matriz, 17 em Jaguariúna).
+  - Negócio sem loja vai para os administradores.
+- **Função única:** `posvenda_resolver_responsavel(p_empresa, p_filial, p_tipo, p_negocio)`. O `p_tipo` é `acompanhamento` ou `admin`. Nenhum acompanhamento ou chamado nasce sem responsável; `responsavel_id` é **NOT NULL**.
+- **Passo de acompanhamento:**
+  - **a)** O vendedor do negócio (`negocios.responsavel_id`), se ativo na empresa (`empresa_usuarios.ativo`).
+  - **e)** Senão, se a configuração **opcional** `posvenda.responsavel_padrao` tiver alguém para a loja, ele tem prioridade sobre a roleta.
+  - **b)** Senão, a **roleta do pós-venda** entre os **vendedores** ativos da loja:
+    - `role = 'vendedor'`, a mesma regra de loja de `lib/roleta.ts` (vendedor sem loja conta como da matriz);
+    - com **contador próprio**: tabela `posvenda_roleta (empresa_id, filial_id, ultimo_usuario_id)`, travada com `FOR UPDATE`;
+    - "ausente" não tira da roleta, porque o passo é para dias depois;
+    - a roleta de leads **não** serve como está, porque não filtra cargo e poria os administradores e a conta da empresa na matriz.
+  - **d)** Loja sem vendedor ativo: os administradores.
+- **NPS com nota até o limite (6) e chamados (c):** os **administradores** da empresa, distribuídos entre eles pela mesma roleta (contador próprio, chave "administradores").
+  - "Administrador" é buscado pelo cargo: `empresa_usuarios.role = 'admin'` e `ativo`. Na JM hoje são Matheus e Eduardo.
+  - Nenhum nome fixo no código.
+  - Empresa sem nenhum admin ativo cai no `owner`, a última rede.
+- **Na hora do passo:** se o responsável estiver inativo quando o passo vence, a mesma função escolhe de novo.
+  - Ao desativar um usuário em `empresa_usuarios`, os passos pendentes e os chamados abertos dele são redistribuídos pela mesma função.
+  - Fica a observação "reatribuído" no acompanhamento e um registro em `posvenda_chamado_eventos`.
+- **Ligar o módulo não exige configuração de responsável.** A tela mostra as lojas sem vendedor ativo, cujos passos irão para os administradores, e o `responsavel_padrao` opcional por loja.
+- **Nos passos da régua da JM:** D+1, D+30, D+90 e D+330 são acompanhamento (vendedor ou roleta da loja). O NPS de nota baixa e os chamados vão para os administradores.
 - `tolerancia_dias`: depois desse prazo atrasado, o passo vira "perdido". Não fica para sempre na fila.
 - `pular_se`: lista de condições, por exemplo `chamado_aberto` ou `respondeu_nps`.
 
@@ -363,7 +376,7 @@ O módulo `avaliacoes` (veículos) está em preparação. A régua da Aletrini u
 
 **Nota baixa:**
 - Nota ≤ `posvenda.nps_limite_detrator` (padrão 6) **abre um chamado** da categoria "Insatisfação", prioridade alta.
-- O chamado vai para `posvenda.nps_responsavel_chamado`: `responsavel_da_loja` (padrão, **D9**) | `vendedor` | `usuario:<uuid>`. A resolução segue a mesma função do §2.3; o chamado nunca nasce sem responsável.
+- O chamado vai para os **administradores** da empresa (D9 revista em 24/11), pela roleta "administradores" da mesma função do §2.3. O chamado nunca nasce sem responsável.
 - O texto inicial do chamado é a nota mais o comentário.
 
 **Indicadores** (tela do módulo; ver também §2.5):
@@ -609,10 +622,10 @@ Convenções:
 
 **Configuração:** chaves no manifesto (`configuracoes` do PDV v2 §A), módulo `posvenda`.
 - `intervalo_minimo_dias` (3), `teto_diario_por_responsavel` (25);
-- `nps_limite_detrator` (6), `nps_responsavel_chamado` (responsavel_da_loja);
+- `nps_limite_detrator` (6); o chamado da nota baixa vai sempre para os administradores (D9 revista em 24/11);
 - `envio_automatico` (false), `categorias_aparelho` ([1,2,3,4]), `sem_resposta_tentar_em_dias` (2).
 - No core: `ciclo_dias_entre_compras` (7), `ciclo_nota_promotor` (9), `ciclo_validade_nps_meses` (12), `ciclo_inativo_meses` (null = desligado), `pos_venda_dias` (já existe, 30).
-- No módulo também: `responsavel_padrao` (por loja; **D9**) e `janela_acompanhamento_dias` (3; roteamento da M7, §2.6).
+- No módulo também: `responsavel_padrao` (por loja, **opcional** desde 24/11; **D9**) e `janela_acompanhamento_dias` (3; roteamento da M7, §2.6).
 
 **Armazenamento provisório e a migração para o `empresa_config` (D6, 23/11).** Enquanto o `empresa_config` do PDV v2 não existir, as chaves ficam em `configuracoes_sistema`, a tabela que já existe com `empresa_id`, `chave` e `valor` jsonb, sem loja. As convenções são escolhidas para a migração ser mecânica.
 
@@ -630,7 +643,7 @@ Convenções:
 3. **Ninguém lê `configuracoes_sistema` direto para essas chaves.** O SQL usa a função **`config_valor_emp(p_empresa, p_modulo, p_chave, p_filial)`**, `STABLE` e `SECURITY DEFINER`.
    - Ordem de leitura: valor da loja, valor da empresa, `null`. É a mesma do `config_valor` do PDV v2 §A; o padrão fica no chamador (`coalesce` com o padrão do manifesto).
    - Para a sessão, há o atalho `config_valor(p_modulo, p_chave, p_filial)`, que usa `get_empresa_id()`, com o mesmo nome e a mesma assinatura do PDV v2.
-   - A escrita passa só por `config_salvar(p_modulo, p_chave, p_valor, p_filial)`. Ela confere dono ou admin, sessão que pode escrever e loja da própria empresa, e grava no envelope (com `atualizado_por` e `atualizado_em`). **Não** exige o módulo ligado: a D9 pede o responsável padrão preenchido antes de ligar o pós-venda.
+   - A escrita passa só por `config_salvar(p_modulo, p_chave, p_valor, p_filial)`. Ela confere dono ou admin, sessão que pode escrever e loja da própria empresa, e grava no envelope (com `atualizado_por` e `atualizado_em`). **Não** exige o módulo ligado: o `responsavel_padrao` opcional pode ser preenchido antes de ligar o pós-venda.
    - O TypeScript usa um único `lib/config.ts` (`lerConfig` e `salvarConfig`), que chama essas RPCs.
 4. **Migração quando o PDV v2 Fase 1 criar o `empresa_config`.** É uma migração só, e ninguém fora dela muda:
    1. cria `empresa_config`, se ainda não existir;
@@ -738,13 +751,13 @@ Convenções:
    - aba Compras com os ganhos e o total gasto (corrige o "Compras = 0").
 5. **Entrega C — Módulo Pós-venda** (M6 e M7 + app; chave `posvenda`, menu "Pós-venda", D4):
    - Configurações › Pós-venda:
-     - responsável padrão por loja, obrigatório para ligar o módulo (D9);
+     - responsável padrão por loja, **opcional** (D9 revista em 24/11: tem prioridade sobre a roleta quando preenchido);
      - régua iPhone (passos, ligar e desligar);
      - intervalo mínimo e teto diário;
      - limite do NPS;
      - status, categorias e SLA de chamado.
    - Fila `/pos-venda` em três abas: Atrasados, Hoje e Próximos 7 dias. Ações: Abrir WhatsApp com o texto montado, Registrar resultado, NPS manual, Reagendar, Pular e Abrir chamado.
-   - Chamados: lista com filtros (sem realtime), abrir e mover, SLA em horas corridas. Nota de NPS ≤ 6 abre chamado para o responsável da loja.
+   - Chamados: lista com filtros (sem realtime), abrir e mover, SLA em horas corridas. Nota de NPS ≤ 6 abre chamado para os administradores (roleta entre eles).
    - Aba Pós-venda na ficha do cliente: jornada, NPS e chamados.
    - Vitrine `/vitrine/posvenda` para quem não tem o módulo: por último, dentro da C ou logo depois.
 6. **Desligar a etapa "Pós Venda"**, depois da triagem aplicada e conferida.
@@ -780,7 +793,7 @@ O detalhe da Fase 2 e da Fase 3 está no fim do §8.3. A ordem dentro de cada fa
 | Risco | Mitigação |
 |---|---|
 | ~~Fazer a 4B da conciliação sem M1~~ | **Resolvido:** a M1 entrou antes da 4B (23/11) |
-| Acompanhamento ou chamado sem dono (110 de 112 negócios "sem registro" e os 38 da etapa Pós Venda estão sem responsável) | Responsável padrão por loja + reserva no dono; `responsavel_id` NOT NULL (D9) |
+| Acompanhamento ou chamado sem dono (110 de 112 negócios "sem registro" e os 38 da etapa Pós Venda estão sem responsável) | Vendedor do negócio → `responsavel_padrao` opcional → roleta dos vendedores da loja → administradores; `responsavel_id` NOT NULL (D9 revista em 24/11) |
 | Mexer em `core_negocio_do_canal` muda o recebimento de todos os canais e empresas | Migração com rollback, teste com contato de teste por canal, conferência de `negocio_historico` nas primeiras horas (zona sensível da Meta) |
 | Régua com dados ruins: 84% dos ganhos sem produto ou categoria | Campos obrigatórios no ganho (checados também no servidor) e uma régua "Geral" de reserva |
 | Fila inchada no dia da importação ou da instalação | Passos vencidos nascem `pulado`; teto diário por responsável; histórico de mais de 12 meses vai para público, não para fila |
@@ -929,6 +942,34 @@ O detalhe da Fase 2 e da Fase 3 está no fim do §8.3. A ordem dentro de cada fa
   - Opção: o gatilho valida só as chaves que mudaram (`new.dados` × `old.dados`);
   - ou apagar o campo exige limpar a chave antes.
 
+### 8.8 Plano de execução da Entrega C (proposta de 24/11/2026; aguarda o ok do Lucas, nenhum código escrito)
+
+Cada etapa segue o ritual do §8.6.1: migração e teste no banco local descartável (`scripts/teste-local.sh`), depois a produção e depois o deploy. **O módulo só liga na JM depois da triagem dos 38**, que está com o Lucas.
+
+| # | Etapa | O que entra | Teste (local) |
+|---|---|---|---|
+| C1 | **M6a: esquema** | `posvenda_cadencias`, `posvenda_cadencia_passos`, `posvenda_jornadas`, `posvenda_acompanhamentos` (`responsavel_id` NOT NULL), `posvenda_pesquisas`/`posvenda_respostas`, `posvenda_chamados` (+ status, categorias, eventos), **`posvenda_roleta`** (contador da D9). RLS por empresa e loja. Chave `posvenda` no manifesto (`core/modulos.ts`), tabelas com o prefixo do módulo | `teste-m6a.sql`: RLS (vendedor de uma loja não vê a outra), FK, NOT NULL do responsável |
+| C2 | **M6b: regra do responsável (D9)** | `posvenda_resolver_responsavel`: vendedor ativo do negócio → padrão opcional da loja → roleta dos vendedores da loja → administradores. Roleta "administradores" para NPS baixo e chamados. Redistribuição ao desativar usuário (gatilho em `empresa_usuarios`) e na hora do passo | `teste-m6b-responsavel.sql`: os 5 casos (a–e), a roleta alternando, loja sem vendedor, negócio sem loja, empresa sem admin (cai no dono), vendedor desativado redistribui |
+| C3 | **M6c: jornada** | `posvenda_iniciar_jornadas(negocio)`: materializa os passos da régua pela categoria e condição de `dados.venda`; sem categoria, régua Geral. Gatilho próprio `posvenda_negocio_ganho`, só com o módulo ligado: entrar no ganho inicia, sair cancela os pendentes (`venda_reaberta`). `posvenda_reancorar_jornada` (o gancho que a M3 já chama). Teto diário e intervalo mínimo | `teste-m6c-jornada.sql`: ganho cria passos; seminovo ganha D+90; reabrir cancela; corrigir data reancora; módulo desligado não cria nada |
+| C4 | **Pendências do §8.7 que vão junto** | `corrigir_data_venda` atualiza também `dados.venda.data` (1); `reabrir_negocio` move `dados.venda` para o histórico e limpa do negócio (3b); avaliar exigir `dados.venda` no banco ao entrar no ganho e restringir quem edita a venda depois de gravada (3c) | casos nos testes da M3 e da M1 |
+| C5 | **M7: roteamento** | Mensagem que chega com um acompanhamento pendente dentro da janela (`posvenda.janela_acompanhamento_dias`, 3) vai para ele, sem abrir negócio novo. Passo futuro não segura mensagem | os casos aprovados, inclusive "cliente com D+330 agendado manda mensagem querendo comprar" → negócio novo |
+| C6 | **Ativação sobre as vendas que já existem** | `posvenda_ativar_existentes`: só passos futuros, idempotente. Antes de ligar, a simulação atualizada mostra os passos por responsável (vendedor, roleta por loja, administradores) e por mês | idem, mais contagem igual à simulação |
+| C7 | **App** | Configurações › Pós-venda: réguas, limite do NPS, status/categorias/SLA dos chamados, `responsavel_padrao` **opcional** por loja e aviso de loja sem vendedor ativo. Fila `/pos-venda` (Atrasados, Hoje, 7 dias e as ações). Aba Pós-venda na ficha. Lista de chamados. NPS manual | `test:local`: ganho pela rota cria a jornada com o responsável certo; vendedor só vê a própria fila; NPS ≤ 6 abre chamado para um administrador. Tela no `npm run dev` contra o local |
+| C8 | **Ligar na JM** | Depois da triagem dos 38 e com o ok do Lucas sobre a simulação: Central de Módulos → instala → `posvenda_ativar_existentes` | conferência na Nexus Demonstração antes; na JM, contagens iguais às da simulação |
+
+**Números de hoje para a D9 (JM, 290 ganhos):**
+- 35 têm vendedor ativo e ficam com ele.
+- 7 estão com um administrador como responsável.
+- 248 estão sem responsável e vão para a roleta da loja:
+  - matriz: 3 vendedores de loja, mais 1 vendedor sem loja que conta como da matriz;
+  - Jaguariúna: 2 vendedores ativos.
+- Nenhum está sem loja.
+
+**Perguntas antes do código:**
+1. **Negócio com um administrador como responsável (7 ganhos).** O passo fica com ele (regra a, "responsável ativo") ou vai para a roleta da loja (o administrador não é "vendedor")?
+2. **Vendedor marcado como "ausente" no dia da distribuição.** Proposta: continua na roleta, porque o passo é para dias depois.
+3. **Teto diário por responsável.** Quando estoura, o passo vai para o dia seguinte do mesmo responsável. A alternativa é passar para o próximo da roleta.
+
 ---
 
 ## 3. Decisões do Lucas (23/11/2026)
@@ -943,7 +984,7 @@ O detalhe da Fase 2 e da Fase 3 está no fim do §8.3. A ordem dentro de cada fa
 | D6 | Esperar o `empresa_config` ou chave provisória? | **Provisória em `configuracoes_sistema`**: chave `<modulo>.<chave>`, valor `{empresa, lojas}`, acesso só por `config_valor_emp`/`config_valor`/`config_salvar`, com a migração documentada | §8.1, M2, M10 |
 | D7 | D+90 da régua de iPhone | **Só seminovo** (bateria). **Seguro só com parceiro:** passo pronto e **desligado** | §2.3 |
 | D8 | Modelos do envio automático | **Só UTILITY no começo**, na Fase 3 | §2.6, §8.3 |
-| D9 | Responsável padrão dos passos | Vendedor do negócio no D+1 e no D+330; NPS e nota baixa com o **responsável da loja**. Configuração **"responsável padrão por loja"** (Guaçu e Jaguariúna), que recebe todo passo sem vendedor ou com vendedor inativo. **Nada nasce sem responsável** | §2.3, §2.4, §8.1 |
+| D9 | Responsável dos passos (**revista em 24/11**) | Acompanhamento: vendedor ativo do negócio; senão `responsavel_padrao` da loja (opcional); senão roleta dos vendedores ativos da loja (contador próprio); loja sem vendedor ou negócio sem loja → administradores. NPS baixo e chamados → administradores (cargo `admin`, roleta entre eles). **O módulo liga sem configuração de responsável. Nada nasce sem responsável** | §2.3, §2.4, §8.1 |
 | D10 | Quem pode "Reabrir venda"? | **Dono e admin por enquanto;** gerente quando o cargo existir | §2.5.4 |
 | D11 | Triagem dos negócios da etapa Pós Venda | **Feita pelo Matheus**, na planilha `triagem_pos_venda.csv` (38 negócios, com sugestão), aplicada por script | §2.5.4, §8.3 |
 | D12 | Estágio `inativo` | **Desligado no MVP** (18 meses quando ligar, Fase 3) | §2.1, §8.3 |
