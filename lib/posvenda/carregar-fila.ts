@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { diaNoFuso, instanteLocal, somarDias } from '@/lib/datas'
 import { semTipo } from '@/lib/posvenda/ligado'
 import {
-  decidirContato, descricaoDaCompra, primeiroNome, diasDesdeAVenda, grupoDoDia, montarMensagem, ordenarFila, rotuloDoPasso,
+  decidirContato, descricaoDaCompra, ecoDoPasso, primeiroNome, diasDesdeAVenda, grupoDoDia, montarMensagem, ordenarFila, rotuloDoPasso,
   type ConversaDoCanal, type ItemPosVenda, type TipoAcao,
 } from '@/lib/posvenda/fila'
 
@@ -73,6 +73,13 @@ export async function carregarFilaPosVenda(db: SupabaseClient<any>, opcoes: {
   const nomeLoja = new Map(((fils ?? []) as { id: number; nome: string }[]).map((f) => [f.id, f.nome]))
   const conversa = await conversasNoWhatsAppDaLoja(s, linhas)
   const agora = opcoes.agora ?? new Date()
+  // Coexistência: lojas cujo WhatsApp conectado também roda no app do celular da loja (o wa.me cai no app da loja).
+  const { data: canaisWa } = await s.from('canais').select('filial_id, coexistencia').eq('empresa_id', opcoes.empresaId)
+    .eq('tipo', 'whatsapp').eq('status', 'ativo')
+  const coex = ((canaisWa ?? []) as { filial_id: number | null; coexistencia: boolean | null }[]).filter((c) => c.coexistencia)
+  const appNaLoja = (filial: number | null) => coex.some((c) => c.filial_id === filial) || (coex.length > 0 && coex.every((c) => c.filial_id == null))
+  // Eco do app da loja (mensagem enviada sem usuário do Nexus) desde o dia do passo mais antigo de hoje/atrasados.
+  const ecosPorContato = await ecosDoApp(s, linhas.filter((l) => diaNoFuso(new Date(l.previsto_para), opcoes.fuso) <= hoje), opcoes.fuso)
 
   const itens: ItemPosVenda[] = linhas.map((l) => {
     const contato = um(l.contato)
@@ -109,7 +116,9 @@ export async function carregarFilaPosVenda(db: SupabaseClient<any>, opcoes: {
       tentativas: l.tentativas ?? 0,
       contato: decidirContato(conversa.get(l.id) ?? null, contato?.telefone, mensagem, agora,
         { id: passo?.modelo_id ?? null, categorias: opcoes.categoriasModelo ?? ['UTILITY'],
-          variaveis: [primeiroNome(contato?.nome), (negocio?.produto?.trim() || categoria || '')] }),
+          variaveis: [primeiroNome(contato?.nome), (negocio?.produto?.trim() || categoria || '')] },
+        { appDaLoja: conversa.get(l.id)?.coexistencia ?? appNaLoja(l.filial_id) }),
+      ecoApp: grupo === 'proximos' ? null : ecoDoPasso(ecosPorContato.get(l.contato_id) ?? [], previsto, opcoes.fuso),
     }
   })
   return { itens: ordenarFila(itens), hoje, cortado: linhas.length >= LIMITE_FILA }
@@ -124,9 +133,9 @@ async function conversasNoWhatsAppDaLoja(s: SupabaseClient, linhas: Linha[]): Pr
   const contatos = [...new Set(linhas.map((l) => l.contato_id))]
   if (contatos.length === 0) return out
   type C = { id: number; contato_id: number; ultima_recebida_at: string | null; ultima_mensagem_at: string | null
-    canal: Embed<{ tipo: string; status: string; filial_id: number | null }> }
+    canal: Embed<{ tipo: string; status: string; filial_id: number | null; coexistencia: boolean | null }> }
   const { data } = await s.from('conversas')
-    .select('id, contato_id, ultima_recebida_at, ultima_mensagem_at, canal:canais!canal_id(tipo, status, filial_id)')
+    .select('id, contato_id, ultima_recebida_at, ultima_mensagem_at, canal:canais!canal_id(tipo, status, filial_id, coexistencia)')
     .in('contato_id', contatos).not('canal_id', 'is', null)
   const porContato = new Map<number, C[]>()
   for (const c of (data ?? []) as unknown as C[]) {
@@ -141,7 +150,27 @@ async function conversasNoWhatsAppDaLoja(s: SupabaseClient, linhas: Linha[]): Pr
     const c = lista[0]
     // O WhatsApp no Nexus é sempre a API oficial da Meta (lib/whatsapp/types.ts: o único provedor é 'official'): a
     // janela de 24 h vale para todo canal whatsapp, como no painel da conversa.
-    if (c) out.set(l.id, { conversaId: c.id, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: c.ultima_recebida_at })
+    if (c) out.set(l.id, { conversaId: c.id, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: c.ultima_recebida_at,
+                           coexistencia: !!um(c.canal)?.coexistencia })
+  }
+  return out
+}
+
+/**
+ * Mensagens que saíram pelo app do celular da loja (eco da coexistência: enviada, WhatsApp, sem usuário do Nexus) para
+ * os clientes dos passos de hoje e atrasados, desde o dia do passo mais antigo. Pela sessão (RLS das mensagens).
+ */
+async function ecosDoApp(s: SupabaseClient, linhas: Linha[], fuso: string): Promise<Map<number, { em: string; texto: string | null }[]>> {
+  const out = new Map<number, { em: string; texto: string | null }[]>()
+  const contatos = [...new Set(linhas.map((l) => l.contato_id))]
+  if (contatos.length === 0) return out
+  const desde = linhas.map((l) => diaNoFuso(new Date(l.previsto_para), fuso)).sort()[0]
+  const { data } = await s.from('mensagens').select('contato_id, conteudo, created_at')
+    .in('contato_id', contatos).eq('direcao', 'enviada').eq('origem', 'whatsapp').is('usuario_id', null)
+    .gte('created_at', instanteLocal(desde, '00:00', fuso).toISOString())
+    .order('created_at', { ascending: false }).limit(1000)
+  for (const m of (data ?? []) as { contato_id: number; conteudo: string | null; created_at: string }[]) {
+    out.set(m.contato_id, [...(out.get(m.contato_id) ?? []), { em: m.created_at, texto: m.conteudo }])
   }
   return out
 }

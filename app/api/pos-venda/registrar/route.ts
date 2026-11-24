@@ -23,6 +23,8 @@ const ERROS: Record<string, [number, string]> = {
   SOMENTE_LEITURA: [403, 'A empresa está em modo somente leitura.'],
 }
 
+const CANAL_DA_NOTA: Record<string, string> = { 'app da loja': 'app_loja', 'ligação': 'ligacao', Nexus: 'nexus', modelo: 'modelo' }
+
 export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -46,7 +48,9 @@ export async function POST(req: Request) {
     const { data: a } = await semTipo(supabase).from('posvenda_acompanhamentos').select('negocio_id').eq('id', acompanhamento).maybeSingle()
     if (!a?.negocio_id) return NextResponse.json({ error: ERROS.NAO_ENCONTRADO[1] }, { status: 404 })
     r = await supabase.rpc('posvenda_nps_registrar' as never, {
-      p_negocio: a.negocio_id, p_nota: nota, p_comentario: texto(b.comentario), p_acompanhamento: acompanhamento, p_canal: 'manual',
+      p_negocio: a.negocio_id, p_nota: nota, p_comentario: texto(b.comentario), p_acompanhamento: acompanhamento,
+      // por onde a nota veio (app da loja, ligação, Nexus ou modelo), para o resumo por pessoa
+      p_canal: CANAL_DA_NOTA[String(b.canal ?? '')] ?? 'manual',
     } as never)
   } else if (['feito', 'sem_resposta', 'reagendar', 'pular'].includes(acao)) {
     const data = typeof b.data === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.data) ? b.data : null

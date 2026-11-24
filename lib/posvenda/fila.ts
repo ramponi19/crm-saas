@@ -3,7 +3,7 @@
  * docs/design-pos-venda.md §2.5.2. Universal: nada de régua, texto ou loja de uma empresa aqui; o texto da mensagem é
  * o roteiro do passo (configuração da empresa), com as variáveis trocadas.
  */
-import { diasEntre } from '@/lib/datas'
+import { diasEntre, diaNoFuso } from '@/lib/datas'
 import { linkWhatsApp } from '@/lib/whatsapp-link'
 
 export type GrupoFila = 'atrasados' | 'hoje' | 'proximos'
@@ -34,6 +34,8 @@ export interface ItemPosVenda {
   tentativas: number
   /** Por onde falar com o cliente (decidirContato). */
   contato: ContatoDoPasso
+  /** Mensagem que saiu pelo app do celular da loja desde o dia do passo (sugere "feito"). */
+  ecoApp?: EcoDoApp | null
 }
 
 /**
@@ -42,11 +44,17 @@ export interface ItemPosVenda {
  *              no campo de envio (fica registrada; a resposta entra pelo roteamento do pós-venda);
  *   modelo     a mesma conversa, mas é API oficial e a janela de 24 h da Meta está fechada: só modelo aprovado
  *              (abre a lista das categorias liberadas para o pós-venda, com o modelo do passo já escolhido; D8 revista);
- *   externo    sem conversa no WhatsApp da loja: wa.me, com o aviso de que a conversa não fica registrada;
+ *   app_loja   janela fechada e sem modelo, ou sem conversa, num número em COEXISTÊNCIA (o app WhatsApp Business do
+ *              celular da loja usa o mesmo número): wa.me com o texto, "use no celular da loja"; a mensagem volta ao
+ *              Nexus pelo eco (smb_message_echoes) e a fila sugere marcar o passo como feito;
+ *   ligar      janela fechada e sem modelo, ou sem conversa, sem coexistência: copiar a mensagem ou ligar (o wa.me abriria
+ *              o WhatsApp PESSOAL de quem clica — decisão do Lucas de 24/11/2026: não oferecer);
  *   sem_numero sem conversa e sem telefone válido.
  */
-export type ModoContato = 'nexus' | 'modelo' | 'externo' | 'sem_numero'
+export type ModoContato = 'nexus' | 'modelo' | 'app_loja' | 'ligar' | 'sem_numero'
 export interface ContatoDoPasso { modo: ModoContato; href: string | null; aviso: string | null
+  /** Telefone para o "Ligar" (só dígitos), quando há um válido. */
+  telefone?: string | null
   /** A conversa no WhatsApp da loja (modos nexus e modelo): a mensagem depois da nota vai por ela. */
   conversaId?: number | null }
 export interface ConversaDoCanal {
@@ -55,6 +63,8 @@ export interface ConversaDoCanal {
   canalTipo: string
   oficial: boolean
   ultimaRecebida: string | null
+  /** O canal da conversa está em coexistência (o mesmo número roda no app do celular da loja). */
+  coexistencia?: boolean
 }
 export const JANELA_META_MS = 24 * 60 * 60 * 1000
 
@@ -64,22 +74,46 @@ export const JANELA_META_MS = 24 * 60 * 60 * 1000
  */
 export interface ModeloDoPasso { id: number | null; categorias: string[]; variaveis?: string[] }
 
+export const AVISO_APP_LOJA = 'Janela de 24 h fechada: use no celular da loja (a mensagem volta para o Nexus)'
+export const AVISO_LIGAR = 'Janela de 24 h fechada e sem modelo: ligue ou copie a mensagem'
+
 export function decidirContato(conversa: ConversaDoCanal | null, telefone: string | null | undefined, mensagem: string, agora: Date,
-                               modelo: ModeloDoPasso = { id: null, categorias: ['UTILITY'] }): ContatoDoPasso {
+                               modelo: ModeloDoPasso = { id: null, categorias: ['UTILITY'] },
+                               opcoes: { appDaLoja?: boolean } = {}): ContatoDoPasso {
+  const tel = (telefone ?? '').replace(/\D/g, '')
+  const fone = tel.length >= 10 ? tel : null
+  // Sem modelo (ou sem conversa): pelo app do celular da loja, se o número está em coexistência; senão ligar/copiar.
+  const semModelo = (aviso: string): ContatoDoPasso => {
+    const wa = opcoes.appDaLoja ? linkWhatsApp(telefone, mensagem) : null
+    if (wa) return { modo: 'app_loja', href: wa, aviso: AVISO_APP_LOJA, telefone: fone, conversaId: conversa?.conversaId ?? null }
+    if (fone) return { modo: 'ligar', href: null, aviso, telefone: fone, conversaId: conversa?.conversaId ?? null }
+    return { modo: 'sem_numero', href: null, aviso: 'Sem WhatsApp da loja e sem telefone válido', telefone: null }
+  }
   if (conversa && conversa.canalTipo === 'whatsapp') {
     const ultima = conversa.ultimaRecebida ? new Date(conversa.ultimaRecebida).getTime() : null
     if (conversa.oficial && (ultima == null || agora.getTime() - ultima > JANELA_META_MS)) {
+      if (!modelo.id) return semModelo(AVISO_LIGAR)
       const cat = (modelo.categorias.length ? modelo.categorias : ['UTILITY']).join(',')
-      const vs = modelo.id ? (modelo.variaveis ?? []).map((v, i) => `&v${i + 1}=${encodeURIComponent(v)}`).join('') : ''
-      return { modo: 'modelo', conversaId: conversa.conversaId, href: `/comunicacao?c=${conversa.conversaId}&modelo=posvenda&cat=${cat}${modelo.id ? `&m=${modelo.id}` : ''}${vs}`,
-               aviso: modelo.id ? 'Janela de 24 h fechada: vai o modelo do passo' : 'Janela de 24 h fechada e o passo não tem modelo: ligue ou escolha um modelo' }
+      const vs = (modelo.variaveis ?? []).map((v, i) => `&v${i + 1}=${encodeURIComponent(v)}`).join('')
+      return { modo: 'modelo', conversaId: conversa.conversaId, telefone: fone,
+               href: `/comunicacao?c=${conversa.conversaId}&modelo=posvenda&cat=${cat}&m=${modelo.id}${vs}`,
+               aviso: 'Janela de 24 h fechada: vai o modelo do passo' }
     }
     const t = mensagem.trim()
-    return { modo: 'nexus', conversaId: conversa.conversaId, href: `/comunicacao?c=${conversa.conversaId}${t ? `&texto=${encodeURIComponent(t)}` : ''}`, aviso: null }
+    return { modo: 'nexus', conversaId: conversa.conversaId, telefone: fone, href: `/comunicacao?c=${conversa.conversaId}${t ? `&texto=${encodeURIComponent(t)}` : ''}`, aviso: null }
   }
-  const wa = linkWhatsApp(telefone, mensagem)
-  if (wa) return { modo: 'externo', href: wa, aviso: 'Fora do Nexus: a conversa não fica registrada' }
-  return { modo: 'sem_numero', href: null, aviso: 'Sem WhatsApp da loja e sem telefone válido' }
+  return semModelo('Sem conversa no WhatsApp da loja: ligue ou copie a mensagem')
+}
+
+/**
+ * ECO DO APP DA LOJA (coexistência): a mensagem que saiu pelo celular da loja para o cliente desde o dia do passo. A fila
+ * SUGERE marcar o passo como feito (decisão do Lucas de 24/11/2026: não marca sozinha). Só passos de hoje ou atrasados.
+ */
+export interface EcoDoApp { em: string; texto: string }
+export function ecoDoPasso(ecos: { em: string; texto: string | null }[], previstoDia: string, fuso: string): EcoDoApp | null {
+  const doDia = ecos.filter((e) => diaNoFuso(new Date(e.em), fuso) >= previstoDia).sort((a, b) => b.em.localeCompare(a.em))
+  const e = doDia[0]
+  return e ? { em: e.em, texto: (e.texto ?? '').replace(/\s+/g, ' ').trim().slice(0, 120) } : null
 }
 
 /** Atrasado (antes de hoje), hoje, ou nos próximos dias. */
