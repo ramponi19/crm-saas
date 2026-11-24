@@ -1,6 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { NextResponse } from 'next/server'
+import { aplicarSemDono } from '@/lib/sem-dono'
 
 /**
  * Posse/roteamento de leads (Fase 4.7).
@@ -55,6 +56,10 @@ export async function POST(req: Request) {
     p_negocio: body.leadId, p_responsavel: novo, p_acao: body.acao, p_por: user.id,
   } as never)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Nunca sem dono (24/11/2026): no modo 'roleta' da loja, o devolvido vai para o próximo da roleta (não para quem
+  // devolveu); no modo 'esteira' (padrão) fica na Esteira, como sempre.
+  if (body.acao === 'devolver') novo = (await aplicarSemDono([body.leadId], [atual])).get(body.leadId) ?? null
 
   return NextResponse.json({ ok: true, responsavel_id: novo })
 }
