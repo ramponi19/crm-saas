@@ -1,0 +1,26 @@
+{
+  "2_encerrar": {
+    "jornada_da_3a": "concluida:recompra",
+    "pendentes_da_3a": 0
+  },
+  "3_para_tras": {
+    "D+1 M2": "pulado:oc1",
+    "mensal": "pendente:oc3",
+    "D+40 produto": "pulado:oc1"
+  },
+  "3_idempotente": true,
+  "3_mensal_dias": true,
+  "9_so_servidor": false,
+  "4_juntado_antes": "juntado",
+  "4_juntado_depois": "feito:ok",
+  "4_juntado_repete": 1,
+  "3_para_frente_nascem": 1,
+  "1_responsavel_de_fora": "RESPONSAVEL_INVALIDO",
+  "7_responsavel_inativo": "vendedor:false",
+  "2_manter_produto_da_2a": "pendente",
+  "5_antiga_com_repeticao": true,
+  "1_passo_em_regua_alheia": "PASSO_DE_OUTRA_EMPRESA",
+  "6_natal_depois_da_venda": "2027-12-20",
+  "2_reiniciar_produto_da_1a": "cancelado:recompra",
+  "8_nps_pesquisa_desativada": "ok"
+}
