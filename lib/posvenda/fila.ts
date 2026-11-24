@@ -92,8 +92,12 @@ export function grupoDoDia(previsto: string, hoje: string): GrupoFila {
 /**
  * "D+7 Experiência": o dia do passo na frente do título. Se o título já começa com o dia ("D+7 …"), não repete.
  */
-export function rotuloDoPasso(diaOffset: number | null | undefined, titulo: string): string {
+export function rotuloDoPasso(diaOffset: number | null | undefined, titulo: string,
+  extra: { ancora?: string | null; ocorrencia?: number | null } = {}): string {
   const t = (titulo ?? '').trim()
+  const vez = (extra.ocorrencia ?? 1) > 1 ? ` · ${extra.ocorrencia}ª vez` : ''
+  // Passo por data do ano, data de campo, uso ou repetição: o "D+" da venda não diz nada; vale o título.
+  if ((extra.ancora ?? 'venda') !== 'venda' || (extra.ocorrencia ?? 1) > 1) return `${t}${vez}`
   if (diaOffset == null || /^D\s*\+\s*\d+/i.test(t)) return t
   return `D+${diaOffset} ${t}`.trim()
 }

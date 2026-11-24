@@ -7,6 +7,7 @@ import { useEmpresa } from '@/lib/empresa-context'
 import { useFuso } from '@/components/fuso-provider'
 import { diaNoFuso } from '@/lib/datas'
 import { CONDICOES, DATA_MINIMA, modoCondicao, validarVendaGanho, valorDigitado, type CampoVenda, type CondicaoVenda, type ModoCondicao } from '@/lib/venda-ganho'
+import { camposDaVenda, validarCamposDaVenda, type CampoDaVenda } from '@/lib/venda-campos'
 import { cn } from '@/lib/utils'
 
 /** O que o modal devolve — vai no corpo de /api/leads/mover como `venda`. */
@@ -15,6 +16,8 @@ export interface VendaDoModal {
   categoria_id: number | null
   condicao: CondicaoVenda | null
   valor: string
+  /** Campos da venda que a empresa pede (core_venda_campos), já no tipo do banco. */
+  campos?: Record<string, string | number>
 }
 
 interface Props {
@@ -55,14 +58,19 @@ export function GanhoModal({ leadNome, valorInicial, criadoEm, confirmar = 'Marc
   const [categorias, setCategorias] = useState<{ id: number; nome: string }[] | null>(null)
   // Condição na venda por empresa (core.condicao_venda): exigida, opcional ou não usa.
   const [modo, setModo] = useState<ModoCondicao | null>(null)
+  // Campos da venda da empresa (com o Pós-venda ligado; senão lista vazia) e o que foi digitado.
+  const [campos, setCampos] = useState<CampoDaVenda[] | null>(null)
+  const [valoresCampos, setValoresCampos] = useState<Record<string, string>>({})
   const [tentou, setTentou] = useState(false)
 
   useEffect(() => {
     if (!empresa?.id) return
     let vivo = true
-    createClient().from('estoque_categorias').select('id, nome')
-      .eq('empresa_id', empresa.id).eq('ativo', true).order('ordem').order('nome')
-      .then(({ data: cats }) => { if (vivo) setCategorias(((cats ?? []) as { id: number; nome: string }[])) })
+    // As categorias que a empresa usa na venda: as do Estoque ou as próprias do Pós-venda (core_venda_categorias).
+    createClient().rpc('core_venda_categorias' as never)
+      .then(({ data: cats }) => { if (vivo) setCategorias(((cats ?? []) as { id: number; nome: string }[])) }, () => { if (vivo) setCategorias([]) })
+    createClient().rpc('core_venda_campos' as never)
+      .then(({ data: cs }) => { if (vivo) setCampos(camposDaVenda(cs)) }, () => { if (vivo) setCampos([]) })
     createClient().rpc('config_valor' as never, { p_modulo: 'core', p_chave: 'condicao_venda' } as never)
       .then(({ data: m }) => { if (vivo) setModo(modoCondicao(m)) }, () => { if (vivo) setModo('exigida') })
     return () => { vivo = false }
@@ -72,15 +80,20 @@ export function GanhoModal({ leadNome, valorInicial, criadoEm, confirmar = 'Marc
     { data, categoria_id: categoria, condicao: condicao ?? undefined, valor },
     { hoje, criadoEm: criadoEm ?? DATA_MINIMA, categorias: (categorias ?? []).map((c) => c.id), condicao: modo ?? 'exigida' },
   )
+  const checagemCampos = validarCamposDaVenda(campos ?? [], valoresCampos)
   const erroDe = (campo: CampoVenda): string | undefined => {
     if (erroServidor?.campo === campo) return erroServidor.erro
     return tentou && !checagem.ok && checagem.campo === campo ? checagem.erro : undefined
   }
+  const erroDoCampo = (chave: string): string | undefined => {
+    if (erroServidor?.campo === chave) return erroServidor.erro
+    return tentou && checagem.ok && !checagemCampos.ok && checagemCampos.campo === chave ? checagemCampos.erro : undefined
+  }
 
   function enviar() {
     setTentou(true)
-    if (!checagem.ok || categorias == null || modo == null) return
-    onConfirm({ data, categoria_id: categoria, condicao: checagem.venda.condicao, valor })
+    if (!checagem.ok || !checagemCampos.ok || categorias == null || modo == null || campos == null) return
+    onConfirm({ data, categoria_id: categoria, condicao: checagem.venda.condicao, valor, campos: checagemCampos.valores })
   }
 
   const botao = 'min-h-[40px] rounded-lg border px-3 text-[13px] font-medium transition-colors'
@@ -97,7 +110,7 @@ export function GanhoModal({ leadNome, valorInicial, criadoEm, confirmar = 'Marc
       footer={
         <>
           <Button variant="ghost" onClick={onCancel} disabled={loading}>Cancelar</Button>
-          <Button onClick={enviar} loading={loading} disabled={categorias == null}>{confirmar}</Button>
+          <Button onClick={enviar} loading={loading} disabled={categorias == null || campos == null}>{confirmar}</Button>
         </>
       }
     >
@@ -150,6 +163,21 @@ export function GanhoModal({ leadNome, valorInicial, criadoEm, confirmar = 'Marc
           // Focar seleciona tudo (no celular o toque posiciona o cursor depois do foco, daí o setTimeout).
           onFocus={(e) => { const el = e.currentTarget; setTimeout(() => el.select(), 0) }}
           onChange={(e) => { const novo = e.target.value; setValor(valorIntocado ? valorDigitado(valor, novo) : novo); setValorIntocado(false) }} />
+
+        {(campos ?? []).map((c) => {
+          const v = valoresCampos[c.chave] ?? ''
+          const muda = (x: string) => setValoresCampos((a) => ({ ...a, [c.chave]: x }))
+          return c.tipo === 'opcao' && c.opcoes.length ? (
+            <Select key={c.chave} label={c.rotulo} value={v} required={c.obrigatorio} error={erroDoCampo(c.chave)} onChange={(e) => muda(e.target.value)}>
+              <option value="">{c.obrigatorio ? 'Selecione…' : 'Não informado'}</option>
+              {c.opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
+            </Select>
+          ) : (
+            <Input key={c.chave} label={c.rotulo} value={v} required={c.obrigatorio} error={erroDoCampo(c.chave)} autoComplete="off"
+              type={c.tipo === 'data' ? 'date' : 'text'} inputMode={c.tipo === 'numero' || c.tipo === 'moeda' ? 'decimal' : undefined}
+              onChange={(e) => muda(e.target.value)} />
+          )
+        })}
       </div>
     </Modal>
   )

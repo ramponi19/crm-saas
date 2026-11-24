@@ -1,0 +1,27 @@
+{
+  "1_datas": {
+    "venda_d30": "2026-04-09", "repetir_3a": "2026-06-08", "mes_2a": "2026-04-10", "mes_12a": "2027-02-10",
+    "natal": "2026-12-20", "natal_2a": "2027-12-20", "bissexto": "2027-02-28", "revisao": "2026-05-25",
+    "aniversario_1a": "1990-08-15", "aniversario_38a": "2027-08-15",
+    "uso_padrao": "2026-09-26", "uso_padrao_2a": "2027-04-14", "uso_campo": "2026-06-18", "campo_vazio": null
+  },
+  "1_uso_com_leitura": "2026-06-18",
+  "2_filtros": { "azul_e_km": true, "placa": false, "sem_filtro": true, "contem": true, "menor": false, "do_cliente": true },
+  "3_jornada": {
+    "passos": { "29/02": 1, "a cada 10 mil": 1, "ritmo do campo": 1, "5 dias antes do Natal": 1, "todo mês no dia da venda": 5 },
+    "mensal_na_ocorrencia_de_hoje_em_diante": 5,
+    "todos_de_hoje_em_diante": true
+  },
+  "4_repeticao": { "mensal": ["feito:5", "pendente:6"], "uso_pulado_repete": ["pulado:1", "pendente:2"], "mensal_proxima_30_dias_depois": true },
+  "4_maximo": ["feito:2", "feito:3"],
+  "4_atrasada_vai_para_amanha": true,
+  "4_nao_duplica": 2,
+  "5_antes": true,
+  "5_outro_vendedor": "SEM_PERMISSAO",
+  "5_negativo": "VALOR_INVALIDO",
+  "5_recalculou": { "passos_recalculados": 2 },
+  "5_depois": true,
+  "5_leitura": 1,
+  "6_venda_negativo": "barrado", "6_mes_invalido": "barrado", "6_uso_sem_alvo": "barrado", "6_repetir_sem_unidade": "barrado",
+  "7_privilegios": { "data_do_passo": false, "uso_registrar": true, "uso_anon": false, "categorias_rls": true, "leituras_sem_escrita": true }
+}

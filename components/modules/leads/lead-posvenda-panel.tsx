@@ -12,7 +12,8 @@ interface Passo {
 }
 interface Nota { id: number; nota: number; comentario: string | null; dia: string }
 interface Chamado { id: number; numero: number; titulo: string; prioridade: string; status: string; resolvido: boolean; aberto: string; atrasado: boolean }
-interface Dados { hoje: string; contatoId: number; categorias: { id: number; nome: string }[]; passos: Passo[]; notas: Nota[]; chamados: Chamado[] }
+interface Uso { campo: string; rotulo: string; ultimo: number | null; em: string | null }
+interface Dados { hoje: string; contatoId: number; categorias: { id: number; nome: string }[]; passos: Passo[]; notas: Nota[]; chamados: Chamado[]; usos?: Uso[] }
 
 const ddmm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`
 const STATUS: Record<string, string> = {
@@ -26,7 +27,7 @@ const STATUS: Record<string, string> = {
 export function LeadPosVendaPanel({ leadId }: { leadId: number }) {
   const [dados, setDados] = useState<Dados | null>(null)
   const [estado, setEstado] = useState<'carregando' | 'ok' | 'oculto'>('carregando')
-  const [form, setForm] = useState<'nota' | 'chamado' | null>(null)
+  const [form, setForm] = useState<'nota' | 'chamado' | 'uso' | null>(null)
 
   const carregar = useCallback(async () => {
     try {
@@ -101,7 +102,18 @@ export function LeadPosVendaPanel({ leadId }: { leadId: number }) {
               ))}
             </div>
           )}
-          {form === 'nota' ? <FormNota leadId={leadId} aoFechar={(ok) => { setForm(null); if (ok) carregar() }} />
+          {(dados.usos ?? []).length > 0 && form !== 'uso' && (
+            <div className="flex flex-col gap-1">
+              {(dados.usos ?? []).map((u) => (
+                <div key={u.campo} className="flex items-center justify-between gap-2 text-[12.5px] text-ink-2">
+                  <span>{u.rotulo}: <span className="num text-ink">{u.ultimo != null ? u.ultimo.toLocaleString('pt-BR') : '—'}</span>{u.em ? ` em ${ddmm(u.em)}` : ''}</span>
+                  <button type="button" className="text-[12px] font-medium text-ink-2 hover:text-ink" onClick={() => setForm('uso')}>Informar</button>
+                </div>
+              ))}
+            </div>
+          )}
+          {form === 'uso' ? <FormUso leadId={leadId} usos={dados.usos ?? []} aoFechar={(ok) => { setForm(null); if (ok) carregar() }} />
+            : form === 'nota' ? <FormNota leadId={leadId} aoFechar={(ok) => { setForm(null); if (ok) carregar() }} />
             : form === 'chamado' ? <FormChamado leadId={leadId} contatoId={dados.contatoId} categorias={dados.categorias} aoFechar={(ok) => { setForm(null); if (ok) carregar() }} />
             : (
               <div className="flex gap-2">
@@ -115,6 +127,37 @@ export function LeadPosVendaPanel({ leadId }: { leadId: number }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Uso atual contado pelo cliente ou pela equipe (ex.: horas de uso): recalcula os passos de uso desta venda. */
+function FormUso({ leadId, usos, aoFechar }: { leadId: number; usos: Uso[]; aoFechar: (ok: boolean) => void }) {
+  const [campo, setCampo] = useState(usos[0]?.campo ?? '')
+  const [valor, setValor] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const rotulo = usos.find((u) => u.campo === campo)?.rotulo ?? 'Uso'
+  async function salvar() {
+    setSalvando(true)
+    const r = await fetch('/api/pos-venda/uso', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ negocio_id: leadId, campo, valor }) })
+    const j = await r.json().catch(() => ({}))
+    setSalvando(false)
+    if (!r.ok) { notify.bad(j.error ?? 'Não foi possível registrar'); return }
+    const n = j.resultado?.passos_recalculados ?? 0
+    notify.ok(n ? `${rotulo} registrado: ${n} ${n === 1 ? 'passo recalculado' : 'passos recalculados'}` : `${rotulo} registrado`)
+    aoFechar(true)
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-control border border-line-soft bg-bg p-2.5">
+      {usos.length > 1 && (
+        <Select label="O quê" value={campo} onChange={(e) => setCampo(e.target.value)}>
+          {usos.map((u) => <option key={u.campo} value={u.campo}>{u.rotulo}</option>)}
+        </Select>
+      )}
+      <Input label={`${rotulo} hoje`} inputMode="decimal" autoComplete="off" value={valor} onChange={(e) => setValor(e.target.value)} />
+      <p className="text-[11.5px] text-ink-3">O Nexus recalcula a data dos próximos passos pelo uso real desde a venda.</p>
+      <div className="flex gap-2"><Button size="sm" loading={salvando} disabled={!valor.trim()} onClick={salvar}>Salvar</Button><Button size="sm" variant="ghost" onClick={() => aoFechar(false)}>Cancelar</Button></div>
     </div>
   )
 }

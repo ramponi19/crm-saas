@@ -92,4 +92,43 @@ describe('Configurações › Pós-venda (rota + RLS + config_salvar)', () => {
     const { data } = await svc.from('posvenda_chamado_categorias').select('ativo').eq('id', c.corpo.id as number).single()
     assert.equal(data!.ativo, false)
   })
+
+  // Pós-venda universal (migração 2200): categorias próprias, campos da venda e passo com âncora.
+  test('categorias próprias: o modal passa a oferecer as do Pós-venda só quando a empresa escolhe "proprias"', async () => {
+    atual = sessoes.admin
+    const antes = ok(await sessoes.admin.rpc('core_venda_categorias')) as { id: number; nome: string }[]
+    const c = await enviar({ acao: 'categoria_venda', nome: 'Revisão de carro' })
+    assert.equal(c.status, 200)
+    assert.deepEqual(ok(await sessoes.admin.rpc('core_venda_categorias')), antes, 'origem ainda é o Estoque')
+    assert.equal((await enviar({ acao: 'parametro', chave: 'categorias_fonte', valor: 'proprias' })).status, 200)
+    const depois = ok(await sessoes.m1.rpc('core_venda_categorias')) as { id: number; nome: string }[]
+    assert.deepEqual(depois.map((x) => x.nome), ['Revisão de carro'])
+    atual = sessoes.m1
+    assert.equal((await enviar({ acao: 'categoria_venda', nome: 'Do vendedor' })).status, 403)
+    atual = sessoes.admin
+    assert.equal((await enviar({ acao: 'parametro', chave: 'categorias_fonte', valor: 'estoque' })).status, 200)
+  })
+
+  test('campos da venda: o admin cria; o modal recebe a lista; o passo usa o campo (e recusa campo que não existe)', async () => {
+    atual = sessoes.admin
+    const km = await enviar({ acao: 'campo_venda', rotulo: 'Quilometragem na venda', tipo: 'numero', obrigatorio: true })
+    assert.equal(km.status, 200)
+    assert.equal((await enviar({ acao: 'campo_venda', rotulo: 'Quilometragem na venda', tipo: 'numero' })).status, 409)
+    const lista = ok(await sessoes.m1.rpc('core_venda_campos')) as { chave: string; obrigatorio: boolean }[]
+    assert.ok(lista.some((x) => x.chave === 'quilometragem_na_venda' && x.obrigatorio))
+    const semCampo = await enviar({ acao: 'passo', cadencia_id: regua, ordem: 5, tipo_acao: 'ligacao', titulo: 'Revisão', ancora_tipo: 'uso',
+      ancora_campo: 'odometro', uso_alvo: 10000, uso_ritmo_padrao: 40 })
+    assert.equal(semCampo.status, 422)
+    const p = await enviar({ acao: 'passo', cadencia_id: regua, ordem: 5, tipo_acao: 'ligacao', titulo: 'Revisão', ancora_tipo: 'uso',
+      ancora_campo: 'quilometragem_na_venda', uso_alvo: '10.000', uso_ritmo_padrao: 40, repetir: true,
+      campos: [{ chave: 'quilometragem_na_venda', op: 'maior', valor: '0' }] })
+    assert.equal(p.status, 200)
+    const { data } = await svc.from('posvenda_cadencia_passos').select('ancora_tipo, ancora_campo, uso_alvo, repetir_intervalo, filtros').eq('id', p.corpo.id as number).single()
+    assert.deepEqual(data, { ancora_tipo: 'uso', ancora_campo: 'quilometragem_na_venda', uso_alvo: 10000, repetir_intervalo: 1,
+      filtros: { campos: [{ chave: 'quilometragem_na_venda', op: 'maior', valor: '0' }] } })
+    // desligado, sai do modal
+    assert.equal((await enviar({ acao: 'campo_venda', id: km.corpo.id, rotulo: 'Quilometragem na venda', tipo: 'numero', ativo: false })).status, 200)
+    const sem = ok(await sessoes.m1.rpc('core_venda_campos')) as { chave: string }[]
+    assert.ok(!sem.some((x) => x.chave === 'quilometragem_na_venda'))
+  })
 })

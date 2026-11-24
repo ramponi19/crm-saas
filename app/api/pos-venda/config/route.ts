@@ -3,7 +3,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { posvendaLigado, semTipo } from '@/lib/posvenda/ligado'
 import { nadaGravado } from '@/lib/linhas-afetadas'
-import { categoriasPermitidas, ehParametro, PARAMETROS, validarPasso, validarRegua, ROTULO_CATEGORIA } from '@/lib/posvenda/config'
+import { categoriasPermitidas, ehParametro, filtrosDoPasso, PARAMETROS, validarCampoVenda, validarPasso, validarRegua, ROTULO_CATEGORIA } from '@/lib/posvenda/config'
 
 /**
  * CONFIGURAÇÕES › PÓS-VENDA: GRAVAÇÕES (C7 bloco 3, 24/11/2026). Só dono ou administrador (RLS da C1 nas tabelas de
@@ -12,7 +12,11 @@ import { categoriasPermitidas, ehParametro, PARAMETROS, validarPasso, validarReg
  *
  * POST { acao: 'regua', id?, nome, ativo, prioridade, categorias[], condicao, ao_recomprar }
  *      { acao: 'passo', id?, cadencia_id, ordem, dia_offset, tipo_acao, titulo, roteiro, grupo, ativo, responsavel,
- *        modelo_id, condicao, tolerancia_dias }   modelo: aprovado, da empresa, de categoria liberada (D8 revista)
+ *        modelo_id, condicao, tolerancia_dias, ancora_tipo, ancora_mes_dia, ancora_campo, uso_alvo, uso_ritmo_campo,
+ *        uso_ritmo_padrao, repetir, repetir_intervalo, repetir_unidade, repetir_max, campos[] }
+ *        modelo: aprovado, da empresa, de categoria liberada (D8 revista); campo da âncora e dos filtros: cadastrado
+ *      { acao: 'categoria_venda', id?, nome, ativo, ordem? }   categorias próprias (posvenda.categorias_fonte = proprias)
+ *      { acao: 'campo_venda', id?, rotulo, tipo, opcoes[], obrigatorio, ativo }   campo de negócio do Pós-venda
  *      { acao: 'parametro', chave, valor, filialId? }   valor null na loja = volta ao da empresa
  *      { acao: 'categoria_chamado', id?, nome, ativo }
  *      { acao: 'sla', prioridade, primeira_resposta_horas, resolucao_horas }
@@ -70,8 +74,17 @@ export async function POST(req: Request) {
         return erro(`O pós-venda desta empresa só usa modelos de ${ok.map((c) => ROTULO_CATEGORIA[c]).join(' e ')}. Libere ${ROTULO_CATEGORIA[modelo.categoria] ?? modelo.categoria} nos parâmetros.`, 422)
       }
     }
-    const { condicao, ...resto } = r.v
-    const linha = { ...resto, filtros: condicao ? { condicao } : {} }
+    // Os campos que o passo usa (âncora, ritmo, filtros) precisam existir na empresa (negócio ou cliente).
+    const usados = [...new Set([r.v.ancora_campo, r.v.uso_ritmo_campo, ...r.v.campos.map((c) => c.chave)].filter((c): c is string => !!c))]
+    if (usados.length) {
+      const { data: existem } = await s.from('campos_personalizados').select('chave').eq('empresa_id', empresaId).eq('ativo', true)
+        .in('entidade', ['negocio', 'contato']).in('chave', usados)
+      const achou = new Set(((existem ?? []) as { chave: string }[]).map((c) => c.chave))
+      const falta = usados.filter((c) => !achou.has(c))
+      if (falta.length) return erro(`Campo não cadastrado: ${falta.join(', ')}. Crie em Pós-venda › Venda.`, 422)
+    }
+    const { condicao, campos, ...resto } = r.v
+    const linha = { ...resto, filtros: filtrosDoPasso({ condicao, campos }) }
     const { data, error } = id
       ? await s.from('posvenda_cadencia_passos').update(linha).eq('id', id).eq('empresa_id', empresaId).eq('cadencia_id', cadencia).select('id')
       : await s.from('posvenda_cadencia_passos').insert({ ...linha, empresa_id: empresaId, cadencia_id: cadencia }).select('id')
@@ -118,6 +131,46 @@ export async function POST(req: Request) {
     const { error } = await supabase.rpc('config_salvar', { p_modulo: 'core', p_chave: 'condicao_venda', p_valor: b.valor } as never)
     if (error) return /SEM_PERMISSAO|SOMENTE_LEITURA/.test(error.message) ? semPermissao() : erro(error.message)
     return NextResponse.json({ ok: true })
+  }
+
+  // Categorias próprias da venda (quem não usa o Estoque). Nada é apagado: sai de uso com ativo = false.
+  if (b.acao === 'categoria_venda') {
+    const nome = typeof b.nome === 'string' ? b.nome.trim().slice(0, 60) : ''
+    if (nome.length < 2) return erro('Dê um nome à categoria.', 422)
+    const ordem = Number.isInteger(Number(b.ordem)) ? Number(b.ordem) : 0
+    const linha = { nome, ativo: b.ativo !== false, ordem }
+    const { data, error } = id
+      ? await s.from('posvenda_categorias_venda').update(linha).eq('id', id).eq('empresa_id', empresaId).select('id')
+      : await s.from('posvenda_categorias_venda').insert({ ...linha, empresa_id: empresaId }).select('id')
+    if (error) return barradoPelaRls(error) ? semPermissao() : erro(error.message, 500)
+    if (nadaGravado(data)) return semPermissao()
+    return NextResponse.json({ ok: true, id: (data as { id: number }[])[0].id })
+  }
+
+  // Campos da venda: campos personalizados de negócio do Pós-venda (aparecem no modal de venda com o módulo ligado).
+  // A chave e o tipo não mudam depois de criados (os valores já gravados dependem deles).
+  if (b.acao === 'campo_venda') {
+    const r = validarCampoVenda(b)
+    if (!r.ok) return erro(r.erro, 422)
+    if (id) {
+      const { data, error } = await s.from('campos_personalizados')
+        .update({ rotulo: r.v.rotulo, opcoes: r.v.opcoes, obrigatorio_na_venda: r.v.obrigatorio, ativo: r.v.ativo, updated_at: new Date().toISOString() })
+        .eq('id', id).eq('empresa_id', empresaId).eq('entidade', 'negocio').eq('modulo_dono', 'posvenda').select('id')
+      if (error) return barradoPelaRls(error) ? semPermissao() : erro(error.message, 500)
+      if (nadaGravado(data)) return semPermissao()
+      return NextResponse.json({ ok: true, id })
+    }
+    const { data: ultimo } = await s.from('campos_personalizados').select('ordem').eq('empresa_id', empresaId).eq('entidade', 'negocio')
+      .order('ordem', { ascending: false }).limit(1)
+    const ordem = (((ultimo ?? []) as { ordem: number }[])[0]?.ordem ?? 0) + 1
+    const { data, error } = await s.from('campos_personalizados').insert({
+      empresa_id: empresaId, entidade: 'negocio', chave: r.v.chave, rotulo: r.v.rotulo, tipo: r.v.tipo, opcoes: r.v.opcoes,
+      modulo_dono: 'posvenda', obrigatorio_na_venda: r.v.obrigatorio, ativo: r.v.ativo, ordem,
+    }).select('id')
+    if (error && barradoPelaRls(error)) return semPermissao()
+    if (error) return /unique|duplicate/i.test(error.message) ? erro('Já existe um campo com esse nome na empresa. Use outro nome.', 409) : erro(error.message, 500)
+    if (nadaGravado(data)) return semPermissao()
+    return NextResponse.json({ ok: true, id: (data as { id: number }[])[0].id })
   }
 
   if (b.acao === 'categoria_chamado') {

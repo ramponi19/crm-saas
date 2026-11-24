@@ -38,8 +38,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const [fuso, { data: acomp }, { data: notas }, { data: chamados }, { data: cats }] = await Promise.all([
     fusoDaEmpresa(supabase, empresaId),
     s.from('posvenda_acompanhamentos')
-      .select(`id, negocio_id, previsto_para, status, resultado, motivo, feito_em, tentativas, responsavel_id,
-        passo:posvenda_cadencia_passos!passo_id(titulo, dia_offset, tipo_acao),
+      .select(`id, negocio_id, previsto_para, status, resultado, motivo, feito_em, tentativas, responsavel_id, ocorrencia,
+        passo:posvenda_cadencia_passos!passo_id(titulo, dia_offset, tipo_acao, ancora_tipo, ancora_campo),
         jornada:posvenda_jornadas!jornada_id(status, cadencia:posvenda_cadencias!cadencia_id(nome))`)
       .eq('empresa_id', empresaId).eq('contato_id', neg.contato_id)
       .not('status', 'in', '(cancelado,juntado)')
@@ -53,22 +53,44 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   ])
 
   type A = { id: number; negocio_id: number | null; previsto_para: string; status: string; resultado: string | null; motivo: string | null
-    feito_em: string | null; tentativas: number; responsavel_id: string
-    passo: Embed<{ titulo: string; dia_offset: number; tipo_acao: string }>; jornada: Embed<{ status: string; cadencia: Embed<{ nome: string }> }> }
+    feito_em: string | null; tentativas: number; responsavel_id: string; ocorrencia: number | null
+    passo: Embed<{ titulo: string; dia_offset: number; tipo_acao: string; ancora_tipo: string | null; ancora_campo: string | null }>; jornada: Embed<{ status: string; cadencia: Embed<{ nome: string }> }> }
   const linhas = (acomp ?? []) as unknown as A[]
   const ids = [...new Set(linhas.map((l) => l.responsavel_id))]
   const { data: pessoas } = ids.length ? await service.from('usuarios').select('id, nome').in('id', ids) : { data: [] }
   const nome = new Map((pessoas ?? []).map((p) => [p.id, p.nome]))
   const hoje = diaNoFuso(new Date(), fuso)
 
+  // Uso estimado (km, horas…): os campos dos passos de uso pendentes DESTA venda, com o último valor conhecido.
+  const camposUso = [...new Set(linhas.filter((l) => l.negocio_id === id && l.status === 'pendente' && um(l.passo)?.ancora_tipo === 'uso')
+    .map((l) => um(l.passo)?.ancora_campo).filter((c): c is string => !!c))]
+  let usos: { campo: string; rotulo: string; ultimo: number | null; em: string | null }[] = []
+  if (camposUso.length) {
+    const [{ data: defs }, { data: leituras }, { data: negDados }] = await Promise.all([
+      s.from('campos_personalizados').select('chave, rotulo').eq('empresa_id', empresaId).eq('entidade', 'negocio').in('chave', camposUso),
+      s.from('posvenda_uso_leituras').select('campo, valor, em').eq('negocio_id', id).in('campo', camposUso).order('em', { ascending: false }).order('id', { ascending: false }),
+      s.from('negocios').select('dados, ganho_em').eq('id', id).maybeSingle(),
+    ])
+    const rot = new Map(((defs ?? []) as { chave: string; rotulo: string }[]).map((d) => [d.chave, d.rotulo]))
+    const lidas = (leituras ?? []) as { campo: string; valor: number; em: string }[]
+    const nd = negDados as { dados: Record<string, unknown> | null; ganho_em: string | null } | null
+    usos = camposUso.map((c) => {
+      const l = lidas.find((x) => x.campo === c)
+      const naVenda = nd?.dados?.[c]
+      return l ? { campo: c, rotulo: rot.get(c) ?? c, ultimo: Number(l.valor), em: l.em }
+        : { campo: c, rotulo: rot.get(c) ?? c, ultimo: typeof naVenda === 'number' ? naVenda : null, em: nd?.ganho_em ? diaNoFuso(new Date(nd.ganho_em), fuso) : null }
+    })
+  }
+
   return NextResponse.json({
     hoje,
     contatoId: neg.contato_id,
+    usos,
     categorias: (cats ?? []) as { id: number; nome: string }[],
     passos: linhas.map((l) => ({
       id: l.id,
       desteNegocio: l.negocio_id === id,
-      passo: rotuloDoPasso(um(l.passo)?.dia_offset, um(l.passo)?.titulo ?? 'Passo'),
+      passo: rotuloDoPasso(um(l.passo)?.dia_offset, um(l.passo)?.titulo ?? 'Passo', { ancora: um(l.passo)?.ancora_tipo, ocorrencia: l.ocorrencia }),
       regua: um(um(l.jornada)?.cadencia ?? null)?.nome ?? null,
       dia: diaNoFuso(new Date(l.previsto_para), fuso),
       status: l.status,
