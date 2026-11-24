@@ -1,0 +1,43 @@
+import { redirect } from 'next/navigation'
+import { createClient, getEmpresaId } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { carregarConfigEmpresa } from '@/lib/empresa-config'
+import { posvendaLigado } from '@/lib/posvenda/ligado'
+import { carregarFilaPosVenda } from '@/lib/posvenda/carregar-fila'
+import { FilaPosVenda } from './fila-pos-venda'
+
+export const metadata = { title: 'Pós-venda' }
+
+/**
+ * FILA DO PÓS-VENDA (C7 bloco 2, 24/11/2026; docs/design-pos-venda.md §2.5.2).
+ * Atrasados · Hoje · Próximos 7 dias. O vendedor vê os dele (RLS); dono e administrador escolhem Meus ou Todos.
+ * A trava: a linha do módulo em empresa_modulos (lib/posvenda/ligado.ts); o proxy já barra a tela enquanto o módulo
+ * está em preparação (só o superadmin entra).
+ */
+export default async function PosVendaPage({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const empresaId = await getEmpresaId()
+  if (!empresaId) redirect('/dashboard')
+
+  const service = createServiceClient()
+  const [ligado, { data: vinc }, { data: eu }, fuso, cfg, sp] = await Promise.all([
+    posvendaLigado(service, empresaId),
+    service.from('empresa_usuarios').select('role').eq('empresa_id', empresaId).eq('usuario_id', user.id).eq('ativo', true).maybeSingle(),
+    supabase.from('usuarios').select('is_super_admin').eq('id', user.id).maybeSingle(),
+    fusoDaEmpresa(supabase, empresaId),
+    carregarConfigEmpresa(supabase, empresaId),
+    searchParams,
+  ])
+  if (!ligado) return <FilaPosVenda desligado itens={[]} hoje="" podeVerTodos={false} ver="meus" cortado={false} />
+
+  const podeVerTodos = !!eu?.is_super_admin || ['owner', 'admin'].includes(vinc?.role ?? '')
+  const ver = podeVerTodos && sp.ver === 'todos' ? 'todos' : 'meus'
+  const { itens, hoje, cortado } = await carregarFilaPosVenda(supabase, {
+    empresaId, fuso, rotuloUsado: cfg.vocabulario.usado ?? 'Usado', so: ver === 'meus' ? user.id : null,
+  })
+  // key: trocar Meus/Todos monta a fila de novo com os itens da outra visão (o estado local começa das props).
+  return <FilaPosVenda key={ver} itens={itens} hoje={hoje} podeVerTodos={podeVerTodos} ver={ver} cortado={cortado} />
+}

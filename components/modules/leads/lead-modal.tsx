@@ -24,6 +24,7 @@ import { PaineisDaVertical } from './paineis-vertical'
 import type { PerfilDoLead } from '@/lib/empresa-config'
 import { LeadChamadasPanel } from './lead-chamadas-panel'
 import { LeadCadenciaPanel } from './lead-cadencia-panel'
+import { LeadPosVendaPanel } from './lead-posvenda-panel'
 import { LeadOrcamentoPanel } from '@/components/modules/orcamentos/lead-orcamento-panel'
 import { LeadReservaPanel } from '@/components/modules/estoque/lead-reserva-panel'
 import { ProdutoAutocomplete } from './produto-autocomplete'
@@ -1696,6 +1697,8 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
               <LeadOrcamentoPanel leadId={lead.id} leadNome={lead.nome} leadTelefone={lead.telefone} onSalvo={moverParaOrcamento} />
             )}
             <LeadCadenciaPanel leadId={lead.id} />
+            {/* Pós-venda (módulo): a régua do cliente, notas e chamados. */}
+            {perfil.posvenda && <LeadPosVendaPanel leadId={lead.id} />}
             {/* Continua existindo para quem já rolou até aqui, mas agora reflete o
                 estado: sem alteração pendente não há o que salvar. */}
             <Button

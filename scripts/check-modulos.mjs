@@ -122,7 +122,8 @@ const DONOS = {
 }
 const PREFIXOS = Object.keys(DONOS).sort((a, b) => b.length - a.length)
 
-const GUARDA = /\b(exigirModuloLigado|moduloLigado|moduloEstaLigado|exigirAbaDeModulo|ligadosDaEmpresa|inteligenciaLigada|zapintelAcesso)\s*\(|<SecaoConfiguracoes\b/
+// posvendaLigado (lib/posvenda/ligado.ts, 24/11/2026): o Pós-venda em preparação lê a linha de empresa_modulos.
+const GUARDA = /\b(exigirModuloLigado|moduloLigado|posvendaLigado|moduloEstaLigado|exigirAbaDeModulo|ligadosDaEmpresa|inteligenciaLigada|zapintelAcesso)\s*\(|<SecaoConfiguracoes\b/
 
 // ── As rotas ─────────────────────────────────────────────────────────────────
 function arquivos(dir) {

@@ -20,7 +20,7 @@ test('a migração traz os 7 presets', () => {
 test('imobiliária: módulos em preparação não ligam painel; vocabulário fica (corretor)', () => {
   const cfg = empresaNascidaCom('imobiliaria')
   assert.deepEqual(perfilDoLead(cfg), {
-    paineis: [], interesse: 'Imóvel interessado', agendaVisitas: false, textoLivre: false, rotuloUsado: 'Usado',
+    paineis: [], interesse: 'Imóvel interessado', agendaVisitas: false, textoLivre: false, rotuloUsado: 'Usado', posvenda: false,
   })
   assert.equal(vocabulario(cfg).equipe, 'Corretor')
 })
@@ -29,19 +29,19 @@ test('imobiliária: módulos em preparação não ligam painel; vocabulário fic
 // sempre): quem nasce com Estoque e Orçamentos os tem — e continua no autocomplete do catálogo.
 test('loja de veículos: Avaliações em preparação, nenhum painel de veículo', () => {
   assert.deepEqual(perfilDoLead(empresaNascidaCom('concessionaria')), {
-    paineis: ['orcamento', 'reserva-estoque'], interesse: 'Veículo interessado', agendaVisitas: false, textoLivre: false, rotuloUsado: 'Usado',
+    paineis: ['orcamento', 'reserva-estoque'], interesse: 'Veículo interessado', agendaVisitas: false, textoLivre: false, rotuloUsado: 'Usado', posvenda: false,
   })
 })
 
 test('varejo: autocomplete do catálogo, reservar e orçar, vendedor', () => {
-  const varejo = { paineis: ['orcamento', 'reserva-estoque'], interesse: 'Produto interessado', agendaVisitas: false, textoLivre: false, rotuloUsado: 'Usado' }
+  const varejo = { paineis: ['orcamento', 'reserva-estoque'], interesse: 'Produto interessado', agendaVisitas: false, textoLivre: false, rotuloUsado: 'Usado', posvenda: false }
   assert.deepEqual(perfilDoLead(empresaNascidaCom('varejo')), varejo)
   assert.equal(vocabulario(empresaNascidaCom('varejo')).equipe, 'Vendedor')
 })
 
 test('empresa sem base gravada: o texto padrão, nunca um painel de vertical', () => {
   const cfg = { ...camadasDoMenu({}), modulos: [], forcados: undefined }
-  assert.deepEqual(perfilDoLead(cfg), { paineis: [], interesse: 'Produto interessado', agendaVisitas: false, textoLivre: false, rotuloUsado: 'Usado' })
+  assert.deepEqual(perfilDoLead(cfg), { paineis: [], interesse: 'Produto interessado', agendaVisitas: false, textoLivre: false, rotuloUsado: 'Usado', posvenda: false })
   assert.equal(vocabulario(cfg).equipe, 'Vendedor')
 })
 
