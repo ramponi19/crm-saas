@@ -2,6 +2,15 @@
 
 **Data:** 19/11/2026 · **Tipo:** só documentação (nenhum código, migração ou dado alterado).
 **Revisão 2 (19/11/2026, noite):** decisões do Lucas registradas (seção [Decisões](#decisões)), comissão da JM refeita como teste T-H1, calendário de dias úteis (§N).
+**Revisão 3 (24/11/2026):** integração com a variante de produto ([unificacao-preco-proposta.md](unificacao-preco-proposta.md), decisões D1–D11), a precificação por fornecedores ([precificacao-fornecedores-proposta.md](precificacao-fornecedores-proposta.md)) e o módulo **Pós-venda** (`docs/design-pos-venda.md`, branch `feat/pos-venda`). Entram:
+- custo protegido no banco na etapa 1.1 (§B.1);
+- cargos da JM (§B);
+- comissão da JM fechada (§H);
+- preço congelado em todo item (§C);
+- o antigo §I vira **Devolução, troca e garantia**: a régua, o NPS e os chamados são do módulo Pós-venda, que o PDV não reespecifica (§I, §L).
+
+A ordem das etapas agora está em [roteiro-reconstrucao.md](roteiro-reconstrucao.md), que prevalece sobre o "Plano de fases" deste documento quando os dois divergirem.
+
 **Base:**
 - [auditoria-pdv.md](auditoria-pdv.md): nota 2/10, 62 itens;
 - hotfix da branch `fix/entregar-sem-pagamento` (`c21eca3a`, `e3cdf2cf`): `concluir_encomenda`, `concluir_venda_pdv`, `encomenda_saldo`, trava `vendas_conclusao_guarda`, colunas `concluida_em/por/via`;
@@ -77,12 +86,16 @@ flowchart LR
       DESC[F. Desconto e aprovação]
       CRED[G. Crediário]
       COM[H. Comissão]
-      POS[I. Pós-venda]
+      DEV[I. Devolução, troca e garantia]
       IMP[J. Impressão]
     end
     FISCAL[K. Módulo Fiscal]
     CEL[Módulo Celulares<br/>troca de aparelho, IMEI]
-    EST[Módulo Estoque]
+    EST[Módulo Estoque<br/>produto, variante, unidade]
+    POSV[Módulo Pós-venda<br/>régua, NPS, chamados]
+    PREC[Módulo Precificação<br/>preço da variante]
+    VENDA -- evento venda_concluida --> POSV
+    PREC --> EST
     VENDA --> CAIXA
     VENDA --> MEIOS
     VENDA --> EST
@@ -153,7 +166,7 @@ interface DefinicaoConfig {
 
 ### Telas
 
-- **Configurações → PDV**, com uma seção por bloco: Venda, Caixa, Pagamentos, Descontos, Crediário, Comissão, Pós-venda, Impressão e Fiscal (esta só aparece com o módulo Fiscal ligado).
+- **Configurações → PDV**, com uma seção por bloco: Venda, Caixa, Pagamentos, Descontos, Crediário, Comissão, Devolução e garantia, Impressão e Fiscal (esta só aparece com o módulo Fiscal ligado). A régua de pós-venda, o NPS e os chamados ficam em **Configurações → Pós-venda**, que é do módulo Pós-venda e já existe.
 - Cada campo mostra o rótulo, a ajuda e o selo "padrão" (quando não foi editado) ou "editado por X em dd/mm".
 - Para chaves de `empresa_ou_loja`, aparece o seletor "Toda a empresa / Loja X". Na loja, o switch "usar valor próprio desta loja" e "voltar ao valor da empresa".
 
@@ -212,7 +225,9 @@ São usadas nas políticas de **leitura** (ex.: ver venda de outro) e dentro de 
 | `pdv.devolver` / `pdv.trocar` | sim/não | ✓ | — | — | — |
 | `crediario.liberar` | limite R$ | ∞ | — | — | — |
 | `crediario.receber` | sim/não | ✓ | — | ✓ | — |
-| `pdv.ver_custo` (custo e margem) | sim/não | ✓ | — | — | — |
+| `estoque.ver_custo` (custo, margem e lucro em qualquer tela: estoque, catálogo, PDV, relatórios, painel, assistente; ver §B.1). Era `pdv.ver_custo`: passa ao núcleo do estoque porque o custo aparece fora do PDV | sim/não | — ³ | — | — | — |
+| `estoque.preco_variante` (editar o preço de referência da variante; propaga às unidades que herdam) | sim/não | — ³ | — | — | — |
+| `estoque.preco_proprio` (definir ou tirar o preço próprio de uma unidade) | sim/não | — ³ | — | — | — |
 | `comissao.ver_propria` / `comissao.ver_todas` | sim/não | ✓ / ✓ | ✓ / — | ✓ / — | ✓ / — |
 | `comissao.fechar` | sim/não | — (Dono) | — | — | — |
 | `pdv.lancar_retroativo` | sim/não | — (Dono) | — | — | — |
@@ -223,6 +238,32 @@ São usadas nas políticas de **leitura** (ex.: ver venda de outro) e dentro de 
 
 ¹ A política `caixa.vendedor_pode_receber` (§D) pode liberar o vendedor sem caixa para receber formas não-dinheiro.
 ² A política `pdv.cancelar_propria_minutos` libera cancelar a **própria** venda em até N minutos (padrão 0 = desligado).
+³ **Decidido (24/11):** custo e preço começam **só com o Dono** (e o Admin, enquanto o papel existir). A empresa marca no cargo quem mais pode. Na JM, as três ficam com Dono e Admin.
+
+**Cargos semeados (valor de fábrica, editável):**
+- Dono (`sistema`, tudo);
+- Gerente, Vendedor, Caixa, Técnico (tabela acima);
+- **Consulta**: só leitura, sem nenhuma permissão de escrita e **sem** `estoque.ver_custo`. Serve a contas de acompanhamento, como a conta "JM Store".
+
+**Cargos da JM (dados, aplicados na etapa 1.1, conferidos na produção em 24/11):**
+
+| Conta | Hoje | Passa a | Observação |
+|---|---|---|---|
+| Matheus Rosa | `admin` | **Dono** | sócio |
+| Eduardo Abreu | `admin` | **Dono** | sócio |
+| "JM Store" (conta da loja) | `owner` | **Consulta** | Hoje é a única `owner`. Depende de 5 negócios, 2 vendas como vendedora e 7 módulos instalados, que ficam como histórico. Tem de sair de `owner` **depois** de os dois sócios virarem Dono, para a empresa nunca ficar sem dono |
+| Vendedores ativos (Pedro, Luis Felipe, Milena, Emerson, Vanessa) | `vendedor` | Vendedor | |
+| "Meta Reviewer" (`reviewer.meta@…`) | `vendedor` ativo, marcado como conta de serviço | **desativar na etapa 1.1** (decidido em 24/11) | É a conta de teste **antiga e errada** do App Review. A certa (`meta.review@…`) é dona da empresa 5, de demonstração. Nada depende dela: a marca de conta de serviço só a tira da roleta. Na mesma migração do mapeamento de cargos, os **3 negócios e a conversa** em que ela é responsável passam para o **Matheus** (Dono). As 2 mensagens enviadas ficam como histórico |
+| Contas inativas (6) | inativas | sem cargo | |
+
+**Lojas da JM:**
+- Cadastradas: Mogi Guaçu (matriz, id 3) e Jaguariúna (id 6). As 130 vendas da JM estão numa das duas, nenhuma sem loja.
+- **Campinas** está **em construção** e ainda não é cadastrada (decidido em 24/11). Nada a fazer agora. Quando abrir, entra como loja nova pela tela de lojas, sem usuários até a equipe existir. Nenhuma etapa deste roteiro depende dela.
+
+**Papel de plataforma (Lucas):**
+- A conta do Lucas é **superadmin do Nexus** e **não aparece** na lista de cargos nem na Equipe de nenhuma empresa.
+- Entra na empresa só pela impersonação, que já existe (`get_empresa_id()` com prazo).
+- **Todo acesso a dados de uma empresa é auditado.** O começo e o fim da impersonação vão para `superadmin_logs`, e cada escrita durante ela vai para `auditoria_eventos.impersonado_por`. O dono da empresa vê esses acessos na tela de Auditoria (filtro "acessos da plataforma").
 
 ### Empresa ativa (corrige o achado da auditoria)
 
@@ -264,6 +305,81 @@ São usadas nas políticas de **leitura** (ex.: ver venda de outro) e dentro de 
 
 - `vendas_alertas` (aceite de troca acima da referência) continua até a Fase 2. Depois é absorvida pela auditoria (`acao = 'troca_acima_referencia'`).
 - Tela **Auditoria**: filtro por pessoa, entidade, ação e período, e o "antes → depois" lado a lado.
+- **Histórico de preço** (D11): a mudança de preço da variante, da unidade e a propagação são auditadas aqui (`entidade = 'variante'|'unidade'`, `acao = 'preco'`, `origem` manual, herança, precificação, CSV ou migração). Não há tabela própria de histórico.
+- **Plataforma:** o começo e o fim da impersonação vão para `superadmin_logs`, como hoje. **Toda escrita** feita durante a impersonação vai para `auditoria_eventos` com `impersonado_por`. Hoje o que o superadmin faz dentro da empresa não é registrado.
+
+### B.1 Custo e margem só com permissão, barrados no banco (etapa 1.1, D9)
+
+**Situação hoje (levantamento de 24/11):** nenhuma tabela de custo tem filtro de papel.
+- As políticas olham só empresa e loja.
+- `authenticated` tem SELECT em `estoque_unidades`, `vendas_vendas` (com `valor_custo` e a coluna gerada `lucro`), `compras_pedidos` e `itens`.
+- Fora Relatórios e Financeiro (só dono/admin), **nenhuma tela que mostra custo confere o papel**. O `verFinanceiro` só vale no assistente e no link do menu.
+
+| # | Onde o custo aparece ou vai ao navegador hoje | Quem vê hoje | Depois da 1.1 |
+|---|---|---|---|
+| 1 | /estoque: `select *` das unidades; coluna Custo; entrada com custo, reparo, custo total, margem e lote | todos | coluna e campos só com `estoque.ver_custo`. Sem a permissão, a entrada é permitida e a unidade fica com **custo pendente** (regras abaixo) |
+| 2 | `unidade-modal`: custo, reparo e margem (fórmula diferente da do /estoque) | todos | só com a permissão; uma fórmula de margem só, em `lib` |
+| 3 | /catalogo: "Custo total" | todos | só com a permissão |
+| 4 | PDV: unidades e reservas com `preco_custo`; o navegador calcula lucro (não exibido) e **grava `valor_custo` no insert** | todos | o navegador não recebe custo. O custo da venda passa a ser copiado **no banco**, por gatilho `SECURITY DEFINER` no insert, do custo da unidade naquele instante (congelado) |
+| 5 | PDV: vendas recentes e encomendas com `valor_custo`/`lucro` no prop | todos | fora do prop |
+| 6 | Encomendas abertas: editar custo; aviso "lucro 100%" | todos | editar custo só com a permissão, por RPC auditada |
+| 7 | Histórico: lucro por linha, card "Lucro bruto", CSV com lucro (sem conferir `exportar`) | vendedor vê o das próprias vendas | só com a permissão; CSV confere `core.exportar` |
+| 8 | Painel (dashboard): card "Lucro bruto / margem" | vendedor vê o das próprias vendas | só com a permissão |
+| 9 | Relatórios: lucro, CSV de vendas e CSV de estoque com custo | dono/admin | dono/admin **e** a permissão |
+| 10 | Compras: `valor_total` por pedido e "investido" | todos | só com a permissão |
+| 11 | Avaliações de veículo: valor ofertado (módulo em preparação) | todos | o valor ofertado é **proposta ao cliente** e fica visível ao vendedor durante a negociação (decidido em 24/11) |
+| 12 | Troca de celular: `na_troca`, `valor_final`, "margem para a loja" no PDV | todos | o valor oferecido na troca fica **visível ao vendedor durante a negociação** (decidido em 24/11). O texto "margem para a loja" só aparece com a permissão. Protegido é o **custo da unidade** depois que ela entra, nas telas de estoque, venda e relatórios |
+| 13 | Configurações → Usuários: `vendas_comissoes` | dono/admin | segue `comissao.ver_todas` |
+| 14 | Assistente: lucro e margem só com `verFinanceiro` | papel | passa a `estoque.ver_custo` |
+| 15 | Documentos (termo de garantia, contrato do PDV): `{{trocas}}` com o custo da unidade de troca | todos | lê o valor pago na troca (`vendas_pagamentos`), não o custo (C2 do roteiro) |
+| 16 | Orçamento por link: grava custo a partir da unidade | servidor | custo congelado no orçamento (C1 do roteiro) |
+| 17 | Espelho `itens.custo` (ninguém lê, mas é legível por todos) | todos | o espelho deixa de copiar custo |
+
+**Mecanismo escolhido: tabelas-satélite de custo, 1:1, com RLS pela permissão.**
+
+| Tabela | Conteúdo | Leitura |
+|---|---|---|
+| `estoque_unidades_custos` | `unidade_id` (PK), `empresa_id`, `filial_id`, `preco_custo`, `custo_reparo` | `empresa_id = get_empresa_id()` **e** loja visível **e** `tem_permissao('estoque.ver_custo')` |
+| `vendas_vendas_custos` (legado, até a 1.4) | `venda_id` (PK), `empresa_id`, `filial_id`, `valor_custo` | idem |
+| `vendas_itens_custos` (1.4) | `venda_item_id` (PK), `custo_unit`, `taxa_lojista_rateada` | idem |
+| `compras_pedidos_custos` | `pedido_id` (PK), `valor_total` | idem |
+| `orcamentos_itens_custos` (1.4) | custo por item do orçamento | idem |
+
+- **Escrita:** só por RPC ou gatilho `SECURITY DEFINER`; sem grant de escrita para `authenticated`.
+- O lucro deixa de ser coluna gerada na venda. É calculado pela função `venda_resultado(...)`, que só devolve com a permissão.
+
+**Por que não as alternativas:**
+- **RLS** filtra **linhas**, não colunas: a linha da unidade tem de ser legível pelo vendedor (ele vende a peça), então a RLS não esconde o custo dela.
+- **Privilégio por coluna** (`revoke select (preco_custo)`) vale por **papel do Postgres**. Todo usuário logado é o mesmo `authenticated`, então o Dono também perderia a leitura, e toda leitura legítima teria de passar por RPC com chave de serviço. Isso esconde de todos, não "só de quem não pode".
+- **View com `CASE WHEN tem_permissao()`** exige revogar a tabela base, senão o cliente lê direto dela. Aí a view tem de ser `SECURITY DEFINER`, o que contraria a regra do projeto: todas as 45 views são `security_invoker`, e há um check para isso.
+- **A tabela-satélite** usa o mecanismo que o projeto já confia (RLS por linha). Ela funciona com o *embed* do PostgREST: para quem não tem a permissão, a junção volta nula, sem erro. E é auditável: a escrita passa só por RPC.
+
+**Custo pendente (decidido em 24/11):**
+- **Entrada sem a permissão:** quem não tem `estoque.ver_custo` pode dar entrada. A unidade nasce com a linha em `estoque_unidades_custos` e `preco_custo` **nulo** (`custo_pendente = true`).
+- **Troca:** o custo é preenchido **automaticamente** com o valor oferecido ao cliente, na mesma transação que recebe o aparelho (PDV, encomenda, orçamento por link, avaliação aceita). A troca nunca fica com custo pendente.
+- **Lista "Unidades com custo pendente":** só para quem tem `estoque.ver_custo`, por loja. Mostra também as já vendidas que estão esperando o custo. Um contador fica no menu do estoque.
+- **Unidade vendida com custo pendente:**
+  - a venda é congelada com o custo do item **nulo**;
+  - os relatórios mostram "margem desconhecida", nunca 100%;
+  - quando alguém informa o custo da unidade, a RPC `estoque_custo_informar` grava o custo na unidade **e**, **uma única vez**, o custo congelado da venda (`vendas_vendas_custos` hoje; `vendas_itens_custos` no v2), marcando `custo_preenchido_em/por`;
+  - grava as duas mudanças em `auditoria_eventos` (`acao = 'custo_preenchido_pos_venda'`).
+- **Nenhuma outra alteração de custo atinge venda concluída.** Mudar o custo de uma unidade com o custo da venda já preenchido (ou que nunca esteve pendente) altera só a unidade. A RPC recusa a escrita no satélite da venda quando `custo_preenchido_em` não é nulo, e o gatilho de proteção barra qualquer outro caminho.
+- **Aceite:** prova SQL com quatro casos:
+  - entrada sem permissão;
+  - troca com custo automático;
+  - venda com custo pendente preenchida uma vez;
+  - segunda alteração do custo sem efeito na venda.
+
+**Item futuro (registrado em 24/11, sem etapa):** limite de **valor de troca** com aprovação, configurável por empresa. Acima do limite (por modelo, percentual da referência ou valor), o vendedor pede aprovação, pelo mesmo fluxo do §F. Hoje existe só o aceite de troca acima da referência, em `vendas_alertas`.
+
+**Migração (1.1):**
+- cópia `preco_custo`/`custo_reparo` → satélite, `valor_custo` → satélite;
+- prova de somas iguais por empresa;
+- remoção das colunas antigas no **mesmo deploy** do app (as 17 linhas da tabela acima). Nenhum valor muda.
+
+**Teste de aceite:** um usuário **Vendedor** e um **Consulta** percorrem todas as rotas e telas da tabela, e o teste procura `custo`, `preco_custo`, `valor_custo`, `lucro` e `margem` em toda resposta JSON e em todo prop serializado. Tem de dar zero ocorrências.
+
+**Corrige de passagem:** `/api/permissoes` hoje **não grava** `verVendasOutros` (a chave é descartada ao salvar). A tela inteira é substituída pela de Cargos.
 
 ---
 
@@ -322,11 +438,13 @@ A etapa logística da encomenda (`aguardando_pedido`, `pedido_feito`, `chegou`) 
 | Tabela | Colunas principais |
 |---|---|
 | `vendas` (cabeçalho, nova) | `id`, `empresa_id`, `filial_id`, `numero` (sequência por loja), `status` (CHECK com os estados acima), `modalidade` (`entrega_agora`/`encomenda`), `encomenda_etapa`, `previsao_entrega`, `cliente_id`, `vendedor_id`, `operador_id` (quem montou), `recebido_por`, `caixa_sessao_id`, `subtotal`, `desconto_total`, `desconto_aprovacao_id`, `acrescimo`, `total`, `troco`, `concluida_em/por/via`, `entregue_em/por`, `origem` (`pdv`, `orcamento`, `pre_venda`, `legado`), `origem_id`, `negocio_id`, `chave_idempotencia uuid unique`, `pendencia_legado numeric` (§M), `observacao`, `criado_em` |
-| `vendas_itens` (nova) | `venda_id`, `produto_id`, `unidade_id`, `serial` (cópia do IMEI/série no momento), `descricao`, `quantidade`, `preco_tabela`, `preco_unit`, `desconto_valor`, `desconto_motivo`, `total`, `custo_unit` (cópia), `status` (`reservado`, `entregue`, `devolvido`, `cancelado`), `devolvido_qtd`, `observacao` |
+| `vendas_itens` (nova) | `venda_id`, `produto_id`, **`variante_id`** (obrigatória em item de catálogo; nula só em item livre sem produto, como o acessório digitado de hoje), `unidade_id` (quando há serial ou lote), `serial` (cópia do IMEI/série no momento), `descricao` (cópia: produto + opção + condição), `quantidade`, `preco_tabela` (**preço efetivo** da unidade ou da variante no instante da venda), `preco_origem` (`variante`, `proprio`, `livre`), `preco_unit`, `desconto_valor`, `desconto_motivo`, `total`, `status` (`reservado`, `entregue`, `devolvido`, `cancelado`), `devolvido_qtd`, `observacao` |
+| `vendas_itens_custos` (nova, §B.1) | `venda_item_id` (PK), `empresa_id`, `custo_unit` (cópia do custo da unidade no instante da venda; na encomenda, o custo do pedido de compra quando chegar), `taxa_lojista_rateada`. Leitura só com `estoque.ver_custo` |
 | `vendas_participantes` (nova) | `venda_id`, `usuario_id`, `papel` (`vendedor`, `vendedor_auxiliar`, `operador`), `fracao`. Padrão: vendedor 100%. É a base da divisão de comissão (§H) |
 | `vendas_pagamentos` (evolui) | `venda_id` → **`vendas`**, `forma_id`, `momento` (`sinal`, `entrega`, `balcao`), `valor` (o que abate a venda), `valor_recebido` (dinheiro), `troco`, `parcelas`, `bandeira`, `nsu`, `autorizacao`, `maquininha_id`, `taxa_lojista_valor`, `taxa_cliente_valor`, `status` (`confirmado`, `aguardando`, `estornado`), `confirmado_por`, `caixa_sessao_id`, `troca_unidade_id`, `credito_id`, `cobranca_id`, `natureza` (`normal`, `retroativo_reconciliacao`, `legado`), `recebido_por`, `criado_em` |
-| `estoque_unidades` | + `reservado_venda_id`, `reservado_ate`. O status `reservado` já existe |
-| `estoque_produtos` | + `serializado bool` (padrão vindo da categoria: `estoque_categorias.serializado`), `sku`, `ean text[]` |
+| `estoque_unidades` | + `reservado_venda_id`, `reservado_ate`. O status `reservado` já existe. A etapa da variante acrescenta `variante_id` e `preco_origem`. O custo sai para `estoque_unidades_custos` na 1.1 (§B.1) |
+| `estoque_produtos` | + `serializado bool` (padrão vindo da categoria: `estoque_categorias.serializado`). **Sem `sku`/`ean`:** os dois ficam na variante (D10) |
+| `estoque_variantes` (etapa da variante) | produto + `opcao` + `condicao` (`novo`/`usado`), `preco` de referência, **`sku`, `ean text[]`**, `ativo`, `travado`. Modelo completo em [unificacao-preco-proposta.md §3.2](unificacao-preco-proposta.md), com os ajustes do roteiro: sem `custo_referencia` e sem tabela própria de histórico |
 | `estoque_movimentacoes` | Passa a receber toda entrada, venda, troca, devolução e ajuste (`origem_tipo`, `origem_id`, `usuario_id`) |
 
 ### Regras que o v2 traz e onde ficam
@@ -343,6 +461,10 @@ A etapa logística da encomenda (`aguardando_pedido`, `pedido_feito`, `chegou`) 
 | Venda exige caixa aberto | Política `caixa.exige_caixa_aberto` (§D) |
 | Preço abaixo do catálogo / do custo | Aviso de catálogo: reaproveita `lib/valor-abaixo-do-catalogo.ts`. Abaixo do custo exige `pdv.vender_abaixo_custo` ou aprovação (§F) |
 | Duplo clique / rede caindo | `chave_idempotencia`: a segunda chamada devolve a venda já criada |
+| **Preço e custo congelados** (24/11) | Invariante. Item de venda, de orçamento e de encomenda guarda o preço e o custo do momento. Nada é recalculado depois a partir da unidade, da variante ou do produto. Mudar o preço da variante nunca altera venda, orçamento ou encomenda já criados. **Única exceção**, uma vez só e auditada: o custo **pendente** de uma unidade vendida é copiado para a venda quando for informado (§B.1). As exceções de hoje e a correção de cada uma estão no [roteiro, §4.3](roteiro-reconstrucao.md) |
+| **Preço relido no servidor** | Invariante. `venda_fechar` relê o preço efetivo de cada unidade ou variante. Se diferir do que a tela mostrou, devolve `preco_mudou` com o antes e o depois, e a tela pede confirmação. Até o v2 existir, vale a regra provisória do roteiro (§4.4) |
+| **Encomenda exige a variante** (24/11) | Invariante. O item da encomenda escolhe produto + opção + condição. Quem tem `estoque.preco_variante` cria a variante que falta na própria tela, com o preço. O preço da encomenda é o digitado (congelado), sugerido pela variante |
+| Preço efetivo | Preço da unidade quando há peça; da variante quando não há (encomenda). A unidade guarda o efetivo e marca `preco_origem` (`variante`/`proprio`). A variante propaga às **disponíveis** que herdam, na mesma transação; reservadas não mudam (D5) |
 
 **A troca é extensão do módulo Celulares.**
 - A RPC do núcleo aceita uma troca **genérica**: `{produto_id?, descricao, serial?, atributos jsonb, valor, cotacao_id?}`.
@@ -375,7 +497,7 @@ A etapa logística da encomenda (`aguardando_pedido`, `pedido_feito`, `chegou`) 
 - **Histórico:**
   - lista e 2ª via;
   - "Entregar" abre o mesmo painel de pagamento (já é assim no hotfix);
-  - ações de pós-venda (§I).
+  - ações de devolução, troca e garantia (§I).
 
 ### O que muda
 
@@ -659,23 +781,39 @@ Não existe nada hoje. É tudo novo. Boleto e carnê registrado vêm por conecto
 - modo: **faixa atingida vale para todas as vendas do período**;
 - aparelhos: **iPhone, iPad, MacBook, Watch e AirPods** (a seleção de categorias é por regra);
 - venda com troca **conta** na quantidade da faixa;
-- base: **valor cheio do aparelho, sem abater a troca** (o percentual menor da venda com troca já compensa);
-- apuração no **mês calendário**; pagamento no **5º dia útil do mês seguinte** *[aguardando confirmação do Lucas]*. Apuração e pagamento são configurações separadas (`comissao_planos.periodo` e `comissao_planos.pagamento`), e o dia útil vem do calendário (§N).
+- base (**fechado em 24/11**): **valor da venda depois do desconto, sem abater a troca**. O percentual menor da venda com troca já compensa;
+- **AirPods contam como aparelho** (24/11);
+- **momento (24/11):** a venda só entra na comissão quando está **concluída e paga por inteiro** (saldo zero). O **mês de apuração é o da quitação**:
+  - encomenda com sinal conta no mês em que o saldo foi pago;
+  - fiado conta no mês da **última parcela**;
+  - venda à vista conta no mês da conclusão (conclusão e quitação são o mesmo instante, pela invariante I3);
+- apuração no **mês calendário**; pagamento no **5º dia útil do mês seguinte** (**confirmado em 24/11**). Apuração e pagamento são configurações separadas (`comissao_planos.periodo` e `comissao_planos.pagamento`). O dia útil vem do calendário (§N), configurável por empresa e loja.
+
+**O que muda no motor por causa do momento "quitada":**
+- `comissao_planos.momento` ganha o valor `quitada` (e fica o padrão do semeado).
+- A data que ordena e põe a venda no período passa a ser `vendas.quitada_em`. A RPC que zera o saldo grava a coluna nova:
+  - `venda_fechar` à vista;
+  - `encomenda_entregar`;
+  - `crediario_receber`, na última parcela.
+- **Venda "em aberto"** = concluída e ainda não quitada (só existe com crediário). Aparece no painel do vendedor como "em aberto", fora da comissão.
+- Pagamento retroativo da reconciliação (§M) **também quita**: a venda entra no mês em que o dinheiro foi recebido de fato (`vendas_pagamentos.recebido_em`), não no mês do lançamento. Se esse mês já estiver fechado, entra como ajuste no período aberto, pela mesma regra do estorno.
 
 ```jsonc
 // comissao_planos
-{ "nome": "Vendedores JM", "periodo": "mes", "dia_inicio": 1, "momento": "concluida",
-  "pagamento": { "regra": "dia_util", "n": 5, "mes": "seguinte" } }   // [aguardando confirmação]
+{ "nome": "Vendedores JM", "periodo": "mes", "dia_inicio": 1, "momento": "quitada",
+  "pagamento": { "regra": "dia_util", "n": 5, "mes": "seguinte" },   // confirmado em 24/11
+  "estorno": "proxima_apuracao" }   // padrão sugerido; decisão da Fase 2 (D-C4)
 
 // comissao_regras[0] + faixas + variantes
 { "nome": "Aparelhos novos", "prioridade": 10,
   // categorias gravadas por id; os nomes são os do cadastro da JM, sem o emoji.
   // "AirPods" ainda NÃO existe como categoria na JM (hoje estão em Acessórios): ver decisão D-C2.
+  // condição lida da VARIANTE vendida (novo | usado); "seminovo" é só o rótulo exibido.
   "filtro": { "categorias": ["Iphone / Smartphone", "Ipad / Tablet", "MacBook / Notebook", "Apple Watch / Smartwatch", "AirPods"],
               "condicoes": ["novo"] },
   "metrica_faixa": "quantidade", "contagem": "regra", "modo_faixa": "atingida",
   "troca_conta_na_faixa": true,
-  "base": "liquido_desconto",          // sem abater a troca; antes ou depois do desconto: decisão D-C1
+  "base": "liquido_desconto",          // depois do desconto, sem abater a troca (fechado em 24/11)
   "tipo_valor": "percentual", "abaixo_primeira_faixa": "zero",
   "divisao": [{ "papel": "vendedor", "fracao": 1 }],
   "faixas": [
@@ -685,7 +823,7 @@ Não existe nada hoje. É tudo novo. Boleto e carnê registrado vêm por conecto
 
 // comissao_regras[1]
 { "nome": "Seminovos", "prioridade": 20,
-  "filtro": { "categorias": ["(as mesmas 5)"], "condicoes": ["seminovo", "usado"] },
+  "filtro": { "categorias": ["(as mesmas 5)"], "condicoes": ["usado"] },   // a variante tem só novo | usado (D3)
   "metrica_faixa": "quantidade", "contagem": "regra", "modo_faixa": "atingida",
   "troca_conta_na_faixa": true, "base": "liquido_desconto", "tipo_valor": "percentual",
   "abaixo_primeira_faixa": "zero",
@@ -699,7 +837,7 @@ Acessórios (fora os AirPods), perfumes e "outros" não casam com nenhuma regra,
 
 ### Exemplo calculado da JM = teste automático T-H1 (Fase 2)
 
-Vendedor fictício, novembro de 2026, sem desconto em nenhuma venda (para a base não depender da decisão D-C1):
+Vendedor fictício, novembro de 2026, todas as vendas quitadas em novembro e sem desconto. Com a base já fechada, desconto entra no caso T-H1h:
 
 | Novos (27 unidades) | Sem troca | Com troca |
 |---|---|---|
@@ -729,6 +867,10 @@ Mais **12 seminovos** (R$ 30.000) e **1 capa** (Acessórios, R$ 200).
 | T-H1e · estorno sem mudar de faixa | em dezembro, devolução de um novo com troca de R$ 9.000 vendido em novembro (fechado) | novembro recalculado com 26, ainda 21–30 → ajuste **−R$ 54,00** lançado em dezembro |
 | T-H1f · estorno que derruba a faixa | vendedor com 21 novos sem troca a R$ 6.000 (R$ 126.000 × 0,80% = R$ 1.008,00), novembro fechado; 1 devolvido em dezembro | novembro recalculado: 20 × R$ 6.000 × 0,65% = R$ 780,00 → ajuste **−R$ 228,00** em dezembro |
 | T-H1g · feriado municipal | o mesmo mês com 03/12 cadastrado como feriado da cidade da loja | pagamento **08/12/2026** |
+| T-H1h · desconto | iPhone de tabela R$ 8.000 vendido com R$ 500 de desconto e troca de R$ 3.000, faixa 21–30 | base **R$ 7.500** (depois do desconto, sem abater a troca) × 0,60% = **R$ 45,00** |
+| T-H1i · encomenda quitada no mês seguinte | encomenda de R$ 6.000 com sinal de R$ 1.000 em 28/11 e saldo pago em 03/12 | conta em **dezembro** (mês da quitação), não em novembro |
+| T-H1j · fiado | venda de R$ 4.000 em 3 parcelas: 10/11, 10/12, 10/01 | entra em **janeiro**; até lá aparece como "em aberto" no painel do vendedor |
+| T-H1k · retroativo da reconciliação | encomenda entregue em 15/10 com saldo lançado retroativo em 26/11, com recebimento informado em 15/10 | conta em **outubro**; se outubro estiver fechado, vira ajuste no período aberto |
 
 ### Teste do motor nos dois modos = T-H2 (genérico, outras empresas)
 
@@ -761,7 +903,15 @@ Asserções extras do T-H2:
 - **Configurações → Comissão:**
   - planos e regras (filtros, faixas, variantes) com **simulador**: "se eu vender X, quanto ganho";
   - pré-visualização das vendas do mês passado com a regra nova antes de salvar.
-- **Minha comissão** (vendedor): quanto já ganhou, faixa atual, quanto falta para a próxima e as vendas que contaram. Também aparece como barra no PDV.
+- **Painel do vendedor** (Fase 2, decidido em 24/11), visível a quem tem `comissao.ver_propria`:
+  - meta do mês (de Metas);
+  - **efetivado**: vendas quitadas no período;
+  - **em aberto**: concluídas e não quitadas (fiado, encomenda com saldo), em lista separada;
+  - faixa atual e quantas unidades faltam para a próxima;
+  - comissão prevista;
+  - as vendas que contaram.
+
+  **Nunca mostra custo nem margem**, mesmo quando a regra usa a base `margem`. Nesse caso mostra só a comissão. Também aparece como barra no PDV.
 - **Comissões** (gestor):
   - prévia por vendedor;
   - "Fechar período" com a conferência;
@@ -779,7 +929,9 @@ Asserções extras do T-H2:
 
 ---
 
-## I. Pós-venda
+## I. Devolução, troca e garantia
+
+> **Revisão 3:** este bloco se chamava "Pós-venda". O nome passa ao **módulo Pós-venda** (régua de acompanhamento, NPS e chamados, já em produção e "em preparação"), que o PDV **usa e não reespecifica**. Aqui fica só o que mexe em dinheiro, estoque e garantia da venda: cancelamento, devolução, troca de produto, vale e garantia. A ligação entre os dois está no §L.2.
 
 ### Modelo de dados
 
@@ -807,7 +959,7 @@ Asserções extras do T-H2:
 - **`venda_devolver(p_venda, p_itens, p_tipo, p_motivo)`:** devolução parcial ou total, com o destino de cada peça e o reembolso (formas acima) **ou** vale.
 - **Troca de produto:** é uma devolução tipo `troca` que gera o vale e já abre o PDV com o vale aplicado à venda nova. São duas RPCs, mas um fluxo só na tela. Se a venda nova não sair, o vale fica com o cliente.
 - **Vale como forma de pagamento:** forma tipo `vale`. `venda_fechar` debita o saldo (`vendas_creditos_movimentos`). Validade: política `credito.validade_dias` (padrão 90).
-- **Garantia:** nasce na conclusão, por item serializado. O prazo vem do produto (`garantia_dias`), da categoria ou da política por condição (`garantia.dias_seminovo`). O termo atual (`vendas_termos`) se liga à garantia.
+- **Garantia:** nasce na conclusão, por item serializado. O prazo vem do produto (`garantia_dias`), da categoria ou da política por condição (`garantia.dias_usado`; condição neutra, D3). O termo atual (`vendas_termos`) se liga à garantia.
 - **Rastreio por serial:** `rastreio_serial(p_serial)` devolve a linha do tempo inteira:
   - entrada (compra ou troca, de quem e por quanto);
   - transferências;
@@ -839,7 +991,7 @@ Asserções extras do T-H2:
 
 | Tabela | Colunas |
 |---|---|
-| `impressao_modelos` (PDV) | `id`, `empresa_id`, `filial_id` (nulo = todas), `tipo` (`cupom_venda`, `recibo_sinal`, `fechamento_caixa`, `carne`, `etiqueta_seminovo`, `etiqueta_produto`), `formato` (`80mm`, `58mm`, `A4`, `etiqueta` + `largura_mm`/`altura_mm`), `blocos jsonb`, `padrao bool`, `ativo` |
+| `impressao_modelos` (PDV) | `id`, `empresa_id`, `filial_id` (nulo = todas), `tipo` (`cupom_venda`, `recibo_sinal`, `fechamento_caixa`, `carne`, `etiqueta_unidade`, `etiqueta_produto`). Era `etiqueta_seminovo`: o nome do tipo fica neutro, e o layout "seminovo" é um modelo semeado pelo módulo Celulares, `formato` (`80mm`, `58mm`, `A4`, `etiqueta` + `largura_mm`/`altura_mm`), `blocos jsonb`, `padrao bool`, `ativo` |
 
 O layout é uma **lista de blocos**, não HTML livre (evita injeção e mantém os textos obrigatórios). Cada bloco é ligado ou desligado, reordenado e tem textos editáveis:
 - logo;
@@ -878,14 +1030,17 @@ O texto "Não é documento fiscal" é fixo no cupom não fiscal.
 2. O canvas é convertido para 1 bit e enviado. O carregamento é dinâmico, só na tela de etiquetas.
 3. Parear exige um clique do usuário e HTTPS (o Nexus já é). A permissão fica salva por origem no navegador.
 
-**Etiqueta de seminovo (primeira):**
-- modelo e armazenamento;
+**Etiqueta de seminovo (primeira, layout do módulo Celulares sobre o tipo `etiqueta_unidade`):**
+- produto e opção da **variante** (ex.: "iPhone 13 · 128GB");
 - IMEI, em texto e código de barras Code 128;
 - saúde da bateria;
-- preço;
+- preço **efetivo** da unidade (o próprio, se houver; senão o herdado da variante). Mudou o preço depois de impressa, a tela de etiquetas lista as "etiquetas com preço desatualizado" para reimprimir;
 - QR para a ficha do aparelho. **Decidido (19/11):** por padrão abre a **tela interna** (exige login). A **página pública do aparelho** é opção da empresa (política `etiqueta.qr_destino`): mostra modelo, bateria, garantia e preço, **nunca** dado de cliente, por um token próprio da unidade.
 
-**Impressora da JM: Niimbot B2 Pro** (300 dpi, 2", preto e vermelho). O suporte da biblioteca é verificado numa prova de conceito isolada antes da Fase 2 ([spike-niimbot.md](spike-niimbot.md), branch `spike/niimbot-b2pro`).
+**Impressora da JM: Niimbot B2 Pro** (300 dpi, 2", preto e vermelho). O suporte da biblioteca é verificado numa prova de conceito isolada antes da Fase 2 ([spike-niimbot.md](spike-niimbot.md), branch `spike/niimbot-b2pro`). **Situação em 24/11:**
+- a página de teste compila (`tsc`, check e build limpos), com a biblioteca 0.49.1;
+- **ainda não foi testada com a impressora real**;
+- a branch não vai para a `main`.
 
 Os campos vêm de `estoque_unidades` e dos atributos do módulo Celulares. O layout é um `impressao_modelos` do tipo `etiqueta_seminovo`, editável.
 
@@ -973,13 +1128,41 @@ Implementações em `lib/fiscal/provedores/<nome>.ts`, como `lib/payments/provid
    - O PDV registra o provedor `indicadoresDeVenda` (§0.4): a função `vendas_indicadores_cliente(p_contatos bigint[])` devolve a quantidade, o total líquido de devoluções, a última compra e o ticket, a partir de `vendas` concluídas.
    - Com o PDV desligado, as colunas somem em vez de mostrar zero.
    - Com o volume atual, uma consulta na hora com índice `(cliente_id, status)` basta. Se crescer, vira uma tabela-resumo atualizada pelas RPCs.
-2. **Evento `venda_concluida` no Automatize** (`lib/automacoes.ts`, o motor de gatilhos que já existe). A RPC grava o evento (cliente, valor, itens, categorias, vendedor, loja). As ações são configuráveis:
-   - ganhar o negócio aberto do cliente (com o valor), quando a política `crm.venda_ganha_negocio` estiver ligada;
-   - criar **tarefas de pós-venda** a partir de modelos da empresa: `{ dias: 3, titulo: "Ligar para saber se está tudo certo com o aparelho", responsavel: "vendedor", filtro: { categorias: [...] } }`;
-   - mandar mensagem por modelo (agradecimento, avaliação);
-   - colocar etiqueta.
+2. **Evento `venda_concluida` e o módulo Pós-venda** (revisto em 24/11).
 
-   Também há eventos `venda_cancelada` e `venda_devolvida`.
+   **Situação encontrada:**
+   - O módulo Pós-venda está **em produção no banco**: todas as migrações `posvenda_*`, inclusive `posvenda_ativar_existentes`. O app está na `main`, com o módulo em preparação e não ligado na JM.
+   - O gatilho dele **não é a venda**: é o negócio virar **ganho** (trigger `negocios_posvenda`, que chama `posvenda_iniciar_jornadas`).
+   - Ele lê de `negocios.dados.venda` (`data`, `categoria_id`, `condicao` novo/usado, `valor`), que hoje vem do modal de ganho.
+   - Não lê nem grava nenhuma tabela de venda, estoque ou preço; só lê `estoque_categorias` (ids).
+   - A trava `negocios_venda_exigida` (0900) recusa ganho sem `dados.venda`.
+
+   **Decisão de integração** (um evento só, sem segunda régua):
+   1. **O evento é emitido dentro das funções atômicas de conclusão**, na mesma transação:
+      - no hotfix, `concluir_venda_pdv` e `concluir_encomenda`;
+      - no v2, `venda_fechar` quando conclui, `venda_receber` e `encomenda_entregar`.
+
+      A comissão usa o mesmo evento: lê `quitada_em`, que coincide com `concluida_em` em toda venda, exceto no fiado.
+   2. A conclusão chama `venda_registrar_no_negocio(p_venda)`, `SECURITY DEFINER`, do núcleo de vendas:
+      - pega `vendas.negocio_id`;
+      - se não houver, pega o negócio aberto do cliente;
+      - se não houver nenhum, **cria um negócio já ganho** no funil padrão.
+
+      Grava `status = ganho`, `ganho_em = concluida_em` e `dados.venda` montado da própria venda: data, `categoria_id` e `condicao` do **item principal** (o de maior valor; ver decisão D-P1), e `valor = total`. Com `dados.venda` preenchido, a trava 0900 passa sem marca de exceção. O trigger `negocios_posvenda` faz o resto, **sem nenhuma mudança no módulo Pós-venda**.
+   3. Venda **sem cliente** não gera negócio nem jornada (não há com quem falar).
+   4. Cancelamento e devolução total chamam o encerramento que o módulo já tem (`posvenda_encerrar_jornadas`, motivo `venda_cancelada`) ao reabrir ou perder o negócio.
+   5. **Removido deste documento:**
+      - "criar tarefas de pós-venda a partir de modelos";
+      - "mandar mensagem por modelo (agradecimento, avaliação)".
+
+      Os dois são a régua do módulo Pós-venda. O Automatize continua recebendo `venda_concluida`, `venda_cancelada` e `venda_devolvida` só para ações genéricas: etiqueta, campo, aviso.
+   6. Âncora "entrega": o módulo já tem a coluna `posvenda_jornadas.entrega_em`, sem uso. O PDV v2 passa a gravá-la com `vendas.entregue_em`.
+
+   **Conflitos que isso resolve:**
+   - régua duplicada;
+   - data digitada × data da conclusão;
+   - vendedor do negócio × vendedor da venda: o negócio criado ou ganho recebe `responsavel_id = vendas.vendedor_id`, com o cuidado de não trocar o responsável de um negócio já existente sem a política `crm.venda_troca_responsavel`;
+   - condição `seminovo`: o PDV grava só `novo`/`usado`.
 3. **Negócio na venda:** se o cliente tem negócio aberto, o PDV sugere ligar (`vendas.negocio_id`). A reserva de lead continua nascendo no negócio.
 4. **ZapIntel:** o trigger `tg_zapintel_vendas_ao_vivo`, a função `zapintel_posvenda` e a ponte venda↔conversa (`lib/zapintel/ponte.ts`) são **reapontados** para `vendas`/`vendas_itens` na mesma migração da Fase 1. Isso está na lista de impacto (§M).
 5. **Painel do cliente no carrinho** (Fase 3): negócio, etiquetas, ficha do ZapIntel, últimas compras, crediário e vale.
@@ -993,8 +1176,10 @@ Implementações em `lib/fiscal/provedores/<nome>.ts`, como `lib/payments/provid
 ### Passo a passo
 
 1. **Pré-requisitos:**
-   - hotfix `fix/entregar-sem-pagamento` em produção;
+   - hotfix `fix/entregar-sem-pagamento` em produção, com os ajustes H1–H3 do roteiro;
+   - etapa 1.1 (custo já nas tabelas-satélite) e variante (1.2) em produção;
    - a loja já começou a conferir o CSV da reconciliação.
+   - Os itens migrados de `vendas_vendas` ficam com `variante_id` **nulo**: nenhum valor de venda antiga é deduzido nem alterado. O custo vem de `vendas_vendas_custos` para `vendas_itens_custos`, com a mesma prova de somas.
 2. **Fase 1, migração de dados** (uma transação, com a prova de totais abaixo):
    - cada `grupo_pdv` (ou venda sem grupo) de `vendas_vendas` vira **uma** `vendas` com os seus `vendas_itens`. O número da venda é sequencial por loja, na ordem de criação;
    - os pagamentos sobem para o cabeçalho, com `natureza = 'legado'` e `caixa_sessao_id` nulo (não havia caixa);
@@ -1078,7 +1263,7 @@ gantt
     C Venda única + migração M                       :a3, 3, 4
     D Caixa                                          :a4, 6, 2
     section Fase 2 Operação
-    I Pós-venda                                      :b1, 8, 2
+    I Devolução, troca e garantia                    :b1, 8, 2
     H Comissão                                       :b2, 9, 3
     F Desconto e aprovação                           :b3, 10, 2
     J Impressão (80mm + Niimbot)                     :b4, 11, 2
@@ -1092,6 +1277,8 @@ gantt
 (Unidades relativas de esforço, não semanas.)
 
 ### Fase 1 — Fundação · complexidade **G**
+
+> **Revisão 3:** a ordem oficial é a do [roteiro](roteiro-reconstrucao.md): E0 hotfix → E1.1 base (este item 1, mais o custo protegido do §B.1) → **E1.2 variante** → E1.3 meios de pagamento → E1.4 venda única + M → E1.5 caixa. A precificação corre em paralelo a partir da E1.2.
 
 **Entregas** (nesta ordem; cada uma sobe sozinha):
 1. **Base de segurança:**
@@ -1155,7 +1342,7 @@ gantt
 
 **Entregas** (ordem sugerida; cada uma sobe sozinha):
 0. **Calendário de dias úteis** (§N): feriados nacionais pré-carregados, estaduais e municipais da empresa, por loja.
-1. **Pós-venda** (I): cancelamento, devolução, troca, vale, garantia na venda, rastreio por serial. Vem primeiro porque a comissão precisa do estorno.
+1. **Devolução, troca e garantia** (I): cancelamento, devolução, troca, vale, garantia na venda, rastreio por serial. Vem primeiro porque a comissão precisa do estorno.
 2. **Comissão** (H): planos, regras, faixas, variantes, prévia, fechamento, ajuste em período fechado, remuneração total. A tabela da JM é validada contra o exemplo deste documento.
 3. **Desconto e aprovação** (F): regras, pedidos, canais (Nexus, WhatsApp, e-mail, PIN).
 4. **Impressão** (J): modelos por blocos, cupom 80 mm, etiqueta Niimbot (seminovo primeiro).
@@ -1247,6 +1434,27 @@ gantt
 | Comissão da JM: troca | Venda com troca **conta** na faixa | §H |
 | Comissão da JM: base | Valor cheio do aparelho, **sem abater a troca** | §H |
 | Comissão: apuração e pagamento | Mês calendário; pagamento e apuração são configurações separadas | §H, §N |
+
+### Tomadas em 24/11/2026
+
+| Tema | Decisão | Onde ficou |
+|---|---|---|
+| Ordem | hotfix → 1.1 (configuração, cargos, custo, auditoria, empresa ativa) → **variante** → restante do PDV v2. A precificação começa em paralelo quando a variante existir | [roteiro](roteiro-reconstrucao.md) |
+| Custo | Visível só com `estoque.ver_custo` (Dono e Admin na JM), **barrado no banco** na etapa 1.1 | §B.1 |
+| Cargos da JM | Matheus e Eduardo **Dono**; conta "JM Store" no cargo **Consulta** (só leitura, sem custo); conta de revisão da Meta desativada; o Lucas como **plataforma**, fora dos cargos, com acesso auditado | §B |
+| Variante | Produto + opção (nome pela categoria, valor composto permitido) + condição novo/usado; cor agregada; preço por empresa (exceção por loja prevista, não implementada); herança guardada no banco; reservadas não mudam; duas permissões de preço; criada sob demanda; SKU e código de barras na variante | §C, [unificacao-preco-proposta.md](unificacao-preco-proposta.md) |
+| Encomenda | Exige a variante, com criação rápida na própria tela para quem tem `estoque.preco_variante` | §C |
+| Preço congelado | Item de venda, orçamento e encomenda guarda preço e custo do momento | §C |
+| Histórico de preço | Na auditoria da 1.1 (`auditoria_eventos`), sem tabela própria | §B, §C |
+| Comissão da JM | Base depois do desconto e sem abater a troca; AirPods contam como aparelho; troca conta na faixa; entra na **quitação** (saldo zero); 5º dia útil confirmado | §H |
+| Painel do vendedor | Fase 2: meta, efetivado, em aberto, faixa, comissão prevista; sem custo nem margem | §H |
+| Pós-venda | O PDV **não** especifica pós-venda relacional: usa o módulo Pós-venda. O §I vira "Devolução, troca e garantia" | §I, §L |
+| Evento de conclusão | Emitido dentro das funções atômicas; ganha o negócio com `dados.venda` vindo da venda; o trigger do Pós-venda segue igual | §L.2 |
+| Hotfix | H1 (não sobrescrever `data_venda`), H2 (venda concluída sem UPDATE de valor) e H3 (editar só encomenda) entram no hotfix; quem aplica é a sessão do hotfix | [roteiro §1.1](roteiro-reconstrucao.md) |
+| Loja Campinas | Em construção, não cadastrada; nada a fazer até abrir | §B |
+| Valor da troca | Visível ao vendedor na negociação; protegido é o custo da unidade em estoque, venda e relatórios. Futuro: limite de troca com aprovação, por empresa | §B.1 |
+| Custo pendente | Entrada sem a permissão é permitida; troca preenche o custo com o valor oferecido; lista para quem vê custo; venda com custo pendente recebe o custo uma única vez, auditado | §B.1 |
+| Conta "Meta Reviewer" | Desativada na etapa 1.1; os 3 negócios e a conversa vão para o Matheus | §B |
 | Dias úteis | Calendário de feriados configurável (nacionais pré-carregados, estaduais e municipais por empresa e loja) | §N |
 | Impressora da JM | Niimbot **B2 Pro** (300 dpi, 2", preto e vermelho); prova de conceito antes da Fase 2 | §J, [spike-niimbot.md](spike-niimbot.md) |
 
@@ -1254,8 +1462,12 @@ gantt
 
 | # | Pergunta | Precisa até |
 |---|---|---|
-| D-C1 | Base da comissão quando há **desconto**: "valor cheio" é o preço de tabela (antes do desconto) ou o valor cobrado pelo aparelho (depois do desconto)? A troca não é abatida em nenhum dos casos | Fase 2 |
-| D-C2 | **AirPods** não existe como categoria na JM (hoje ficam em Acessórios). A JM cria a categoria "AirPods" e move os produtos (recomendado), ou a regra filtra por produto? | Fase 2 |
-| D-C3 | Pagamento da comissão no **5º dia útil do mês seguinte**: confirmar | Fase 2 |
+| ~~D-C1~~ | ~~Base com desconto~~ → **fechada em 24/11:** depois do desconto, sem abater a troca | — |
+| D-C2 | AirPods **contam como aparelho** (decidido em 24/11). Falta o *como*: a JM cria a categoria "AirPods" e move os produtos (recomendado), ou a regra filtra por produto? | Fase 2 |
+| ~~D-C3~~ | ~~5º dia útil~~ → **confirmado em 24/11** | — |
+| D-C4 | **Estorno** de venda comissionada devolvida: padrão sugerido "na apuração seguinte" (`comissao_planos.estorno = proxima_apuracao`), configurável | Fase 2 |
+| D-C5 | Pagamento **retroativo** da reconciliação: a venda conta no mês em que o dinheiro entrou de fato (recomendado, T-H1k) ou no mês do lançamento? | Fase 2 |
 | D-N1 | Para a comissão, **sábado** conta como dia útil? (padrão proposto: não, segunda a sexta) | Fase 2 |
+| D-P1 | Venda com vários itens e **uma** jornada de pós-venda: a categoria e a condição vêm do item de **maior valor** (recomendado) ou de cada item, numa jornada por item? | etapa 1.4 |
+| D-P2 | Venda no **fiado**: a jornada de pós-venda começa na conclusão, com o produto entregue (recomendado), e a comissão na quitação. Confirmar | etapa 1.4 |
 | — | Resultado da prova de conceito da B2 Pro na loja | Fase 2 |
