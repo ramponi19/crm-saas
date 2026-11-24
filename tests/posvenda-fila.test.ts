@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  decidirContato, descricaoDaCompra, textoDoCampo, diasDesdeAVenda, grupoDoDia, montarMensagem, ordenarFila, primeiroNome, rotuloDoPasso, textoDias,
+  decidirContato, descricaoDaCompra, ecoDoPasso, textoDoCampo, diasDesdeAVenda, grupoDoDia, montarMensagem, ordenarFila, primeiroNome, rotuloDoPasso, textoDias,
 } from '@/lib/posvenda/fila'
 import { linkWhatsApp } from '@/lib/whatsapp-link'
 
@@ -75,26 +75,44 @@ test('contato: conversa no WhatsApp da loja com a janela aberta → abre no Nexu
   assert.equal(c.aviso, null)
 })
 
-test('contato: API oficial com a janela de 24 h fechada (ou o cliente nunca escreveu) → modelo de Utilidade', () => {
-  const fechada = decidirContato({ conversaId: 42, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: '2026-11-23T14:59:00Z' }, '11987654321', MSG, AGORA)
-  assert.equal(fechada.modo, 'modelo')
-  assert.equal(fechada.href, '/comunicacao?c=42&modelo=posvenda&cat=UTILITY')
-  assert.match(fechada.aviso ?? '', /não tem modelo/)
-  // o modelo do passo e as categorias liberadas pela empresa (D8 revista) vão no endereço
+test('contato: janela fechada COM modelo no passo → modelo (categorias liberadas e variáveis no endereço)', () => {
   const comModelo = decidirContato({ conversaId: 42, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: null }, null, MSG, AGORA,
     { id: 12, categorias: ['UTILITY', 'MARKETING'], variaveis: ['Ana', 'iPhone 15 Pro'] })
+  assert.equal(comModelo.modo, 'modelo')
   assert.equal(comModelo.href, '/comunicacao?c=42&modelo=posvenda&cat=UTILITY,MARKETING&m=12&v1=Ana&v2=iPhone%2015%20Pro')
   assert.match(comModelo.aviso ?? '', /modelo do passo/)
-  assert.equal(decidirContato({ conversaId: 7, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: null }, null, MSG, AGORA).modo, 'modelo')
 })
 
-test('contato: sem conversa no WhatsApp da loja → wa.me com o aviso; sem telefone → sem botão', () => {
-  const ext = decidirContato(null, '11987654321', MSG, AGORA)
-  assert.equal(ext.modo, 'externo')
-  assert.ok(ext.href?.startsWith('https://wa.me/5511987654321?text='))
-  assert.match(ext.aviso ?? '', /não fica registrada/)
-  assert.equal(decidirContato({ conversaId: 9, canalTipo: 'instagram', oficial: false, ultimaRecebida: null }, '11987654321', MSG, AGORA).modo, 'externo')
-  assert.deepEqual(decidirContato(null, '', MSG, AGORA).modo, 'sem_numero')
+test('contato: janela fechada SEM modelo em coexistência → WhatsApp da loja (wa.me) com o aviso do celular da loja', () => {
+  const c = decidirContato({ conversaId: 42, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: '2026-11-23T14:59:00Z', coexistencia: true },
+    '11987654321', MSG, AGORA, undefined, { appDaLoja: true })
+  assert.equal(c.modo, 'app_loja')
+  assert.ok(c.href?.startsWith('https://wa.me/5511987654321?text='))
+  assert.match(c.aviso ?? '', /celular da loja/)
+  assert.equal(c.telefone, '11987654321')
+  assert.equal(c.conversaId, 42)
+})
+
+test('contato: janela fechada sem modelo e sem coexistência → ligar/copiar, nunca o WhatsApp pessoal', () => {
+  const c = decidirContato({ conversaId: 42, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: null }, '11987654321', MSG, AGORA)
+  assert.equal(c.modo, 'ligar')
+  assert.equal(c.href, null)
+  assert.match(c.aviso ?? '', /ligue ou copie/)
+})
+
+test('contato: sem conversa → app da loja se houver coexistência; senão ligar; sem telefone → sem número', () => {
+  assert.equal(decidirContato(null, '11987654321', MSG, AGORA, undefined, { appDaLoja: true }).modo, 'app_loja')
+  const sem = decidirContato(null, '11987654321', MSG, AGORA)
+  assert.equal(sem.modo, 'ligar')
+  assert.equal(sem.href, null)
+  assert.equal(decidirContato({ conversaId: 9, canalTipo: 'instagram', oficial: false, ultimaRecebida: null }, '11987654321', MSG, AGORA).modo, 'ligar')
+  assert.equal(decidirContato(null, '', MSG, AGORA, undefined, { appDaLoja: true }).modo, 'sem_numero')
+})
+
+test('eco do app da loja: a mensagem mais recente desde o dia do passo sugere "feito"; antes do dia não conta', () => {
+  const ecos = [{ em: '2026-11-24T17:32:00Z', texto: 'Oi Ana,  tudo certo\ncom o iPhone?' }, { em: '2026-11-22T12:00:00Z', texto: 'antiga' }]
+  assert.deepEqual(ecoDoPasso(ecos, '2026-11-24', 'America/Sao_Paulo'), { em: '2026-11-24T17:32:00Z', texto: 'Oi Ana, tudo certo com o iPhone?' })
+  assert.equal(ecoDoPasso([{ em: '2026-11-22T12:00:00Z', texto: 'antiga' }], '2026-11-24', 'America/Sao_Paulo'), null)
 })
 
 // 24/11/2026: {{campo:chave}} no roteiro (universal: placa, quilometragem, número de série…).
