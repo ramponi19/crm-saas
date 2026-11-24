@@ -94,12 +94,12 @@ begin
   res := res || jsonb_build_object('4b_cliente_do_M1', jsonb_build_object('resp', (select n from _n where u = r.responsavel_id), 'origem', r.origem));
   update empresa_usuarios set participa_roleta = true where empresa_id = 1 and usuario_id = M1;
 
-  -- 5. Administradores: fora da roleta e conta de serviço não recebem NPS/chamados; sem nenhum, o dono
+  -- 5. Administradores (1300): participa_roleta NÃO os tira do NPS baixo e dos chamados; conta de serviço sim; sem nenhum, o dono
   update empresa_usuarios set participa_roleta = false where empresa_id = 1 and usuario_id = A;
-  res := res || jsonb_build_object('5a_admins_sem_A', (select jsonb_agg((select n from _n where u = x)) from unnest((posvenda_administradores(1)).ids) x));
+  res := res || jsonb_build_object('5a_admin_fora_da_roleta_continua', (select jsonb_agg((select n from _n where u = x)) from unnest((posvenda_administradores(1)).ids) x));
   update empresa_usuarios set conta_servico = true where empresa_id = 1 and usuario_id = B;
   select * into r from posvenda_administradores(1);
-  res := res || jsonb_build_object('5b_sem_admin_cai_no_dono', jsonb_build_object('ids', (select jsonb_agg((select n from _n where u = x)) from unnest(r.ids) x), 'eh_dono', r.eh_dono));
+  res := res || jsonb_build_object('5b_conta_servico_sai', jsonb_build_object('ids', (select jsonb_agg((select n from _n where u = x)) from unnest(r.ids) x), 'eh_dono', r.eh_dono));
   update empresa_usuarios set participa_roleta = true where empresa_id = 1 and usuario_id = A;
   update empresa_usuarios set conta_servico = false where empresa_id = 1 and usuario_id = B;
 

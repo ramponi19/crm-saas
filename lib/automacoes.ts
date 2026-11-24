@@ -5,8 +5,10 @@ import { recusadaPelaMeta } from '@/lib/canais/falha-meta'
 import { aprovadoNaLoja, aprovadosNoCanal, whatsappDoClienteNaLoja } from '@/lib/canais/modelos-waba'
 import { moduloEstaLigado } from '@/lib/modulo-ligado'
 import {
-  agendarPara, horarioValido, modeloRecente, proximoHorario, tetoAtingido, type Horario,
+  agendarPara, modeloRecente, tetoAtingido,
 } from '@/lib/automatize/travas'
+import { proximaAbertura } from '@/lib/horario'
+import { horarioDaEmpresa } from '@/lib/horario-empresa'
 
 /**
  * MOTOR DE AUTOMAÇÕES DE ETAPA — o do Automatize (04/11/2026).
@@ -72,11 +74,6 @@ export async function automacoesPausadas(db: Db, empresaId: number): Promise<boo
   return !!(data?.valor as { pausado?: boolean } | null)?.pausado
 }
 
-async function horarioDaEmpresa(db: Db, empresaId: number): Promise<Horario> {
-  const { data } = await db.from('configuracoes_sistema').select('valor')
-    .eq('empresa_id', empresaId).eq('chave', 'horario_comercial').maybeSingle()
-  return horarioValido(data?.valor)
-}
 
 interface NegocioMin {
   id: number; nome: string | null; responsavel_id: string | null; contato_id: number | null
@@ -239,9 +236,9 @@ export async function executarUma(db: Db, e: Execucao, agora = new Date()): Prom
       return { resultado: 'pulada', motivo: 'este contato já recebeu este modelo nos últimos 7 dias' }
     }
 
-    // O horário de atendimento no relógio DA LOJA (fuso da empresa).
-    const [horario, fuso] = await Promise.all([horarioDaEmpresa(db, e.empresa_id), fusoDaEmpresa(db, e.empresa_id)])
-    const quando = proximoHorario(agora, horario, fuso)
+    // O horário de atendimento DA LOJA do negócio (por dia; 24/11/2026), no relógio da loja (fuso da empresa).
+    const [horario, fuso] = await Promise.all([horarioDaEmpresa(db as never, e.empresa_id, neg.filial_id), fusoDaEmpresa(db, e.empresa_id)])
+    const quando = proximaAbertura(agora, horario, fuso)
     if (quando.getTime() > agora.getTime()) return { resultado: 'adiada', motivo: 'fora do horário de atendimento', quando }
 
     const { count } = await db.from('automacao_execucoes').select('id', { count: 'exact', head: true })

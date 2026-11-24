@@ -6,8 +6,8 @@
   "3_negocio_da_conta_servico": { "resp": "M1", "origem": "roleta" },
   "4a_matriz_sem_M1": ["M2"],
   "4b_cliente_do_M1": { "resp": "M1", "origem": "vendedor" },
-  "5a_admins_sem_A": ["B"],
-  "5b_sem_admin_cai_no_dono": { "ids": ["DONO"], "eh_dono": true },
+  "5a_admin_fora_da_roleta_continua": ["A", "B"],
+  "5b_conta_servico_sai": { "ids": ["A"], "eh_dono": false },
   "6_reavaliacao": { "resp": "VJ", "origem": "roleta" },
   "7_marcar_redistribui": { "resp": "M2", "origem": "roleta", "observacao": true },
   "7b_desmarcar_nao_volta": "M2"

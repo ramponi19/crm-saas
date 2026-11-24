@@ -2,7 +2,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { cabecalhosEdgeInterna, urlEdgeWebhook } from '@/lib/edge-interna'
 import { recusadaPelaMeta } from '@/lib/canais/falha-meta'
-import { horarioValido, modeloRecente, proximoHorario } from '@/lib/automatize/travas'
+import { modeloRecente } from '@/lib/automatize/travas'
+import { proximaAbertura } from '@/lib/horario'
+import { horarioDaEmpresa } from '@/lib/horario-empresa'
 import { CHAVE_CONFIG, renderizar, tetoValido } from '@/lib/transmissao/filtro'
 import { moduloEstaLigado } from '@/lib/modulo-ligado'
 
@@ -62,11 +64,11 @@ export async function enviadasNaHora(svc: Db, empresaId: number, agora = new Dat
 
 /** Quando a loja abre de novo (agora, se está aberta). */
 export async function proximaJanela(svc: Db, empresaId: number, agora = new Date()): Promise<Date> {
-  const [{ data }, fuso] = await Promise.all([
-    svc.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'horario_comercial').maybeSingle(),
+  const [horario, fuso] = await Promise.all([
+    horarioDaEmpresa(svc as never, empresaId),
     fusoDaEmpresa(svc, empresaId),
   ])
-  return proximoHorario(agora, horarioValido(data?.valor), fuso)
+  return proximaAbertura(agora, horario, fuso)
 }
 
 async function statusAtual(svc: Db, id: number): Promise<string | null> {
