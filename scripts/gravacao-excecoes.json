@@ -83,10 +83,6 @@
     "n": 1,
     "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
   },
-  "components/modules/configuracoes/horario-card.tsx|configuracoes_sistema|upsert": {
-    "n": 1,
-    "motivo": "upsert barrado pela RLS dá ERRO (testado no local 04/11), não 0 linhas calado"
-  },
   "components/modules/configuracoes/motivos-perda-card.tsx|motivos_perda|delete": {
     "n": 1,
     "motivo": "exclusão em lote dos motivos removidos; 0 = já tinham saído"
