@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { barradoPorSemOfertas, MOTIVO_SEM_OFERTAS } from '@/lib/sem-ofertas'
 import { cabecalhosEdgeInterna, urlEdgeWebhook } from '@/lib/edge-interna'
 import { recusadaPelaMeta } from '@/lib/canais/falha-meta'
 import { aprovadoNaLoja, aprovadosNoCanal, whatsappDoClienteNaLoja } from '@/lib/canais/modelos-waba'
@@ -199,8 +200,8 @@ export async function executarUma(db: Db, e: Execucao, agora = new Date()): Prom
   }
 
   if (a.acao === 'enviar_modelo') {
-    const { data: m } = await db.from('modelos_mensagem').select('id, nome, idioma, corpo, status').eq('id', a.modelo_id ?? 0).maybeSingle()
-    const modelo = m as { id: number; nome: string; idioma: string; corpo: string | null; status: string } | null
+    const { data: m } = await db.from('modelos_mensagem').select('id, nome, idioma, corpo, status, categoria').eq('id', a.modelo_id ?? 0).maybeSingle()
+    const modelo = m as { id: number; nome: string; idioma: string; corpo: string | null; status: string; categoria?: string | null } | null
     if (!modelo) return { resultado: 'pulada', motivo: 'modelo apagado' }
     // Aprovado NO NÚMERO que envia (11/11/2026: a Meta aprova por WABA; o status da empresa é só
     // resumo). Desde 23/11/2026 o número é o da CONVERSA: o WhatsApp em que o cliente falou por
@@ -213,10 +214,12 @@ export async function executarUma(db: Db, e: Execucao, agora = new Date()): Prom
     if (!aprovado) {
       return { resultado: 'pulada', motivo: doCliente ? 'modelo não aprovado no número em que o cliente fala com a loja' : 'modelo não aprovado no WhatsApp da loja deste negócio' }
     }
-    const { data: c } = await db.from('contatos').select('id, telefone, telefone_e164, ativo, opt_out_em').eq('id', neg.contato_id ?? 0).maybeSingle()
-    const contato = c as { id: number; telefone: string | null; telefone_e164: string | null; ativo: boolean | null; opt_out_em: string | null } | null
+    const { data: c } = await db.from('contatos').select('id, telefone, telefone_e164, ativo, opt_out_em, sem_ofertas_em').eq('id', neg.contato_id ?? 0).maybeSingle()
+    const contato = c as { id: number; telefone: string | null; telefone_e164: string | null; ativo: boolean | null; opt_out_em: string | null; sem_ofertas_em?: string | null } | null
     if (!contato) return { resultado: 'pulada', motivo: 'sem contato' }
     if (contato.opt_out_em) return { resultado: 'pulada', motivo: 'contato pediu para não receber (opt-out)' }
+    // Marketing para quem pediu "não quero receber ofertas" (24/11/2026): pula; Utilidade segue.
+    if (barradoPorSemOfertas(modelo.categoria, contato.sem_ofertas_em)) return { resultado: 'pulada', motivo: MOTIVO_SEM_OFERTAS }
     if (contato.ativo === false) return { resultado: 'pulada', motivo: 'contato bloqueado' }
     const telefone = (contato.telefone_e164 || contato.telefone || '').replace(/\D/g, '')
     if (telefone.length < 10) return { resultado: 'pulada', motivo: 'contato sem telefone' }

@@ -108,6 +108,10 @@ export function validarPasso(b: Record<string, unknown>): { ok: true; v: PassoEn
   } }
 }
 
+/** "Não quero receber ofertas" (core.sem_ofertas; migração 20261124001900): padrões do Nexus. */
+export const BOTAO_SEM_OFERTAS_PADRAO = 'Não quero receber ofertas'
+export const CONFIRMACAO_SEM_OFERTAS_PADRAO = 'Pronto, {{nome}}: você não vai mais receber ofertas da nossa loja. Os avisos sobre a sua compra continuam chegando.'
+
 // ── Depois da nota (C7 bloco 4) ─────────────────────────────────────────────────────────────────
 /** Textos padrão do Nexus (a empresa troca em Configurações › Pós-venda). Variáveis: {{nome}} e {{link}}. */
 export const MENSAGEM_PROMOTOR_PADRAO = 'Que bom, {{nome}}! Obrigado pela nota. Se puder, conte como foi no Google, ajuda muito a loja: {{link}}'

@@ -101,6 +101,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, valor: data })
   }
 
+  // "Não quero receber ofertas" (core.sem_ofertas): os textos dos botões que marcam o cliente e a confirmação que sai.
+  if (b.acao === 'sem_ofertas') {
+    const botoes = Array.isArray(b.botoes) ? [...new Set(b.botoes.filter((x): x is string => typeof x === 'string').map((x) => x.trim().slice(0, 60)).filter((x) => x.length >= 3))] : []
+    const confirmacao = typeof b.confirmacao === 'string' ? b.confirmacao.trim().slice(0, 600) : ''
+    if (botoes.length === 0) return erro('Informe ao menos um texto de botão.', 422)
+    if (confirmacao.length < 3) return erro('Escreva a confirmação que o cliente recebe.', 422)
+    const { error } = await supabase.rpc('config_salvar', { p_modulo: 'core', p_chave: 'sem_ofertas', p_valor: { botoes, confirmacao } } as never)
+    if (error) return /SEM_PERMISSAO|SOMENTE_LEITURA/.test(error.message) ? semPermissao() : erro(error.message)
+    return NextResponse.json({ ok: true })
+  }
+
   if (b.acao === 'categoria_chamado') {
     const nome = typeof b.nome === 'string' ? b.nome.trim().slice(0, 60) : ''
     if (nome.length < 2) return erro('Dê um nome à categoria.', 422)

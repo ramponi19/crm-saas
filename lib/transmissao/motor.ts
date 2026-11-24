@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { barradoPorSemOfertas, MOTIVO_SEM_OFERTAS } from '@/lib/sem-ofertas'
 import { cabecalhosEdgeInterna, urlEdgeWebhook } from '@/lib/edge-interna'
 import { recusadaPelaMeta } from '@/lib/canais/falha-meta'
 import { modeloRecente } from '@/lib/automatize/travas'
@@ -106,11 +107,13 @@ async function chamarEdge(envioId: number, parametros: string[], previa: string)
 }
 
 /** Manda UM envio já reservado ('enviando'). */
-async function enviarUm(svc: Db, t: Transmissao, corpo: string, e: Envio, agora: Date): Promise<Fim> {
-  const { data: c } = await svc.from('contatos').select('nome, ativo, opt_out_em').eq('id', e.contato_id).maybeSingle()
-  const contato = c as { nome: string | null; ativo: boolean | null; opt_out_em: string | null } | null
+async function enviarUm(svc: Db, t: Transmissao, corpo: string, e: Envio, agora: Date, categoria: string | null = null): Promise<Fim> {
+  const { data: c } = await svc.from('contatos').select('nome, ativo, opt_out_em, sem_ofertas_em').eq('id', e.contato_id).maybeSingle()
+  const contato = c as { nome: string | null; ativo: boolean | null; opt_out_em: string | null; sem_ofertas_em?: string | null } | null
   if (!contato) return { status: 'pulada', motivo: 'contato apagado' }
   if (contato.opt_out_em) return { status: 'pulada', motivo: 'contato pediu para não receber (opt-out)' }
+  // Marketing para quem pediu "não quero receber ofertas" (24/11/2026): pula; Utilidade segue.
+  if (barradoPorSemOfertas(categoria, contato.sem_ofertas_em)) return { status: 'pulada', motivo: MOTIVO_SEM_OFERTAS }
   if (contato.ativo === false) return { status: 'pulada', motivo: 'contato bloqueado' }
   if (!e.telefone || e.telefone.length < 10) return { status: 'pulada', motivo: 'contato sem telefone' }
   if (!e.negocio_id) return { status: 'pulada', motivo: 'negócio apagado' }
@@ -152,8 +155,9 @@ export async function processarTransmissao(svc: Db, id: number, { limiteMs = 60_
   const { data } = await svc.from('transmissoes').select('id, empresa_id, filial_id, nome, modelo_id, parametros, status, agendada_para').eq('id', id).maybeSingle()
   const t = data as Transmissao | null
   if (!t || t.status !== 'enviando') return { ...r, aguardando: 'pausada' }
-  const { data: m } = await svc.from('modelos_mensagem').select('corpo').eq('id', t.modelo_id).maybeSingle()
+  const { data: m } = await svc.from('modelos_mensagem').select('corpo, categoria').eq('id', t.modelo_id).maybeSingle()
   const corpo = (m as { corpo?: string } | null)?.corpo ?? ''
+  const categoria = (m as { categoria?: string } | null)?.categoria ?? null
 
   let parar = false
   while (!parar && Date.now() - t0 < limiteMs) {
@@ -179,7 +183,7 @@ export async function processarTransmissao(svc: Db, id: number, { limiteMs = 60_
       }
       const fins = await Promise.all(grupo.map(async (e) => {
         let f: Fim
-        try { f = await enviarUm(svc, t, corpo, e, agora) }
+        try { f = await enviarUm(svc, t, corpo, e, agora, categoria) }
         catch (err) { f = { status: 'pendente', motivo: `erro, nova tentativa: ${(err instanceof Error ? err.message : String(err)).slice(0, 200)}` } }
         await concluirEnvio(svc, e, f)
         return f
