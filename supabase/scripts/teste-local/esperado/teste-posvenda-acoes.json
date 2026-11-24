@@ -1,0 +1,43 @@
+{
+  "1_sementes": {
+    "status": ["aberto", "andamento", "aguardando_cliente", "aguardando_terceiro", "resolvido"],
+    "categorias": 6,
+    "sla": { "urgente": [2, 8], "alta": [8, 24], "normal": [24, 72], "baixa": [48, 168] },
+    "nps": 1,
+    "de_novo": { "status": 0, "categorias": 0, "sla": 0, "pesquisas": 0 },
+    "empresa_5_intocada": 0
+  },
+  "2_modulo_desligado": "MODULO_DESLIGADO",
+  "3a_outro_vendedor": "SEM_PERMISSAO",
+  "3b_outra_empresa": "NAO_ENCONTRADO",
+  "4_feito": { "status": "feito", "gravou": true, "de_novo": "JA_REGISTRADO", "admin_registra": "feito/true" },
+  "5a_primeira": { "status": "pendente", "tentativas": 1, "proximo_dia_aberto": true },
+  "5b_terceira": { "status": "sem_resposta", "tentativas": 3 },
+  "6_reagendar": { "status": "pendente", "sabado_vira_segunda": true, "data_passada": "DATA_INVALIDA" },
+  "7c_acao_invalida": "ACAO_INVALIDA",
+  "7_pular": { "sem_motivo": "MOTIVO_OBRIGATORIO", "status": "pulado", "motivo": "cliente pediu para não ligar" },
+  "8a_nota_9": { "chamado": null, "resposta": "9/manual/true", "passo": "feito/nota 9" },
+  "8b_nota_5": {
+    "origem": "nps", "prioridade": "normal", "status": "aberto", "responsavel_admin_ou_dono": true,
+    "titulo": "NPS 5 — falar com o cliente", "descricao": "demorou a entrega", "sla_24h": true, "eventos": 1
+  },
+  "8c_de_novo": { "chamado": null, "respostas": "1/2", "chamados": 1 },
+  "8d_nota_1_alta": "alta/2",
+  "8e_nota_11": "NOTA_INVALIDA",
+  "8f_limite_8_nota_7_abre": true,
+  "8g_outro_vendedor": "SEM_PERMISSAO",
+  "9_manual": { "numero": 3, "origem": "manual", "criado_por_M1": true, "responsavel_nao_e_M1": true, "sla_da_categoria": true },
+  "9b_sem_titulo": "TITULO_OBRIGATORIO",
+  "9c_prioridade": "PRIORIDADE_INVALIDA",
+  "10a_vendedor_nao_responsavel": "SEM_PERMISSAO",
+  "10b_andamento": { "primeira_resposta": true, "resolvido": null },
+  "10c_resolvido": true,
+  "10d_reaberto": { "resolvido": null, "primeira_resposta_fica": true },
+  "10e_passou_para_M1": "true/manual",
+  "10f_eventos": ["status:Aberto", "status:Em andamento", "status:Resolvido", "status:Aberto"],
+  "10g_M1_nota_mas_nao_repassa": { "nota": 1, "repassar": "SEM_PERMISSAO" },
+  "11_privilegios": {
+    "authenticated_registra": true, "authenticated_abre": true, "anon_registra": false,
+    "authenticated_instala": false, "authenticated_cria_direto": false
+  }
+}
