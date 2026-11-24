@@ -10,7 +10,8 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { faltaParaFechar, resumirPagamentos } from '@/lib/pdv-pagamentos'
-import { concluirEncomenda, saldoDaEncomenda } from '@/lib/encomendas'
+import { concluirEncomenda, saldoDaEncomenda, podeAjustarValores } from '@/lib/encomendas'
+import { filtroConcluidaNoPeriodo } from '@/lib/vendas-mes'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 describe('faltaParaFechar (PDV)', () => {
@@ -81,5 +82,47 @@ describe('concluirEncomenda (lib/encomendas)', () => {
   test('saldoDaEncomenda sem resposta: null (a tela não deixa enviar)', async () => {
     const { cliente } = clienteFalso({ error: { message: 'Venda não encontrada' } })
     assert.equal(await saldoDaEncomenda(cliente, 7), null)
+  })
+})
+
+/**
+ * Hotfix H3 (24/11/2026): o botão de ajuste de preço e custo só aparece quando o fechamento inteiro é
+ * encomenda. A regra de verdade está no banco (vendas_valor_guarda; tests/banco/prova-concluir-encomenda.sql).
+ */
+describe('podeAjustarValores (H3)', () => {
+  test('encomenda: pode ajustar', () => {
+    assert.equal(podeAjustarValores([{ status: 'encomenda' }, { status: 'encomenda' }]), true)
+  })
+  test('pendente de entrega (balcão ou orçamento pelo link): não pode', () => {
+    assert.equal(podeAjustarValores([{ status: 'pendente_entrega' }]), false)
+  })
+  test('fechamento misturado: não pode', () => {
+    assert.equal(podeAjustarValores([{ status: 'encomenda' }, { status: 'pendente_entrega' }]), false)
+  })
+  test('sem itens ou sem situação: não pode', () => {
+    assert.equal(podeAjustarValores([]), false)
+    assert.equal(podeAjustarValores([{ status: null }]), false)
+  })
+})
+
+/**
+ * Hotfix H1 (24/11/2026): a conclusão não sobrescreve mais data_venda. A comissão de hoje conta no mês da
+ * CONCLUSÃO: coalesce(concluida_em, data_venda) dentro do período.
+ */
+describe('filtroConcluidaNoPeriodo (H1)', () => {
+  const ini = '2026-11-01T03:00:00.000Z'
+  const fim = '2026-12-01T03:00:00.000Z'
+  test('concluída no período conta pela data da conclusão', () => {
+    const f = filtroConcluidaNoPeriodo(ini, fim)
+    assert.ok(f.includes(`and(concluida_em.gte."${ini}",concluida_em.lt."${fim}")`))
+  })
+  test('sem data de conclusão (anterior ao hotfix) conta pela data da venda', () => {
+    const f = filtroConcluidaNoPeriodo(ini, fim)
+    assert.ok(f.includes(`and(concluida_em.is.null,data_venda.gte."${ini}",data_venda.lt."${fim}")`))
+  })
+  test('as duas condições ficam num OR só, sem vírgula solta', () => {
+    const f = filtroConcluidaNoPeriodo(ini, fim)
+    assert.equal(f.split('),and(').length, 2)
+    assert.ok(f.startsWith('and(') && f.endsWith(')'))
   })
 })

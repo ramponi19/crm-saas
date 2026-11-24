@@ -1,4 +1,4 @@
--- VOLTA de 20261119000100_concluir_encomenda. Voltar o APP antes: o app novo grava a venda de
+-- VOLTA de 20261125000100_concluir_encomenda. Voltar o APP antes: o app novo grava a venda de
 -- balcão como 'em_fechamento' e conclui por concluir_venda_pdv / concluir_encomenda.
 --
 -- As colunas concluida_em / concluida_por / concluida_via FICAM (são registro de quem concluiu;
@@ -12,6 +12,8 @@ begin;
 
 drop trigger if exists vendas_conclusao_guarda on public.vendas_vendas;
 drop function if exists public.vendas_conclusao_guarda();
+drop trigger if exists vendas_valor_guarda on public.vendas_vendas;
+drop function if exists public.vendas_valor_guarda();
 drop function if exists public.concluir_venda_pdv(uuid, boolean);
 drop function if exists public.concluir_encomenda(bigint, jsonb, jsonb, text);
 drop function if exists public.encomenda_saldo(bigint);

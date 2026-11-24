@@ -1,4 +1,4 @@
--- PROVA no banco LOCAL da migração 20261119000100 (concluir_encomenda / concluir_venda_pdv / guarda).
+-- PROVA no banco LOCAL da migração 20261125000100 (concluir_encomenda / concluir_venda_pdv / guarda).
 -- Transação desfeita no fim: nada fica gravado. Usa a empresa 1 (dono) e um usuário de OUTRA empresa.
 --
 --   psql "host=127.0.0.1 port=54322 dbname=postgres user=postgres password=postgres" -X -A -t -q \
@@ -12,6 +12,10 @@
 -- E mais: grupo com 2 itens + acessório + série copiada + baixa da peça; guarda contra UPDATE/INSERT
 -- de 'concluida' pelo navegador; PDV de balcão com falta, sem falta e com entrega pendente; concluir
 -- duas vezes.
+-- Ajustes de 24/11/2026 (roteiro §1.1):
+--   H1. a conclusão não sobrescreve data_venda (fica em concluida_em)
+--   H2. venda concluída não muda de valor/custo/desconto (navegador nem service_role; script com a marca passa)
+--   H3. pelo navegador, preço e custo só se ajustam em 'encomenda' (não em pendente_entrega nem em_fechamento)
 begin;
 create temp table res(n serial, linha text);
 
@@ -68,8 +72,12 @@ begin
     r := concluir_encomenda(v1, '[]'::jsonb, '[]'::jsonb, 'historico');
     perform pg_temp.admin();
     select count(*) into n from vendas_vendas where id = v1 and status = 'concluida' and concluida_por = dono
-       and concluida_via = 'historico' and concluida_em is not null and data_venda > now() - interval '1 minute';
+       and concluida_via = 'historico' and concluida_em > now() - interval '1 minute';
     perform pg_temp.r(case when n = 1 then 'OK A: saldo zero conclui (quem, quando, via historico gravados)' else 'FALHOU A: não gravou a conclusão' end);
+    -- H1 (24/11/2026): a data da venda NÃO vira a da entrega; a conclusão fica só em concluida_em.
+    select count(*) into n from vendas_vendas where id = v1
+       and data_venda < now() - interval '4 days' and concluida_em > now() - interval '1 minute';
+    perform pg_temp.r(case when n = 1 then 'OK H1: data_venda mantida (lançada há 5 dias), concluida_em = agora' else 'FALHOU H1: data_venda foi sobrescrita' end);
   exception when others then perform pg_temp.admin(); perform pg_temp.r('FALHOU A: ' || sqlerrm);
   end;
 
@@ -249,6 +257,97 @@ begin
     r := concluir_venda_pdv(g, false);
     perform pg_temp.admin(); perform pg_temp.r('FALHOU G5: outra empresa fechou venda alheia');
   exception when others then perform pg_temp.admin(); perform pg_temp.r('OK G5: balcão de outra empresa — ' || sqlerrm);
+  end;
+
+  -- ── H2. venda concluída não muda de valor (24/11/2026) ──────────────────────────────────
+  insert into vendas_vendas (empresa_id, filial_id, cliente_id, valor_venda, valor_custo, status, canal_venda, grupo_pdv, data_venda)
+  values (1, fil, cli, 2000, 1500, 'encomenda', 'encomenda', gen_random_uuid(), now() - interval '3 days') returning id into v1;
+  insert into vendas_pagamentos (empresa_id, filial_id, venda_id, forma_pagamento, valor_pago) values (1, fil, v1, 'pix', 2000);
+  perform pg_temp.como(dono);
+  r := concluir_encomenda(v1, '[]'::jsonb, '[]'::jsonb, 'historico');
+  perform pg_temp.admin();
+  -- pelo navegador (dono)
+  perform pg_temp.como(dono);
+  begin
+    update vendas_vendas set valor_venda = 1, valor_custo = 0 where id = v1;
+    perform pg_temp.admin(); perform pg_temp.r('FALHOU H2: navegador mudou o valor da venda concluída');
+  exception when others then perform pg_temp.admin();
+    perform pg_temp.r(case when sqlerrm = 'Venda concluída não muda de valor' then 'OK H2: navegador não muda valor da concluída — ' || sqlerrm else 'FALHOU H2: ' || sqlerrm end);
+  end;
+  -- pela rota do servidor (service_role), sem a marca
+  perform set_config('role', 'service_role', true);
+  begin
+    update vendas_vendas set valor_custo = 10 where id = v1;
+    perform pg_temp.admin(); perform pg_temp.r('FALHOU H2b: service_role mudou o custo da venda concluída');
+  exception when others then perform pg_temp.admin();
+    perform pg_temp.r(case when sqlerrm = 'Venda concluída não muda de valor' then 'OK H2b: rota do servidor também não muda — ' || sqlerrm else 'FALHOU H2b: ' || sqlerrm end);
+  end;
+  -- desconto também é valor
+  perform pg_temp.como(dono);
+  begin
+    update vendas_vendas set desconto_valor = 100 where id = v1;
+    perform pg_temp.admin(); perform pg_temp.r('FALHOU H2c: desconto da venda concluída mudou');
+  exception when others then perform pg_temp.admin(); perform pg_temp.r('OK H2c: desconto da concluída também travado');
+  end;
+  -- o que não é valor segue livre (vendedor, observação)
+  perform pg_temp.como(dono);
+  begin
+    update vendas_vendas set observacoes = 'nota depois da venda', vendedor_id = dono where id = v1;
+    perform pg_temp.admin(); perform pg_temp.r('OK H2d: observação e vendedor da concluída seguem editáveis');
+  exception when others then perform pg_temp.admin(); perform pg_temp.r('FALHOU H2d: ' || sqlerrm);
+  end;
+  -- script de operação com a marca explícita passa
+  perform set_config('role', 'service_role', true);
+  perform set_config('nexus.venda_valor_ajuste', 'prova local', true);
+  begin
+    update vendas_vendas set valor_custo = 1400 where id = v1;
+    perform set_config('nexus.venda_valor_ajuste', '', true);
+    perform pg_temp.admin();
+    perform pg_temp.r(case when (select valor_custo from vendas_vendas where id = v1) = 1400
+      then 'OK H2e: script com nexus.venda_valor_ajuste corrige o custo' else 'FALHOU H2e: não gravou' end);
+  exception when others then perform set_config('nexus.venda_valor_ajuste', '', true); perform pg_temp.admin(); perform pg_temp.r('FALHOU H2e: ' || sqlerrm);
+  end;
+  select valor_venda::text into s from vendas_vendas where id = v1;
+  perform pg_temp.r(case when s = '2000.00' or s = '2000' then 'OK H2f: valor da concluída intacto (R$ 2.000)' else 'FALHOU H2f: valor = ' || s end);
+
+  -- ── H3. preço e custo só se ajustam em encomenda (24/11/2026) ───────────────────────────
+  insert into vendas_vendas (empresa_id, filial_id, cliente_id, valor_venda, valor_custo, status, canal_venda, grupo_pdv)
+  values (1, fil, cli, 3000, 0, 'encomenda', 'encomenda', gen_random_uuid()) returning id into v2;
+  perform pg_temp.como(dono);
+  begin
+    update vendas_vendas set valor_venda = 2900, valor_custo = 2500 where id = v2;
+    perform pg_temp.admin();
+    perform pg_temp.r(case when (select valor_custo from vendas_vendas where id = v2) = 2500
+      then 'OK H3: encomenda ajusta preço e custo pelo navegador' else 'FALHOU H3: ajuste não gravou' end);
+  exception when others then perform pg_temp.admin(); perform pg_temp.r('FALHOU H3: ' || sqlerrm);
+  end;
+  -- pendente de entrega (balcão com entrega depois / orçamento aprovado pelo link): recusado
+  g := gen_random_uuid();
+  insert into vendas_vendas (empresa_id, filial_id, valor_venda, status, canal_venda, grupo_pdv, usuario_id)
+  values (1, fil, 800, 'em_fechamento', 'loja_fisica', g, dono) returning id into v3;
+  insert into vendas_pagamentos (empresa_id, filial_id, venda_id, forma_pagamento, valor_pago) values (1, fil, v3, 'pix', 800);
+  insert into estoque_unidades (empresa_id, filial_id, status, ativo, quantidade, preco_custo, preco_venda)
+  values (1, fil, 'reservado', true, 1, 0, 800) returning id into un;
+  update vendas_vendas set unidade_id = un where id = v3;
+  perform pg_temp.como(dono);
+  r := concluir_venda_pdv(g, true);
+  perform pg_temp.admin();
+  perform pg_temp.como(dono);
+  begin
+    update vendas_vendas set valor_venda = 700 where id = v3;
+    perform pg_temp.admin(); perform pg_temp.r('FALHOU H3b: pendente_entrega mudou de preço pelo navegador');
+  exception when others then perform pg_temp.admin();
+    perform pg_temp.r(case when sqlerrm like 'Preço e custo só se ajustam em encomenda%' then 'OK H3b: pendente de entrega recusado — ' || sqlerrm else 'FALHOU H3b: ' || sqlerrm end);
+  end;
+  -- em fechamento (balcão no meio do fechamento): recusado
+  g := gen_random_uuid();
+  insert into vendas_vendas (empresa_id, filial_id, valor_venda, status, canal_venda, grupo_pdv, usuario_id)
+  values (1, fil, 500, 'em_fechamento', 'loja_fisica', g, dono) returning id into v3;
+  perform pg_temp.como(dono);
+  begin
+    update vendas_vendas set valor_venda = 1 where id = v3;
+    perform pg_temp.admin(); perform pg_temp.r('FALHOU H3c: em_fechamento mudou de preço pelo navegador');
+  exception when others then perform pg_temp.admin(); perform pg_temp.r('OK H3c: em fechamento recusado');
   end;
 end $$;
 

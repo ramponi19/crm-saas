@@ -3,7 +3,8 @@
 // (tools/banco/montar-local.sh grava 'teste-local-22' nesses usuários).
 import fs from 'node:fs'
 
-const arq = `${import.meta.dirname}/usuarios.local.json`
+// E2E_USUARIOS troca o arquivo (ex.: banco local descartável com a semente fictícia).
+const arq = process.env.E2E_USUARIOS || `${import.meta.dirname}/usuarios.local.json`
 if (!fs.existsSync(arq)) {
   console.error(`Falta ${arq}: copie usuarios.example.json e preencha os e-mails (ver LEIA-ME.md).`)
   process.exit(2)

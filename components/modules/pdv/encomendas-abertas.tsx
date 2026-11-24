@@ -8,7 +8,7 @@ import { AlertTriangle, Check, MessageCircle, PackageCheck, Pencil, ShoppingCart
 import { Badge, Button, ConfirmDialog, EmptyState, Input, notify } from '@/components/ui'
 import { abaixoDoCatalogo, descricaoConfirmeValor, type LinhaComValor, type Referencia } from '@/lib/valor-abaixo-do-catalogo'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
-import { diagnosticar, ordenarPorUrgencia, agruparPorEncomenda, ETAPAS, indiceEtapa, type Etapa } from '@/lib/encomendas'
+import { diagnosticar, ordenarPorUrgencia, agruparPorEncomenda, ETAPAS, indiceEtapa, podeAjustarValores, type Etapa } from '@/lib/encomendas'
 import { formatCurrency } from '@/lib/utils'
 import { type Taxa } from '@/lib/pdv-pagamentos'
 import type { DocumentoDisponivel } from '@/lib/contrato-emitir'
@@ -288,6 +288,10 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
     prazo: string,
     valorConfirmado = false,
   ) {
+    if (!podeAjustarValores(e.itens)) {
+      notify.warn('Só dá para ajustar valores de encomenda', 'Venda com entrega pendente já está fechada no valor.')
+      return
+    }
     if (linhas.some((l) => !(Number(l.venda) > 0))) {
       notify.warn('Cada item precisa de um valor maior que zero')
       return
@@ -376,6 +380,9 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
         const d = diagnosticar(e, hoje, fuso)
         const falta = Math.max(0, e.valor_venda - e.sinal_pago)
         const chegou = d.situacao === 'chegou'
+        // Hotfix H3: preço e custo só se ajustam em ENCOMENDA. Venda de balcão com entrega pendente e
+        // orçamento aprovado pelo link já estão fechados no valor (o banco recusa: vendas_valor_guarda).
+        const ajustavel = podeAjustarValores(e.itens)
         return (
           <div
             key={e.id}
@@ -469,11 +476,13 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
               </div>
 
               <div className="flex flex-none flex-wrap items-center gap-1.5">
-                <button type="button" title="Ajustar valores e prazo"
-                  onClick={() => setEditando(editando === e.id ? null : e.id)}
-                  className="grid h-8 w-8 place-items-center rounded-control border border-line bg-card text-ink-3 transition-colors hover:text-ink">
-                  <Pencil size={13} strokeWidth={1.8} />
-                </button>
+                {ajustavel && (
+                  <button type="button" title="Ajustar valores e prazo"
+                    onClick={() => setEditando(editando === e.id ? null : e.id)}
+                    className="grid h-8 w-8 place-items-center rounded-control border border-line bg-card text-ink-3 transition-colors hover:text-ink">
+                    <Pencil size={13} strokeWidth={1.8} />
+                  </button>
+                )}
                 {chegou ? (
                   <>
                     {e.cliente_telefone && (
@@ -524,7 +533,7 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
               />
             )}
 
-            {editando === e.id && (
+            {editando === e.id && ajustavel && (
               <AjusteInline
                 key={`ajuste-${e.id}`}
                 encomenda={e}

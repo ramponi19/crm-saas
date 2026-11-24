@@ -6,6 +6,7 @@ import { UsoEquipe } from '@/components/admin/uso-equipe'
 import { carregarUsoDaEquipe } from '@/lib/uso-equipe'
 import { sinaisDePresenca } from '@/lib/presenca'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { filtroConcluidaNoPeriodo } from '@/lib/vendas-mes'
 import type { Tables } from '@/types/database'
 
 export const metadata = { title: 'Equipe' }
@@ -43,8 +44,8 @@ export default async function AdminEquipePage({ searchParams }: { searchParams: 
     supabase.from('vendas_vendas')
       .select('vendedor_id, valor_venda, status, grupo_pdv')
       .eq('empresa_id', empresaId)
-      .gte('data_venda', inicioMes)
-      .lt('data_venda', fimMes)
+      // Mês da CONCLUSÃO (hotfix H1), o mesmo da comissão em /equipe.
+      .or(filtroConcluidaNoPeriodo(inicioMes, fimMes))
       .eq('status', 'concluida'),
     supabase.from('vendas_comissoes')
       .select('*')

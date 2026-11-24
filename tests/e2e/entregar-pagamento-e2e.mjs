@@ -5,12 +5,15 @@
 //       pela RPC (concluida_via = historico, concluida_por = dono). Antes concluía sem receber nada.
 //   (B) PDV balcão: peça de R$ 500 com a forma de pagamento em R$ 200 → "Falta R$ 300" e o botão travado;
 //       com R$ 500 fecha, e a venda conclui pela RPC (concluida_via = pdv) com o pagamento gravado.
-// Precisa da migração 20261119000100 no banco local.
+//   (H1) a data da venda não vira a da entrega; (H3) na aba Encomenda do PDV, o lápis de ajuste de preço e custo
+//       aparece na encomenda e some na venda com entrega pendente (24/11/2026).
+// Precisa da migração 20261125000100 no banco local.
+// Banco descartável com a semente fictícia: E2E_USUARIOS=<json com o dono> E2E_SENHA=<senha local> DB_PORT=<porta>.
 // Rodar: node tests/e2e/entregar-pagamento-e2e.mjs (app LOCAL :3010, Supabase LOCAL). Tudo o que cria é apagado.
 import { E } from './_usuarios.mjs'
 import { chromium } from 'playwright-core'
 import { execFileSync } from 'node:child_process'
-const BASE = 'http://localhost:3010', SENHA = 'teste-local-22'
+const BASE = process.env.E2E_BASE ?? 'http://localhost:3010', SENHA = process.env.E2E_SENHA ?? 'teste-local-22'
 const sql = (q) => execFileSync('C:/Ferramentas/pgsql-18.4/bin/psql.exe', ['host=127.0.0.1 port=' + (process.env.DB_PORT ?? '54322') + ' dbname=postgres user=postgres password=postgres', '-X', '-A', '-t', '-q', '-v', 'ON_ERROR_STOP=1', '-c', q], { encoding: 'utf8', env: { ...process.env, PGCLIENTENCODING: 'UTF8' } }).replace(/\r/g, '').trim()
 const espera = (ms) => new Promise((r) => setTimeout(r, ms))
 const falhas = []; const ok = (m) => console.log('ok  ', m); const falha = (m) => { falhas.push(m); console.log('FALHA', m) }
@@ -29,6 +32,14 @@ const produto = sql(`insert into estoque_produtos (empresa_id, nome, preco, ativ
 const encomenda = sql(`insert into vendas_vendas (empresa_id, filial_id, cliente_id, produto_id, valor_venda, status, canal_venda, grupo_pdv, data_venda, vendedor_id)
   values (1, 3, ${cliente}, ${produto}, 1000, 'encomenda', 'encomenda', gen_random_uuid(), now() - interval '2 days', '${dono}') returning id`)
 sql(`insert into vendas_pagamentos (empresa_id, filial_id, venda_id, forma_pagamento, valor_pago) values (1, 3, ${encomenda}, 'pix', 300)`)
+// H3: uma encomenda e uma venda de balcão com entrega pendente, cada uma com um produto próprio.
+const NOME_E = `Produto Ajuste encomenda e2e ${T}`, NOME_P = `Produto Ajuste pendente e2e ${T}`
+const produtoE = sql(`insert into estoque_produtos (empresa_id, nome, preco, ativo) values (1, '${NOME_E}', 800, true) returning id`)
+const produtoP = sql(`insert into estoque_produtos (empresa_id, nome, preco, ativo) values (1, '${NOME_P}', 900, true) returning id`)
+const vendaE = sql(`insert into vendas_vendas (empresa_id, filial_id, cliente_id, produto_id, valor_venda, status, canal_venda, grupo_pdv, data_venda, vendedor_id)
+  values (1, 3, ${cliente}, ${produtoE}, 800, 'encomenda', 'encomenda', gen_random_uuid(), now(), '${dono}') returning id`)
+const vendaP = sql(`insert into vendas_vendas (empresa_id, filial_id, cliente_id, produto_id, valor_venda, status, canal_venda, grupo_pdv, data_venda, vendedor_id)
+  values (1, 3, ${cliente}, ${produtoP}, 900, 'pendente_entrega', 'loja_fisica', gen_random_uuid(), now(), '${dono}') returning id`)
 // B: peça no balcão.
 const unidade = sql(`insert into estoque_unidades (empresa_id, filial_id, produto_id, imei, preco_venda, preco_custo, status, ativo, quantidade)
   values (1, 3, ${produto}, '${IMEI}', 500, 100, 'disponivel', true, 1) returning id`)
@@ -60,6 +71,18 @@ try {
   confere(vA === `concluida|historico|${dono}`, `A: concluída pela RPC, com via e quem (${vA})`)
   const pA = sql(`select count(*) || '|' || sum(valor_pago) from vendas_pagamentos where venda_id=${encomenda}`)
   confere(pA === '2|1000.00', `A: sinal R$ 300 + R$ 700 recebido = R$ 1.000 em pagamentos (${pA})`)
+  // H1 (24/11/2026): a data da venda continua a do lançamento (2 dias atrás); a conclusão fica em concluida_em.
+  const dA = sql(`select (data_venda < now() - interval '1 day')::text || '|' || (concluida_em > now() - interval '10 minutes')::text from vendas_vendas where id=${encomenda}`)
+  confere(dA === 'true|true', `H1: data_venda mantida e concluida_em = agora (${dA})`)
+
+  // ── H3. Encomendas em aberto: o lápis de ajuste só em encomenda ─────────────
+  await page.goto(BASE + '/pdv', { waitUntil: 'networkidle', timeout: 300000 })
+  await page.getByRole('button', { name: /^Encomenda/ }).first().click(); await espera(1200)
+  const cartao = (nome) => page.locator('div.rounded-card').filter({ hasText: nome }).first()
+  const lapisE = await cartao(NOME_E).locator('button[title="Ajustar valores e prazo"]').count()
+  const lapisP = await cartao(NOME_P).locator('button[title="Ajustar valores e prazo"]').count()
+  confere(await cartao(NOME_E).count() === 1 && lapisE === 1, `H3: encomenda mostra o lápis de ajuste (${lapisE})`)
+  confere(await cartao(NOME_P).count() === 1 && lapisP === 0, `H3: pendente de entrega NÃO mostra o lápis (${lapisP})`)
 
   // ── B. PDV balcão ───────────────────────────────────────────────────────────
   await page.goto(BASE + '/pdv', { waitUntil: 'networkidle', timeout: 300000 })
@@ -85,14 +108,14 @@ try {
 } finally {
   await browser.close()
   try {
-    const vendas = sql(`select coalesce(string_agg(id::text, ','), '') from vendas_vendas where produto_id=${produto} or unidade_id=${unidade} or id=${encomenda}`)
+    const vendas = sql(`select coalesce(string_agg(id::text, ','), '') from vendas_vendas where produto_id in (${produto}, ${produtoE}, ${produtoP}) or unidade_id=${unidade} or id in (${encomenda}, ${vendaE}, ${vendaP})`)
     if (vendas) {
       sql(`delete from vendas_pagamentos where venda_id in (${vendas})`)
       sql(`delete from vendas_termos where venda_id in (${vendas})`)
       sql(`delete from vendas_vendas where id in (${vendas})`)
     }
     sql(`delete from estoque_unidades where id=${unidade}`)
-    sql(`delete from estoque_produtos where id=${produto}`)
+    sql(`delete from estoque_produtos where id in (${produto}, ${produtoE}, ${produtoP})`)
     sql(`update usuarios set filial_atual_id=${filialAntes || 'null'} where id='${dono}'`)
     confere(sql(`select count(*) from estoque_produtos where nome='${NOME}'`) === '0'
       && sql(`select count(*) from vendas_vendas where id=${encomenda} or unidade_id=${unidade}`) === '0', 'limpeza: produto, peça, vendas e pagamentos apagados')

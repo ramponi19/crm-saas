@@ -20,6 +20,17 @@
 --      gravar 'concluida' nem 'pendente_entrega' direto — nem por INSERT nem por UPDATE. Só as
 --      funções acima (que rodam como o dono) passam. O service_role (rotas do servidor) não é
 --      barrado: é código nosso, revisado.
+--   6. (24/11/2026, roteiro §1.1) Gatilho vendas_valor_guarda — preço e custo congelados:
+--      H2. venda CONCLUÍDA não muda de valor_venda / valor_custo / desconto_valor por ninguém de fora do
+--          banco (navegador, rotas com service_role). Script de operação passa só com a marca explícita
+--          set_config('nexus.venda_valor_ajuste', '<motivo>', true), no molde do nexus.venda_excecao.
+--      H3. pelo navegador, preço e custo só se ajustam em ENCOMENDA (status 'encomenda'): não em
+--          'pendente_entrega' (balcão com entrega depois, orçamento aprovado pelo link), nem em
+--          'em_fechamento', nem em qualquer outra situação.
+--      As funções do banco (SECURITY DEFINER) não passam por essas regras: são elas que fecham.
+--   7. (24/11/2026, H1) A conclusão NÃO mexe mais em data_venda. A data da venda (quando foi lançada) e a
+--      da conclusão (concluida_em) ficam separadas. Quem contava "no mês da entrega" passa a usar
+--      coalesce(concluida_em, data_venda) — hoje, a tela de comissão (lib/vendas-mes.ts).
 --
 -- A venda é bigint (vendas_vendas.id), não uuid. O "fechamento" é o grupo_pdv: uma venda por item,
 -- os pagamentos na primeira linha do grupo (convenção do PDV e da encomenda desde 09/2026).
@@ -78,6 +89,44 @@ drop trigger if exists vendas_conclusao_guarda on public.vendas_vendas;
 create trigger vendas_conclusao_guarda
   before insert or update of status on public.vendas_vendas
   for each row execute function public.vendas_conclusao_guarda();
+
+-- ── 2b. Preço e custo congelados (H2 e H3) ──────────────────────────────────────────────────
+create or replace function public.vendas_valor_guarda()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if (new.valor_venda, new.valor_custo, new.desconto_valor)
+       is not distinct from (old.valor_venda, old.valor_custo, old.desconto_valor) then
+    return new;
+  end if;
+  -- Dentro das funções do banco (SECURITY DEFINER) o current_user é o dono delas: passam.
+  if current_user not in ('authenticated', 'anon', 'service_role') then
+    return new;
+  end if;
+  -- H2: concluída não muda de valor, nem por rota do servidor. Só script de operação com a marca.
+  if old.status = 'concluida' then
+    if coalesce(current_setting('nexus.venda_valor_ajuste', true), '') <> '' then
+      return new;
+    end if;
+    raise exception 'Venda concluída não muda de valor'
+      using errcode = '42501',
+            hint = 'O valor e o custo ficam congelados na conclusão. Correção só por devolução/cancelamento ou script de operação com nexus.venda_valor_ajuste.';
+  end if;
+  -- H3: pelo navegador, preço e custo só se ajustam em encomenda.
+  if current_user in ('authenticated', 'anon') and old.status is distinct from 'encomenda' then
+    raise exception 'Preço e custo só se ajustam em encomenda (situação: %)', coalesce(old.status, 'sem situação')
+      using errcode = '42501';
+  end if;
+  return new;
+end $$;
+revoke all on function public.vendas_valor_guarda() from public, anon, authenticated;
+
+drop trigger if exists vendas_valor_guarda on public.vendas_vendas;
+create trigger vendas_valor_guarda
+  before update of valor_venda, valor_custo, desconto_valor on public.vendas_vendas
+  for each row execute function public.vendas_valor_guarda();
 
 -- ── 3. Saldo do fechamento (leitura, com a RLS de quem chama) ──────────────────────────────
 create or replace function public.encomenda_saldo(p_venda_id bigint)
@@ -246,11 +295,10 @@ begin
     from jsonb_array_elements(coalesce(p_pagamentos, '[]'::jsonb)) e
    where coalesce((e->>'valor')::numeric, 0) > 0;
 
-  -- Conclui. A data da venda passa a ser a da ENTREGA (é por ela que o faturamento do mês conta).
+  -- Conclui. H1 (24/11/2026): a data da venda NÃO muda — a da conclusão fica em concluida_em.
   -- A série do aparelho só existe na unidade: copiada para a venda se ela não tiver.
   update vendas_vendas vv
      set status          = 'concluida',
-         data_venda      = now(),
          concluida_em    = now(),
          concluida_por   = v_uid,
          concluida_via   = p_origem,

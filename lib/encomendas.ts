@@ -140,6 +140,16 @@ export function ordenarPorUrgencia<T extends EncomendaAberta>(lista: T[], hoje: 
 }
 
 /** O dinheiro que o cliente paga NA ENTREGA (o saldo). Vai para `vendas_pagamentos`. */
+/**
+ * HOTFIX H3 (24/11/2026): preço e custo só se ajustam quando TODOS os itens do fechamento estão em
+ * 'encomenda'. A lista "Encomendas em aberto" também mostra 'pendente_entrega' (balcão com entrega depois,
+ * orçamento aprovado pelo link): esses já estão fechados no valor. O banco recusa do mesmo jeito
+ * (gatilho vendas_valor_guarda, migração 20261125000100); esta função só esconde o botão.
+ */
+export function podeAjustarValores(itens: { status: string | null }[]): boolean {
+  return itens.length > 0 && itens.every((i) => i.status === 'encomenda')
+}
+
 export interface PagamentoNaEntrega {
   forma: string
   valor: number
@@ -180,7 +190,7 @@ export async function saldoDaEncomenda(supabase: SupabaseClient, vendaId: number
  * ENTREGAR: o ÚNICO caminho que conclui uma encomenda ou uma entrega pendente.
  *
  * Tudo acontece no banco, numa transação (`concluir_encomenda`, migração
- * 20261119000100): acessórios, o pagamento do saldo, a conferência "pagamentos do
+ * 20261125000100): acessórios, o pagamento do saldo, a conferência "pagamentos do
  * fechamento = valor do fechamento", a cópia da série da unidade para a venda e a
  * baixa do estoque. Se faltar dinheiro, o banco recusa com "Saldo em aberto: R$ X"
  * e nada fica gravado.
