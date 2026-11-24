@@ -3,11 +3,10 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { MessageCircle, Phone, Check, MoreHorizontal, CheckCircle2, Copy, ExternalLink } from 'lucide-react'
+import { MessageCircle, Phone, Check, MoreHorizontal, CheckCircle2, Copy, ExternalLink, FileText } from 'lucide-react'
 import { Topbar } from '@/components/layout/topbar'
 import { Button, Input, Badge, EmptyState, Tabs, notify } from '@/components/ui'
-import { linkWhatsApp } from '@/lib/whatsapp-link'
-import { textoDias, type GrupoFila, type ItemPosVenda } from '@/lib/posvenda/fila'
+import { textoDias, type ContatoDoPasso, type GrupoFila, type ItemPosVenda } from '@/lib/posvenda/fila'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -131,7 +130,6 @@ function CartaoPasso({ item, mostrarResponsavel, aberto, ocupado, alternar, regi
   const [motivo, setMotivo] = useState('')
   const [nota, setNota] = useState<number | null>(null)
   const [comentario, setComentario] = useState('')
-  const wa = linkWhatsApp(item.telefone, item.mensagem)
   const tel = (item.telefone ?? '').replace(/\D/g, '')
   const pesquisa = item.tipo === 'pesquisa'
 
@@ -158,6 +156,9 @@ function CartaoPasso({ item, mostrarResponsavel, aberto, ocupado, alternar, regi
         {item.tentativas > 0 && <span className="text-ink-3">{item.tentativas === 1 ? '1 tentativa' : `${item.tentativas} tentativas`} sem resposta</span>}
         {mostrarResponsavel && item.responsavel && <span className="truncate text-ink-3">{item.responsavel}</span>}
       </div>
+      {item.tipo !== 'ligacao' && item.contato.aviso && (
+        <div className={cn('mt-1 text-[11.5px]', item.contato.modo === 'modelo' ? 'text-warn' : 'text-ink-3')}>{item.contato.aviso}</div>
+      )}
       {/* 4. ações */}
       <div className="mt-2.5 flex items-center gap-2">
         {item.tipo === 'ligacao' ? (
@@ -165,9 +166,7 @@ function CartaoPasso({ item, mostrarResponsavel, aberto, ocupado, alternar, regi
             <Button variant="outline" size="sm" className="w-full" icon={<Phone size={14} strokeWidth={1.8} />}>Ligar</Button>
           </a>
         ) : (
-          <a href={wa ?? undefined} target="_blank" rel="noopener noreferrer" className={cn('flex-1', !wa && 'pointer-events-none opacity-50')}>
-            <Button variant="outline" size="sm" className="w-full" icon={<MessageCircle size={14} strokeWidth={1.8} />}>WhatsApp</Button>
-          </a>
+          <BotaoContato contato={item.contato} />
         )}
         <Button size="sm" className="flex-1" loading={ocupado && !aberto} icon={<Check size={14} strokeWidth={2} />}
           onClick={() => (pesquisa ? abrirPainel('nota') : registrar({ acao: 'feito' }, 'Passo registrado'))}>
@@ -197,9 +196,11 @@ function CartaoPasso({ item, mostrarResponsavel, aberto, ocupado, alternar, regi
                 <Button variant="outline" size="sm" onClick={() => setModo('reagendar')}>Reagendar</Button>
                 <Button variant="outline" size="sm" onClick={() => setModo('pular')}>Pular</Button>
               </div>
-              {item.tipo === 'ligacao' && wa && (
-                <a href={wa} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[12px] font-medium text-ink-2">
-                  <MessageCircle size={13} strokeWidth={1.8} /> Abrir o WhatsApp em vez de ligar
+              {item.tipo === 'ligacao' && item.contato.href && (
+                <a href={item.contato.href} {...(item.contato.modo === 'externo' ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                  className="flex items-center gap-1.5 text-[12px] font-medium text-ink-2">
+                  <MessageCircle size={13} strokeWidth={1.8} /> {item.contato.modo === 'modelo' ? 'Enviar modelo no WhatsApp' : 'Abrir o WhatsApp em vez de ligar'}
+                  {item.contato.aviso && <span className="font-normal text-ink-3">· {item.contato.aviso}</span>}
                 </a>
               )}
               {item.negocioId && (
@@ -207,7 +208,6 @@ function CartaoPasso({ item, mostrarResponsavel, aberto, ocupado, alternar, regi
                   <ExternalLink size={13} strokeWidth={1.8} /> Abrir o cliente
                 </Link>
               )}
-              <p className="text-[11px] text-ink-3">O WhatsApp abre fora do Nexus: a conversa não fica registrada aqui.</p>
             </div>
           )}
           {modo === 'reagendar' && (
@@ -239,5 +239,30 @@ function CartaoPasso({ item, mostrarResponsavel, aberto, ocupado, alternar, regi
         </div>
       )}
     </li>
+  )
+}
+
+/**
+ * O botão principal do passo (decidirContato): a conversa no Nexus com a mensagem no campo; "Enviar modelo" quando a
+ * janela de 24 h da Meta está fechada; o WhatsApp de fora (wa.me, nova aba) quando não há conversa no WhatsApp da loja.
+ */
+function BotaoContato({ contato }: { contato: ContatoDoPasso }) {
+  if (!contato.href) {
+    return <Button variant="outline" size="sm" className="flex-1" disabled icon={<MessageCircle size={14} strokeWidth={1.8} />}>WhatsApp</Button>
+  }
+  if (contato.modo === 'externo') {
+    return (
+      <a href={contato.href} target="_blank" rel="noopener noreferrer" className="flex-1" data-contato="externo">
+        <Button variant="outline" size="sm" className="w-full" icon={<ExternalLink size={14} strokeWidth={1.8} />}>WhatsApp</Button>
+      </a>
+    )
+  }
+  return (
+    <Link href={contato.href} className="flex-1" data-contato={contato.modo}>
+      <Button variant="outline" size="sm" className="w-full"
+        icon={contato.modo === 'modelo' ? <FileText size={14} strokeWidth={1.8} /> : <MessageCircle size={14} strokeWidth={1.8} />}>
+        {contato.modo === 'modelo' ? 'Enviar modelo' : 'WhatsApp'}
+      </Button>
+    </Link>
   )
 }

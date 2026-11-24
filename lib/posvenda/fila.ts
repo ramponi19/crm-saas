@@ -4,6 +4,7 @@
  * o roteiro do passo (configuração da empresa), com as variáveis trocadas.
  */
 import { diasEntre } from '@/lib/datas'
+import { linkWhatsApp } from '@/lib/whatsapp-link'
 
 export type GrupoFila = 'atrasados' | 'hoje' | 'proximos'
 export type TipoAcao = 'whatsapp' | 'ligacao' | 'pesquisa' | 'tarefa_interna'
@@ -30,6 +31,43 @@ export interface ItemPosVenda {
   responsavel: string | null
   loja: string | null
   tentativas: number
+  /** Por onde falar com o cliente (decidirContato). */
+  contato: ContatoDoPasso
+}
+
+/**
+ * POR ONDE FALAR COM O CLIENTE (24/11/2026, pedido do Lucas). Na ordem:
+ *   nexus      há conversa do contato num WhatsApp conectado da loja: abre a conversa DENTRO do Nexus, com a mensagem
+ *              no campo de envio (fica registrada; a resposta entra pelo roteamento do pós-venda);
+ *   modelo     a mesma conversa, mas é API oficial e a janela de 24 h da Meta está fechada: só modelo aprovado
+ *              (abre a lista dos de Utilidade, D8);
+ *   externo    sem conversa no WhatsApp da loja: wa.me, com o aviso de que a conversa não fica registrada;
+ *   sem_numero sem conversa e sem telefone válido.
+ */
+export type ModoContato = 'nexus' | 'modelo' | 'externo' | 'sem_numero'
+export interface ContatoDoPasso { modo: ModoContato; href: string | null; aviso: string | null }
+export interface ConversaDoCanal {
+  conversaId: number
+  /** tipo do canal (whatsapp, instagram…) e se é a API oficial da Meta (tem WABA). */
+  canalTipo: string
+  oficial: boolean
+  ultimaRecebida: string | null
+}
+export const JANELA_META_MS = 24 * 60 * 60 * 1000
+
+export function decidirContato(conversa: ConversaDoCanal | null, telefone: string | null | undefined, mensagem: string, agora: Date): ContatoDoPasso {
+  if (conversa && conversa.canalTipo === 'whatsapp') {
+    const ultima = conversa.ultimaRecebida ? new Date(conversa.ultimaRecebida).getTime() : null
+    if (conversa.oficial && (ultima == null || agora.getTime() - ultima > JANELA_META_MS)) {
+      return { modo: 'modelo', href: `/comunicacao?c=${conversa.conversaId}&modelo=utilidade`,
+               aviso: 'Janela de 24 h fechada: só modelo aprovado' }
+    }
+    const t = mensagem.trim()
+    return { modo: 'nexus', href: `/comunicacao?c=${conversa.conversaId}${t ? `&texto=${encodeURIComponent(t)}` : ''}`, aviso: null }
+  }
+  const wa = linkWhatsApp(telefone, mensagem)
+  if (wa) return { modo: 'externo', href: wa, aviso: 'Fora do Nexus: a conversa não fica registrada' }
+  return { modo: 'sem_numero', href: null, aviso: 'Sem WhatsApp da loja e sem telefone válido' }
 }
 
 /** Atrasado (antes de hoje), hoje, ou nos próximos dias. */

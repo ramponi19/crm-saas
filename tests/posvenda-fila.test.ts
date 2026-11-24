@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  descricaoDaCompra, diasDesdeAVenda, grupoDoDia, montarMensagem, ordenarFila, primeiroNome, rotuloDoPasso, textoDias,
+  decidirContato, descricaoDaCompra, diasDesdeAVenda, grupoDoDia, montarMensagem, ordenarFila, primeiroNome, rotuloDoPasso, textoDias,
 } from '@/lib/posvenda/fila'
 import { linkWhatsApp } from '@/lib/whatsapp-link'
 
@@ -61,4 +61,33 @@ test('WhatsApp: 55 na frente do número brasileiro; texto codificado; sem númer
   assert.equal(linkWhatsApp('+55 19 3333-4444'), 'https://wa.me/551933334444')
   assert.equal(linkWhatsApp('123'), null)
   assert.equal(linkWhatsApp(null, 'x'), null)
+})
+
+// 24/11/2026: por onde falar com o cliente.
+
+const AGORA = new Date('2026-11-24T15:00:00Z')
+const MSG = 'Oi Ana, o iPhone chegou bem?'
+
+test('contato: conversa no WhatsApp da loja com a janela aberta → abre no Nexus com a mensagem no campo', () => {
+  const c = decidirContato({ conversaId: 42, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: '2026-11-24T09:00:00Z' }, '11987654321', MSG, AGORA)
+  assert.equal(c.modo, 'nexus')
+  assert.equal(c.href, `/comunicacao?c=42&texto=${encodeURIComponent(MSG)}`)
+  assert.equal(c.aviso, null)
+})
+
+test('contato: API oficial com a janela de 24 h fechada (ou o cliente nunca escreveu) → modelo de Utilidade', () => {
+  const fechada = decidirContato({ conversaId: 42, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: '2026-11-23T14:59:00Z' }, '11987654321', MSG, AGORA)
+  assert.equal(fechada.modo, 'modelo')
+  assert.equal(fechada.href, '/comunicacao?c=42&modelo=utilidade')
+  assert.match(fechada.aviso ?? '', /24 h/)
+  assert.equal(decidirContato({ conversaId: 7, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: null }, null, MSG, AGORA).modo, 'modelo')
+})
+
+test('contato: sem conversa no WhatsApp da loja → wa.me com o aviso; sem telefone → sem botão', () => {
+  const ext = decidirContato(null, '11987654321', MSG, AGORA)
+  assert.equal(ext.modo, 'externo')
+  assert.ok(ext.href?.startsWith('https://wa.me/5511987654321?text='))
+  assert.match(ext.aviso ?? '', /não fica registrada/)
+  assert.equal(decidirContato({ conversaId: 9, canalTipo: 'instagram', oficial: false, ultimaRecebida: null }, '11987654321', MSG, AGORA).modo, 'externo')
+  assert.deepEqual(decidirContato(null, '', MSG, AGORA).modo, 'sem_numero')
 })

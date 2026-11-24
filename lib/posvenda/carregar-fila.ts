@@ -2,8 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { diaNoFuso, instanteLocal, somarDias } from '@/lib/datas'
 import { semTipo } from '@/lib/posvenda/ligado'
 import {
-  descricaoDaCompra, diasDesdeAVenda, grupoDoDia, montarMensagem, ordenarFila, rotuloDoPasso,
-  type ItemPosVenda, type TipoAcao,
+  decidirContato, descricaoDaCompra, diasDesdeAVenda, grupoDoDia, montarMensagem, ordenarFila, rotuloDoPasso,
+  type ConversaDoCanal, type ItemPosVenda, type TipoAcao,
 } from '@/lib/posvenda/fila'
 
 /**
@@ -17,6 +17,7 @@ const um = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 interface Linha {
   id: number
   negocio_id: number | null
+  contato_id: number
   filial_id: number | null
   responsavel_id: string
   previsto_para: string
@@ -39,7 +40,7 @@ export async function carregarFilaPosVenda(db: SupabaseClient<any>, opcoes: {
   const s = semTipo(db)
 
   let q = s.from('posvenda_acompanhamentos')
-    .select(`id, negocio_id, filial_id, responsavel_id, previsto_para, tentativas,
+    .select(`id, negocio_id, contato_id, filial_id, responsavel_id, previsto_para, tentativas,
       contato:contatos!contato_id(nome, telefone),
       passo:posvenda_cadencia_passos!passo_id(titulo, tipo_acao, roteiro, dia_offset),
       negocio:negocios!negocio_id(ganho_em, responsavel_id, produto:dados->>produto_interessado, venda:dados->venda),
@@ -64,6 +65,8 @@ export async function carregarFilaPosVenda(db: SupabaseClient<any>, opcoes: {
   const nomeCat = new Map(((cats ?? []) as { id: number; nome: string }[]).map((c) => [c.id, c.nome]))
   const nomePessoa = new Map(((users ?? []) as { id: string; nome: string | null }[]).map((u) => [u.id, u.nome]))
   const nomeLoja = new Map(((fils ?? []) as { id: number; nome: string }[]).map((f) => [f.id, f.nome]))
+  const conversa = await conversasNoWhatsAppDaLoja(s, linhas)
+  const agora = opcoes.agora ?? new Date()
 
   const itens: ItemPosVenda[] = linhas.map((l) => {
     const contato = um(l.contato)
@@ -76,6 +79,7 @@ export async function carregarFilaPosVenda(db: SupabaseClient<any>, opcoes: {
     const produto = descricaoDaCompra(negocio?.produto, categoria, negocio?.venda?.condicao, opcoes.rotuloUsado)
     const loja = l.filial_id != null ? nomeLoja.get(l.filial_id) ?? null : null
     const vendedor = negocio?.responsavel_id ? nomePessoa.get(negocio.responsavel_id) ?? null : null
+    const mensagem = montarMensagem(passo?.roteiro, { nome: contato?.nome, produto: negocio?.produto?.trim() || categoria, loja, vendedor })
     return {
       id: l.id,
       negocioId: l.negocio_id,
@@ -88,13 +92,45 @@ export async function carregarFilaPosVenda(db: SupabaseClient<any>, opcoes: {
       diasDaVenda: diasDesdeAVenda(diaVenda, hoje),
       passo: rotuloDoPasso(passo?.dia_offset, passo?.titulo ?? 'Passo'),
       tipo: passo?.tipo_acao ?? 'tarefa_interna',
-      mensagem: montarMensagem(passo?.roteiro, { nome: contato?.nome, produto: negocio?.produto?.trim() || categoria, loja, vendedor }),
+      mensagem,
       regua: um(um(l.jornada)?.cadencia ?? null)?.nome ?? null,
       responsavelId: l.responsavel_id,
       responsavel: nomePessoa.get(l.responsavel_id) ?? null,
       loja,
       tentativas: l.tentativas ?? 0,
+      contato: decidirContato(conversa.get(l.id) ?? null, contato?.telefone, mensagem, agora),
     }
   })
   return { itens: ordenarFila(itens), hoje, cortado: linhas.length >= LIMITE_FILA }
+}
+
+/**
+ * A conversa de cada passo no WhatsApp CONECTADO da loja: do contato do passo, canal whatsapp ativo, de preferência o
+ * canal da loja do passo; entre várias, a de mensagem mais recente. Pela sessão (RLS das conversas e canais).
+ */
+async function conversasNoWhatsAppDaLoja(s: SupabaseClient, linhas: Linha[]): Promise<Map<number, ConversaDoCanal>> {
+  const out = new Map<number, ConversaDoCanal>()
+  const contatos = [...new Set(linhas.map((l) => l.contato_id))]
+  if (contatos.length === 0) return out
+  type C = { id: number; contato_id: number; ultima_recebida_at: string | null; ultima_mensagem_at: string | null
+    canal: Embed<{ tipo: string; status: string; filial_id: number | null }> }
+  const { data } = await s.from('conversas')
+    .select('id, contato_id, ultima_recebida_at, ultima_mensagem_at, canal:canais!canal_id(tipo, status, filial_id)')
+    .in('contato_id', contatos).not('canal_id', 'is', null)
+  const porContato = new Map<number, C[]>()
+  for (const c of (data ?? []) as unknown as C[]) {
+    const canal = um(c.canal)
+    if (canal?.tipo !== 'whatsapp' || canal.status !== 'ativo') continue
+    porContato.set(c.contato_id, [...(porContato.get(c.contato_id) ?? []), c])
+  }
+  for (const l of linhas) {
+    const lista = (porContato.get(l.contato_id) ?? []).slice().sort((a, b) =>
+      Number(um(b.canal)?.filial_id === l.filial_id) - Number(um(a.canal)?.filial_id === l.filial_id)
+      || (b.ultima_mensagem_at ?? '').localeCompare(a.ultima_mensagem_at ?? ''))
+    const c = lista[0]
+    // O WhatsApp no Nexus é sempre a API oficial da Meta (lib/whatsapp/types.ts: o único provedor é 'official'): a
+    // janela de 24 h vale para todo canal whatsapp, como no painel da conversa.
+    if (c) out.set(l.id, { conversaId: c.id, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: c.ultima_recebida_at })
+  }
+  return out
 }

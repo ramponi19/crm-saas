@@ -88,6 +88,31 @@ describe('fila do pós-venda (rotas + RPCs + banco)', () => {
     assert.equal(a.mensagem, 'Oi Ana, o iPhone 15 chegou bem?')
   })
 
+  test('o botão do WhatsApp: sem conversa → wa.me; conversa no canal da loja → Nexus com a mensagem; janela fechada → modelo', async () => {
+    const botao = async () => {
+      const { itens } = await carregarFilaPosVenda(sessoes.m1, { empresaId: EMPRESA, fuso: 'America/Sao_Paulo', rotuloUsado: 'Seminovo', so: M1 })
+      return itens.find((i) => i.id === acomp[0])!.contato
+    }
+    // 1. sem conversa no WhatsApp da loja
+    const sem = await botao()
+    assert.equal(sem.modo, 'externo'); assert.ok(sem.href?.startsWith('https://wa.me/5511987654321?text=')); assert.match(sem.aviso ?? '', /não fica registrada/)
+    // 2. conversa no WhatsApp conectado da loja, cliente escreveu há 1 hora
+    const canal = ok(await svc.from('canais').insert({ empresa_id: EMPRESA, filial_id: LOJA, tipo: 'whatsapp', external_id: 'teste-local-posvenda', status: 'ativo', via: 'pagina' }).select('id').single()) as { id: number }
+    const { data: ct } = await svc.from('negocios').select('contato_id').eq('id', negocio).single()
+    const conv = ok(await svc.from('conversas').insert({ empresa_id: EMPRESA, filial_id: LOJA, contato_id: ct!.contato_id, canal_id: canal.id,
+      ultima_recebida_at: new Date(Date.now() - 3600_000).toISOString(), ultima_mensagem_at: new Date().toISOString() }).select('id').single()) as { id: number }
+    const nx = await botao()
+    assert.equal(nx.modo, 'nexus')
+    assert.equal(nx.href, `/comunicacao?c=${conv.id}&texto=${encodeURIComponent('Oi Ana, o iPhone 15 chegou bem?')}`)
+    // 3. a mesma conversa, cliente escreveu há 30 horas: janela de 24 h fechada
+    ok(await svc.from('conversas').update({ ultima_recebida_at: new Date(Date.now() - 30 * 3600_000).toISOString() }).eq('id', conv.id).select('id'))
+    const md = await botao()
+    assert.equal(md.modo, 'modelo'); assert.equal(md.href, `/comunicacao?c=${conv.id}&modelo=utilidade`)
+    // canal desconectado: volta para o wa.me
+    ok(await svc.from('canais').update({ status: 'desconectado' }).eq('id', canal.id).select('id'))
+    assert.equal((await botao()).modo, 'externo')
+  })
+
   test('outro vendedor não registra o passo de M1 (403); M1 registra (feito)', async () => {
     atual = sessoes.m2
     assert.equal((await registrar({ acompanhamento: acomp[0], acao: 'feito' })).status, 403)
