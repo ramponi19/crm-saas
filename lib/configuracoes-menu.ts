@@ -82,6 +82,7 @@ export function secoesDeConfiguracoes({ isAdmin, abasDosModulos, zapintel }: {
         { href: '/configuracoes/etiquetas', label: 'Etiquetas' },
         { href: '/configuracoes/horario', label: 'Horário' },
         ...(tem('agendamento') ? [{ href: '/configuracoes/agendamento', label: 'Agendamento' }] : []),
+        ...(tem('posvenda') ? [{ href: '/configuracoes/pos-venda', label: 'Pós-venda' }] : []),
       ] },
       { label: 'Loja', itens: [
         // Seções de módulo (17/11/2026): só com o módulo dono ligado (core/modulos.ts → abasConfiguracoes).

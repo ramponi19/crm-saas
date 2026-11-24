@@ -118,7 +118,12 @@ export function InboxView(props: InboxProps) {
   const [rascunho] = useState<{ conversa: number; r: RascunhoDaConversa } | null>(() => {
     const c = Number(params.get('c')) || null
     const texto = params.get('texto')
-    const modelo = params.get('modelo') === 'utilidade' ? 'utilidade' as const : null
+    // modelo=utilidade (fila de 24/11, só Utilidade) | modelo=posvenda&cat=UTILITY,MARKETING&m=<id do modelo do passo>
+    const tipo = params.get('modelo')
+    const cats = (params.get('cat') ?? '').split(',').filter((c) => c === 'UTILITY' || c === 'MARKETING')
+    const m = Number(params.get('m')) || null
+    const modelo = tipo === 'utilidade' ? { categorias: ['UTILITY'], preferido: null }
+      : tipo === 'posvenda' ? { categorias: cats.length ? cats : ['UTILITY'], preferido: m } : null
     return c && (texto || modelo) ? { conversa: c, r: { texto: texto?.slice(0, 4000) ?? null, modelo } } : null
   })
   const [canais, setCanais] = useState<CanalInbox[] | null>(null)

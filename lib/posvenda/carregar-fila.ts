@@ -23,7 +23,7 @@ interface Linha {
   previsto_para: string
   tentativas: number
   contato: Embed<{ nome: string | null; telefone: string | null }>
-  passo: Embed<{ titulo: string; tipo_acao: TipoAcao; roteiro: string | null; dia_offset: number }>
+  passo: Embed<{ titulo: string; tipo_acao: TipoAcao; roteiro: string | null; dia_offset: number; modelo_id: number | null }>
   negocio: Embed<{ ganho_em: string | null; responsavel_id: string | null; produto: string | null; venda: { data?: string; categoria_id?: number | null; condicao?: string } | null }>
   jornada: Embed<{ cadencia: Embed<{ nome: string }> }>
 }
@@ -34,6 +34,8 @@ export const LIMITE_FILA = 400
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function carregarFilaPosVenda(db: SupabaseClient<any>, opcoes: {
   empresaId: number; fuso: string; rotuloUsado: string; so?: string | null; agora?: Date
+  /** Categorias de modelo liberadas para o pós-venda (posvenda.categorias_modelo; padrão só Utilidade). */
+  categoriasModelo?: string[]
 }): Promise<{ itens: ItemPosVenda[]; hoje: string; cortado: boolean }> {
   const hoje = diaNoFuso(opcoes.agora ?? new Date(), opcoes.fuso)
   const ate = instanteLocal(somarDias(hoje, DIAS_A_FRENTE + 1), '00:00', opcoes.fuso)
@@ -42,7 +44,7 @@ export async function carregarFilaPosVenda(db: SupabaseClient<any>, opcoes: {
   let q = s.from('posvenda_acompanhamentos')
     .select(`id, negocio_id, contato_id, filial_id, responsavel_id, previsto_para, tentativas,
       contato:contatos!contato_id(nome, telefone),
-      passo:posvenda_cadencia_passos!passo_id(titulo, tipo_acao, roteiro, dia_offset),
+      passo:posvenda_cadencia_passos!passo_id(titulo, tipo_acao, roteiro, dia_offset, modelo_id),
       negocio:negocios!negocio_id(ganho_em, responsavel_id, produto:dados->>produto_interessado, venda:dados->venda),
       jornada:posvenda_jornadas!jornada_id(cadencia:posvenda_cadencias!cadencia_id(nome))`)
     .eq('empresa_id', opcoes.empresaId).eq('status', 'pendente')
@@ -98,7 +100,8 @@ export async function carregarFilaPosVenda(db: SupabaseClient<any>, opcoes: {
       responsavel: nomePessoa.get(l.responsavel_id) ?? null,
       loja,
       tentativas: l.tentativas ?? 0,
-      contato: decidirContato(conversa.get(l.id) ?? null, contato?.telefone, mensagem, agora),
+      contato: decidirContato(conversa.get(l.id) ?? null, contato?.telefone, mensagem, agora,
+        { id: passo?.modelo_id ?? null, categorias: opcoes.categoriasModelo ?? ['UTILITY'] }),
     }
   })
   return { itens: ordenarFila(itens), hoje, cortado: linhas.length >= LIMITE_FILA }

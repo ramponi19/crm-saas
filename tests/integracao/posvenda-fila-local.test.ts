@@ -107,7 +107,7 @@ describe('fila do pós-venda (rotas + RPCs + banco)', () => {
     // 3. a mesma conversa, cliente escreveu há 30 horas: janela de 24 h fechada
     ok(await svc.from('conversas').update({ ultima_recebida_at: new Date(Date.now() - 30 * 3600_000).toISOString() }).eq('id', conv.id).select('id'))
     const md = await botao()
-    assert.equal(md.modo, 'modelo'); assert.equal(md.href, `/comunicacao?c=${conv.id}&modelo=utilidade`)
+    assert.equal(md.modo, 'modelo'); assert.equal(md.href, `/comunicacao?c=${conv.id}&modelo=posvenda&cat=UTILITY`)
     // canal desconectado: volta para o wa.me
     ok(await svc.from('canais').update({ status: 'desconectado' }).eq('id', canal.id).select('id'))
     assert.equal((await botao()).modo, 'externo')
