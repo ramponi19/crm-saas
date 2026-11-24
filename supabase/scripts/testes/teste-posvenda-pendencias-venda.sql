@@ -42,7 +42,7 @@ begin
 
   -- 3. ganho de novo com a venda nova: grava normalmente
   update negocios set status = 'ganho', etapa_id = 76, ganho_em = (hoje + time '12:00') at time zone 'America/Sao_Paulo',
-         dados = dados || jsonb_build_object('venda', jsonb_build_object('data', hoje::text, 'categoria_id', 10, 'condicao', 'seminovo', 'valor', 3000))
+         dados = dados || jsonb_build_object('venda', jsonb_build_object('data', hoje::text, 'categoria_id', 10, 'condicao', 'usado', 'valor', 3000))
    where id = n;
   res := res || jsonb_build_object('3_ganho_de_novo', (select jsonb_build_object('status', status, 'categoria', dados -> 'venda' -> 'categoria_id') from negocios where id = n));
 

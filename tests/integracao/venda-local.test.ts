@@ -120,9 +120,9 @@ describe('reabrir e corrigir a data: só dono e admin', () => {
 })
 
 describe('o banco confere a forma de dados.venda (core_validar_dados)', () => {
-  test('condição fora de novo/seminovo é recusada pelo gatilho', async () => {
+  test('condição fora de novo/usado é recusada pelo gatilho', async () => {
     const id = await negocioAberto('Teste local forma da venda')
-    const { error } = await svc.from('negocios').update({ dados: { _lead: { ativo: true }, venda: { condicao: 'usado' } } }).eq('id', id)
+    const { error } = await svc.from('negocios').update({ dados: { _lead: { ativo: true }, venda: { condicao: 'meio-usado' } } }).eq('id', id)
     assert.match(String(error?.message), /negocio\.venda/)
   })
   test('chave desconhecida em dados continua recusada', async () => {

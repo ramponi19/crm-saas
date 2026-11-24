@@ -1,7 +1,7 @@
 -- Teste da 20261124000400_posvenda_jornada (C3): os casos pedidos pelo Lucas em 24/11/2026.
 -- Banco local descartável, JM de teste (empresa 1, loja 3, vendedor M1 …0101, admin A …0201). Termina com RAISE.
 -- Réguas de teste: Aparelhos (categorias 1-4, prioridade 100): D+1 whatsapp, D+7 pesquisa, D+90 whatsapp (só
--- seminovo; do aparelho), D+330 ligação (ciclo de troca; do aparelho). Os demais são de relacionamento. Acessórios (6, prioridade 50): D+1 whatsapp, D+30 whatsapp.
+-- usado; do aparelho), D+330 ligação (ciclo de troca; do aparelho). Os demais são de relacionamento. Acessórios (6, prioridade 50): D+1 whatsapp, D+30 whatsapp.
 -- Geral (sem categorias): D+7 pesquisa, D+330 ligação (ciclo de troca).
 
 -- A venda como a rota grava: negócio aberto → ganho com dados.venda e ganho_em (o gatilho age no UPDATE).
@@ -39,7 +39,7 @@ begin
   insert into posvenda_cadencias (empresa_id, nome, prioridade, filtros) values (1, 'Aparelhos', 100, '{"categorias":[1,2,3,4]}') returning id into c_ap;
   insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo, filtros, grupo) values
     (1, c_ap, 1, 1, 'whatsapp', 'D+1 chegou bem?', '{}', 'relacionamento'), (1, c_ap, 2, 7, 'pesquisa', 'D+7 NPS', '{}', 'relacionamento'),
-    (1, c_ap, 3, 90, 'whatsapp', 'D+90 bateria', '{"condicao":"seminovo"}', 'produto'), (1, c_ap, 4, 330, 'ligacao', 'D+330 troca', '{}', 'produto');
+    (1, c_ap, 3, 90, 'whatsapp', 'D+90 bateria', '{"condicao":"usado"}', 'produto'), (1, c_ap, 4, 330, 'ligacao', 'D+330 troca', '{}', 'produto');
   insert into posvenda_cadencias (empresa_id, nome, prioridade, filtros) values (1, 'Acessórios', 50, '{"categorias":[6]}') returning id into c_ac;
   insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo) values
     (1, c_ac, 1, 1, 'whatsapp', 'D+1 acessório'), (1, c_ac, 2, 30, 'whatsapp', 'D+30 acessório');
@@ -56,8 +56,8 @@ begin
 
   -- 2. módulo ligado: régua pela categoria e condição; sem dados.venda → Geral; passos do ganho_em; responsável da C2
   insert into contatos (empresa_id, filial_id, nome) values (1, 3, 'C3 caso 2a') returning id into ct;
-  n := pg_temp.vender(ct, M1, meio_dia, 1, 'seminovo');
-  res := res || jsonb_build_object('2a_iphone_seminovo', jsonb_build_object(
+  n := pg_temp.vender(ct, M1, meio_dia, 1, 'usado');
+  res := res || jsonb_build_object('2a_iphone_usado', jsonb_build_object(
     'regua', (select c.nome from posvenda_jornadas j join posvenda_cadencias c on c.id = j.cadencia_id where j.negocio_id = n),
     'passos', pg_temp.passos(n),
     'responsaveis', (select jsonb_agg(distinct case when a.responsavel_id = M1 then 'M1' else a.responsavel_id::text end) from posvenda_acompanhamentos a join posvenda_jornadas j on j.id = a.jornada_id where j.negocio_id = n),
@@ -100,7 +100,7 @@ begin
 
   -- 4. corrigir a data da venda: pendentes reancorados; o que cairia no passado vira pulado
   insert into contatos (empresa_id, filial_id, nome) values (1, 3, 'C3 caso 4') returning id into ct;
-  n := pg_temp.vender(ct, M1, meio_dia, 1, 'seminovo');
+  n := pg_temp.vender(ct, M1, meio_dia, 1, 'usado');
   execute 'set local role authenticated';
   perform set_config('request.jwt.claims', json_build_object('sub', A, 'role', 'authenticated')::text, true);
   perform corrigir_data_venda(n, hoje - 20, 'teste da C3: venda foi antes');
@@ -113,7 +113,7 @@ begin
 
   -- 5. recompra: mesma categoria cancela os passos DO APARELHO da jornada anterior (D+90, D+330); outra categoria não cancela nada
   insert into contatos (empresa_id, filial_id, nome) values (1, 3, 'C3 caso 5') returning id into ct;
-  n := pg_temp.vender(ct, M1, meio_dia - interval '60 days', 1, 'seminovo');   -- D+90 e D+330 ainda pela frente
+  n := pg_temp.vender(ct, M1, meio_dia - interval '60 days', 1, 'usado');   -- D+90 e D+330 ainda pela frente
   n2 := pg_temp.vender(ct, M1, meio_dia, 2, 'novo');                           -- iPad: OUTRA categoria (2)
   res := res || jsonb_build_object('5a_outra_categoria_aparelho', jsonb_build_object('anterior', pg_temp.passos(n)));
   n3 := pg_temp.vender(ct, M1, meio_dia, 1, 'novo');                           -- iPhone de novo: MESMA categoria (1)

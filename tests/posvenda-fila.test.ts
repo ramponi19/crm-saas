@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  decidirContato, descricaoDaCompra, diasDesdeAVenda, grupoDoDia, montarMensagem, ordenarFila, primeiroNome, rotuloDoPasso, textoDias,
+  decidirContato, descricaoDaCompra, textoDoCampo, diasDesdeAVenda, grupoDoDia, montarMensagem, ordenarFila, primeiroNome, rotuloDoPasso, textoDias,
 } from '@/lib/posvenda/fila'
 import { linkWhatsApp } from '@/lib/whatsapp-link'
 
@@ -95,4 +95,12 @@ test('contato: sem conversa no WhatsApp da loja → wa.me com o aviso; sem telef
   assert.match(ext.aviso ?? '', /não fica registrada/)
   assert.equal(decidirContato({ conversaId: 9, canalTipo: 'instagram', oficial: false, ultimaRecebida: null }, '11987654321', MSG, AGORA).modo, 'externo')
   assert.deepEqual(decidirContato(null, '', MSG, AGORA).modo, 'sem_numero')
+})
+
+// 24/11/2026: {{campo:chave}} no roteiro (universal: placa, quilometragem, número de série…).
+test('roteiro: campo personalizado do negócio ou do contato', () => {
+  const r = 'Oi {{nome}}, a revisão do carro {{campo:placa}} ({{campo:km}} km) vence em {{campo:vencimento}}. {{campo:nada}}'
+  assert.equal(montarMensagem(r, { nome: 'Ana', campos: { placa: 'ABC1D23', km: 15000, vencimento: '2027-01-15' } }),
+    'Oi Ana, a revisão do carro ABC1D23 (15.000 km) vence em 15/01/2027.')
+  assert.equal(textoDoCampo(['a', 'b']), 'a, b'); assert.equal(textoDoCampo(true), 'sim'); assert.equal(textoDoCampo({}), '')
 })

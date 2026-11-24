@@ -15,7 +15,7 @@
 import { test, describe, mock, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { bancoFalso, type Consulta, type Responder } from './banco-falso'
-import { validarVendaGanho, ganhoEmDaData, lerValor, valorDigitado } from '@/lib/venda-ganho'
+import { validarVendaGanho, ganhoEmDaData, lerValor, valorDigitado, condicaoNeutra, modoCondicao } from '@/lib/venda-ganho'
 
 // ── regras puras ─────────────────────────────────────────────────────────────
 describe('validarVendaGanho', () => {
@@ -36,7 +36,7 @@ describe('validarVendaGanho', () => {
     ['sem categoria', { ...boa, categoria_id: null }, 'categoria_id'],
     ['categoria de outra empresa', { ...boa, categoria_id: 99 }, 'categoria_id'],
     ['sem condição', { ...boa, condicao: undefined }, 'condicao'],
-    ['condição inventada', { ...boa, condicao: 'usado' }, 'condicao'],
+    ['condição inventada', { ...boa, condicao: 'meio-usado' }, 'condicao'],
     ['sem valor', { ...boa, valor: '' }, 'valor'],
     ['valor zero', { ...boa, valor: '0' }, 'valor'],
     ['valor que não é número', { ...boa, valor: 'sete mil' }, 'valor'],
@@ -209,7 +209,7 @@ describe('/api/leads/mover: entrar no ganho exige a venda', () => {
     const dados = d.dados as Record<string, Record<string, unknown>>
     assert.equal(dados.produto_interessado as unknown, 'iPhone 17', 'o resto de dados fica')
     assert.equal(dados.venda.categoria_id, 1)
-    assert.equal(dados.venda.condicao, 'seminovo')
+    assert.equal(dados.venda.condicao, 'usado')  // 'seminovo' (valor antigo) entra como 'usado' (24/11/2026)
     assert.equal(dados.venda.data, '2026-11-20')
     assert.equal(dados.venda.registrada_por, 'u-1')
     // a lista de categorias é a da empresa do negócio, só as ativas
@@ -304,4 +304,17 @@ describe('lead novo não nasce como venda fechada', () => {
     assert.ok(!todas().some((c) => c.tabela === 'contatos' && c.op === 'insert'), 'nenhum contato criado')
     assert.ok(!todas().some((c) => c.tabela === 'negocios' && c.op === 'insert'), 'nenhum negócio criado')
   })
+})
+
+// 24/11/2026: condição com valor neutro e opcional por empresa (core.condicao_venda).
+test('condição: seminovo vira usado; modo da empresa decide se exige', () => {
+  assert.equal(condicaoNeutra('seminovo'), 'usado'); assert.equal(condicaoNeutra('usado'), 'usado'); assert.equal(condicaoNeutra('x'), null)
+  assert.equal(modoCondicao(null), 'exigida'); assert.equal(modoCondicao('opcional'), 'opcional'); assert.equal(modoCondicao('qualquer'), 'exigida')
+  const base = { data: '2026-11-20', categoria_id: 1, valor: 100 }
+  const ctx = { hoje: '2026-11-24', criadoEm: '2026-11-19', categorias: [1] }
+  assert.equal(validarVendaGanho(base, ctx).ok, false)
+  const op = validarVendaGanho(base, { ...ctx, condicao: 'opcional' })
+  assert.ok(op.ok && op.venda.condicao === null)
+  const nu = validarVendaGanho({ ...base, condicao: 'novo' }, { ...ctx, condicao: 'nao_usa' })
+  assert.ok(nu.ok && nu.venda.condicao === null)
 })

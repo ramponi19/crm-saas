@@ -1,6 +1,6 @@
 {
   "1_modulo_desligado_jornadas": 0,
-  "2a_iphone_seminovo": {
+  "2a_iphone_usado": {
     "regua": "Aparelhos",
     "passos": { "1": "pendente", "7": "pendente", "90": "pendente", "330": "pendente" },
     "responsaveis": ["M1"], "origens": ["vendedor"], "datas_do_ganho": true

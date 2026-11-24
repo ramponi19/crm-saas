@@ -8,7 +8,7 @@ import { nadaGravado, SEM_PERMISSAO_CONTATO, SEM_PERMISSAO_NEGOCIO } from '@/lib
 import { formatarData } from '@/lib/datas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { diaNoFuso } from '@/lib/datas'
-import { ganhoEmDaData, validarVendaGanho, type VendaInformada } from '@/lib/venda-ganho'
+import { ganhoEmDaData, validarVendaGanho, type VendaInformada, modoCondicao } from '@/lib/venda-ganho'
 
 /** `string`, não literal: o parser de tipos do supabase-js estoura com relação embutida. */
 const SELECT_NEGOCIO: string = 'id, empresa_id, funil_id, responsavel_id, status, ganho_em, perdido_em, created_at, dados, etapa:funil_etapas!negocios_etapa_id_fkey(slug), contato:contatos!negocios_contato_id_fkey(id, nome, observacoes)'
@@ -151,12 +151,16 @@ export async function POST(req: Request) {
   let valorVenda: number | null = null
   if (entrandoNoGanho) {
     const fuso = await fusoDaEmpresa(supabase, empresaId)
-    const { data: cats } = await supabase.from('estoque_categorias').select('id')
-      .eq('empresa_id', n.empresa_id).eq('ativo', true)
+    const [{ data: cats }, { data: modo }] = await Promise.all([
+      supabase.from('estoque_categorias').select('id').eq('empresa_id', n.empresa_id).eq('ativo', true),
+      // condição exigida | opcional | não usa, por empresa (core.condicao_venda; 24/11/2026)
+      supabase.rpc('config_valor' as never, { p_modulo: 'core', p_chave: 'condicao_venda' } as never),
+    ])
     const v = validarVendaGanho(body.venda, {
       hoje: diaNoFuso(new Date(), fuso),
       criadoEm: diaNoFuso(new Date(n.created_at), fuso),
       categorias: ((cats ?? []) as { id: number }[]).map((c) => Number(c.id)),
+      condicao: modoCondicao(modo),
     })
     if (!v.ok) return NextResponse.json({ error: v.erro, codigo: 'GANHO_DADOS', campo: v.campo }, { status: 422 })
     ganhoEmNovo = ganhoEmDaData(v.venda.data, fuso)

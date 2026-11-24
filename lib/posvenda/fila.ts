@@ -108,10 +108,13 @@ export interface VariaveisMensagem {
   produto?: string | null
   loja?: string | null
   vendedor?: string | null
+  /** Campos personalizados (negócio, depois contato) para {{campo:chave}}. */
+  campos?: Record<string, unknown> | null
 }
 
 /**
- * O roteiro do passo com as variáveis trocadas: {{nome}} (primeiro nome), {{produto}}, {{loja}}, {{vendedor}}.
+ * O roteiro do passo com as variáveis trocadas: {{nome}} (primeiro nome), {{produto}}, {{loja}}, {{vendedor}} e
+ * {{campo:chave}} (campo personalizado do negócio ou do contato, 24/11/2026: placa, quilometragem, número de série…).
  * Variável sem valor some sem deixar espaço duplo; variável desconhecida fica como está (a empresa vê e corrige).
  */
 export function montarMensagem(roteiro: string | null | undefined, v: VariaveisMensagem): string {
@@ -123,6 +126,7 @@ export function montarMensagem(roteiro: string | null | undefined, v: VariaveisM
   }
   return (roteiro ?? '')
     .replace(/\{\{\s*(nome|produto|loja|vendedor)\s*\}\}/gi, (_, k: string) => valores[k.toLowerCase()] ?? '')
+    .replace(/\{\{\s*campo:([a-z0-9_]+)\s*\}\}/gi, (_, k: string) => textoDoCampo(v.campos?.[k.toLowerCase()]))
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/ ([,.!?])/g, '$1')
     .trim()
@@ -132,7 +136,7 @@ export function montarMensagem(roteiro: string | null | undefined, v: VariaveisM
 export function descricaoDaCompra(produto: string | null | undefined, categoria: string | null | undefined,
                                   condicao: string | null | undefined, rotuloUsado = 'Usado'): string | null {
   const nome = (produto ?? '').trim() || (categoria ?? '').trim()
-  const cond = condicao === 'seminovo' ? rotuloUsado : condicao === 'novo' ? 'Novo' : ''
+  const cond = condicao === 'usado' || condicao === 'seminovo' ? rotuloUsado : condicao === 'novo' ? 'Novo' : ''
   const partes = [nome, cond].filter(Boolean)
   return partes.length ? partes.join(' · ') : null
 }
@@ -156,4 +160,17 @@ export function textoDias(n: number): string {
 export function ordenarFila<T extends { grupo: GrupoFila; previsto: string }>(itens: T[]): T[] {
   const peso: Record<GrupoFila, number> = { atrasados: 0, hoje: 1, proximos: 2 }
   return [...itens].sort((a, b) => peso[a.grupo] - peso[b.grupo] || a.previsto.localeCompare(b.previsto))
+}
+
+/** Valor de campo personalizado como texto: número no formato brasileiro, data dd/mm/aaaa, lista com vírgulas. */
+export function textoDoCampo(v: unknown): string {
+  if (v == null) return ''
+  if (typeof v === 'number') return v.toLocaleString('pt-BR')
+  if (typeof v === 'boolean') return v ? 'sim' : 'não'
+  if (Array.isArray(v)) return v.map(textoDoCampo).filter(Boolean).join(', ')
+  if (typeof v === 'string') {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v.trim())
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : v.trim()
+  }
+  return ''
 }

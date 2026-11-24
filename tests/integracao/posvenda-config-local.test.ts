@@ -56,7 +56,7 @@ describe('Configurações › Pós-venda (rota + RLS + config_salvar)', () => {
     assert.equal(r.status, 200)
     regua = r.corpo.id as number
     const { data } = await svc.from('posvenda_cadencias').select('filtros, prioridade').eq('id', regua).single()
-    assert.deepEqual(data, { filtros: { categorias: [1], condicao: 'seminovo' }, prioridade: 50 })
+    assert.deepEqual(data, { filtros: { categorias: [1], condicao: 'usado' }, prioridade: 50 })  // 'seminovo' entra como 'usado'
   })
 
   test('passo com modelo de Utilidade entra; de Marketing só depois que a empresa libera', async () => {

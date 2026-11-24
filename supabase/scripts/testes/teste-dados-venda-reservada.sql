@@ -10,7 +10,7 @@ begin
   -- 1. venda completa, como a rota grava: aceita
   begin
     update negocios set dados = dados || jsonb_build_object('venda', jsonb_build_object(
-      'data', '2026-11-23', 'categoria_id', 10, 'condicao', 'seminovo', 'valor', 4500.5,
+      'data', '2026-11-23', 'categoria_id', 10, 'condicao', 'usado', 'valor', 4500.5,
       'registrada_por', gen_random_uuid(), 'registrada_em', now())) where id = v_neg;
     res := res || '{"1_venda_valida":"ok"}';
   exception when others then res := res || jsonb_build_object('1_venda_valida', 'FALHOU: ' || sqlerrm); end;
