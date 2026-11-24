@@ -45,10 +45,11 @@ A prova do banco foi repetida (28/28) depois de outra sessão ter reiniciado o D
 
 ## Pré-checagens feitas em 24/11 (produção, só leitura)
 
-- **Migrações aplicadas:** até `20261124201040 posvenda_revisao`. Nada do hotfix (colunas, funções e gatilhos ausentes). Gatilhos atuais em `vendas_vendas`: `vendas_preencher_filial`, `zapintel_vendas_ao_vivo`.
-- **Mudanças desde a última verificação**, todas da sessão do pós-venda:
-  - `main` foi a `c6d6efd9` (pós-venda universal, deploy `dpl_3CzmHEBWD9htaL8KH82756sjS7dZ` READY);
-  - banco ganhou `posvenda_universal` (19:33 UTC) e `posvenda_revisao` (20:10 UTC).
+- **Migrações aplicadas:** até `20261124205812 posvenda_rotina_diaria`. Nada do hotfix (colunas, funções e gatilhos ausentes). Gatilhos atuais em `vendas_vendas`: `vendas_preencher_filial`, `zapintel_vendas_ao_vivo`.
+- **Mudanças desde a última verificação**, todas da sessão do pós-venda (encerradas às ~21h25 UTC; janela entregue a esta operação):
+  - `main` foi a `da8c9108` (pós-venda universal, revisão e rotina diária; deploy `dpl_Fr5imQFnqBJj1PvtB84HUCuqMAJr` READY);
+  - banco ganhou `posvenda_universal` (19:33 UTC), `posvenda_revisao` (20:10 UTC) e `posvenda_rotina_diaria` (20:58 UTC, com o job pg_cron `posvenda-rotina-diaria`);
+  - dados da JM: triagem dos 42 negócios da etapa Pós Venda, responsáveis de 141 ganhos, módulo Pós-venda instalado e 3 réguas desativadas, com backups `_backup_triagem_posvenda_20261124` e `_backup_responsaveis_posvenda_20261124`.
 
   Nenhuma toca em `vendas_*` ou `estoque_*`.
 - **Vendas da JM:** 122 concluídas e **8 encomendas pendentes**, nenhuma `pendente_entrega` ou `em_fechamento`. Das 8:
@@ -63,11 +64,11 @@ A prova do banco foi repetida (28/28) depois de outra sessão ter reiniciado o D
 ### 0. Antes de começar
 
 1. **Ninguém mexendo:**
-   - `git fetch` e confirmar que `origin/main` é `c6d6efd9`. Se mudou, voltar ao Claude para remesclar antes de seguir.
-   - Repetir `list_migrations`: a última tem de ser `posvenda_revisao`.
+   - `git fetch` e confirmar que `origin/main` é `da8c9108`. Se mudou, voltar ao Claude para remesclar antes de seguir.
+   - Repetir `list_migrations`: a última tem de ser `posvenda_rotina_diaria`.
    - No `.claude/sessoes-locais.json`, nenhuma outra sessão com deploy marcado.
 2. **IOwait** (regra do projeto), numa chamada separada, no repositório principal: `SEG=65 node .gate/iowait-metricas.mjs`. Seguir só com o número abaixo de **10%**.
-3. Anotar o deploy atual de produção (**ponto de volta do app**): `dpl_3CzmHEBWD9htaL8KH82756sjS7dZ` (`c6d6efd9`).
+3. Anotar o deploy atual de produção (**ponto de volta do app**): `dpl_Fr5imQFnqBJj1PvtB84HUCuqMAJr` (`da8c9108`).
 
 ### 1. Backup
 
@@ -106,7 +107,7 @@ select (select count(*) from vendas_vendas) vendas,
 ### 3. App
 
 1. IOwait abaixo de **20%** (chamada separada).
-2. Publicar: `git fetch`; se `origin/main` ainda é `c6d6efd9`, enviar `fix/entregar-sem-pagamento` para `main` (avanço direto: a branch já contém a `main`). Autor dos commits: Lucas.
+2. Publicar: `git fetch`; se `origin/main` ainda é `da8c9108`, enviar `fix/entregar-sem-pagamento` para `main` (avanço direto: a branch já contém a `main`). Autor dos commits: Lucas.
 3. Esperar o deploy novo ficar **READY** na Vercel. Não confiar no alias logo depois do push: ele serve o build anterior até o novo terminar.
 
 ### 4. Conferências depois do deploy
@@ -123,7 +124,7 @@ select (select count(*) from vendas_vendas) vendas,
 
 ### 5. Se algo der errado (volta)
 
-1. **App primeiro:** na Vercel, promover de volta o `dpl_3CzmHEBWD9htaL8KH82756sjS7dZ` (Instant Rollback).
+1. **App primeiro:** na Vercel, promover de volta o `dpl_Fr5imQFnqBJj1PvtB84HUCuqMAJr` (Instant Rollback).
 2. **Depois o banco:** rodar `supabase/scripts/volta/volta-concluir-encomenda.sql`. Ele remove os dois gatilhos e as quatro funções e **mantém** as colunas `concluida_*`, que são registro de quem concluiu.
 3. Conferir se ficou venda em `em_fechamento` (aba fechada no meio de um fechamento):
    `select id, grupo_pdv, valor_venda, created_at from vendas_vendas where status = 'em_fechamento';`
