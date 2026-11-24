@@ -47,8 +47,6 @@ const dia = (iso) => new Date(Date.parse(iso) - FUSO_MS).toISOString().slice(0, 
 const somar = (d, n) => new Date(Date.parse(d + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10)
 const dow = (d) => new Date(d + 'T12:00:00Z').getUTCDay() // 0 dom … 6 sáb
 const segunda = (d) => somar(d, -((dow(d) + 6) % 7))
-const util = (d) => dow(d) >= 1 && dow(d) <= 5
-const proxUtil = (d) => { let x = somar(d, 1); while (!util(x)) x = somar(x, 1); return x }
 
 const ATIVACAO = (process.argv[2] && /^\d{4}-\d{2}-\d{2}$/.test(process.argv[2])) ? process.argv[2] : dia(new Date().toISOString())
 const SAIDA = process.argv.find((a) => a.endsWith('.json'))
@@ -74,6 +72,22 @@ const nome = Object.fromEntries((us ?? []).map((u) => [u.id, (u.nome ?? u.id).tr
 const { data: lojas } = await sb.from('filiais').select('id, nome, matriz').eq('empresa_id', EMPRESA).eq('ativo', true).order('id')
 const matriz = (lojas ?? []).find((l) => l.matriz)?.id ?? null
 
+// Horário por dia da semana (proposta de 24/11/2026): o `horario_comercial` da empresa vale para os dias dela;
+// `sabado=HH:MM-HH:MM` abre o sábado com outro horário (exemplo). "Dia útil" = dia em que a loja abre:
+// passo que cai em dia fechado vai para o próximo dia aberto; o teto do dia é proporcional às horas abertas
+// (teto × horas do dia ÷ horas do dia mais longo da semana, no mínimo 1).
+const { data: hc } = await sb.from('configuracoes_sistema').select('valor').eq('empresa_id', EMPRESA).eq('chave', 'horario_comercial').maybeSingle()
+const minutos = (h) => { const [a, b] = String(h).split(':').map(Number); return a * 60 + b }
+const H = { inicio: hc?.valor?.inicio ?? '09:00', fim: hc?.valor?.fim ?? '18:00', dias: hc?.valor?.dias ?? [1, 2, 3, 4, 5] }
+const HORAS = Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [d, H.dias.includes(d) ? (minutos(H.fim) - minutos(H.inicio)) / 60 : 0]))
+const SAB = (process.argv.find((a) => a.startsWith('sabado=')) ?? '').slice(7)
+if (SAB) HORAS[6] = (minutos(SAB.split('-')[1]) - minutos(SAB.split('-')[0])) / 60
+const HORAS_REF = Math.max(...Object.values(HORAS))
+const abre = (d) => HORAS[dow(d)] > 0
+const proxUtil = (d) => { let x = somar(d, 1); while (!abre(x)) x = somar(x, 1); return x }
+const noAberto = (d) => (abre(d) ? d : proxUtil(d))
+const tetoDoDia = (d) => (abre(d) ? Math.max(1, Math.floor(TETO * HORAS[dow(d)] / HORAS_REF)) : 0)
+
 // Cenário: `excluir=<uuid>,<uuid>` tira usuários da equipe ativa (ex.: uma conta que não é gente), como se
 // estivessem desativados antes da ativação.
 const EXCLUIR = new Set((process.argv.find((a) => a.startsWith('excluir=')) ?? 'excluir=').slice(8).split(',').filter(Boolean))
@@ -85,7 +99,7 @@ const admins = (() => { const a = ativos.filter((e) => e.role === 'admin').map((
 
 // ── responsável com teto (D9) ──
 const carga = new Map() // `${usuario}|${dia}` → n
-const cheio = (u, d) => (carga.get(`${u}|${d}`) ?? 0) >= TETO
+const cheio = (u, d) => (carga.get(`${u}|${d}`) ?? 0) >= tetoDoDia(d)
 const contador = new Map() // roleta → próximo índice
 const estouros = { vendedor_dia_seguinte: 0, roleta_outro: 0, roleta_dia_seguinte: 0 }
 function roleta(chaveRoleta, cands, d) {
@@ -118,7 +132,7 @@ function responsavel(g, d, tipo) {
 // ── materializa ──
 const passos = [] // { u, d, p, origem, fonte }
 const juntados = new Set()
-const resumo = { ganhos_base: ganhos.length, jornadas_base: 0, passos_base: 0, juntados: 0, cancelados_recompra: 0, projetadas: 0, passos_projecao: 0 }
+const resumo = { ganhos_base: ganhos.length, jornadas_base: 0, passos_base: 0, juntados: 0, cancelados_recompra: 0, projetadas: 0, passos_projecao: 0, movidos_dia_fechado: 0 }
 const catDe = (g) => (g.dados?.venda && typeof g.dados.venda.categoria_id === 'number') ? g.dados.venda.categoria_id : null
 const condDe = (g) => g.dados?.venda?.condicao ?? null
 
@@ -146,11 +160,12 @@ function materializar(g, d0, fonte, hoje) {
       if (juntados.has(kj)) { resumo.juntados++; continue }
       juntados.add(kj)
     }
-    const r = responsavel(g, dp, 'acomp')
+    if (!abre(dp)) resumo.movidos_dia_fechado++
+    const r = responsavel(g, noAberto(dp), 'acomp')
     carga.set(`${r.u}|${r.d}`, (carga.get(`${r.u}|${r.d}`) ?? 0) + 1)
     passos.push({ u: r.u, d: r.d, p: s.p, origem: r.origem, fonte })
     criou++
-    if (s.tipo === 'nps') passos.push({ npsBaixo: true, d: somar(dp, 2), fonte })
+    if (s.tipo === 'nps') passos.push({ npsBaixo: true, d: noAberto(somar(r.d, 2)), fonte })
   }
   return criou
 }
@@ -207,7 +222,8 @@ function periodo(ini, fim) {
 }
 
 const res = {
-  ativacao: ATIVACAO, teto_diario: TETO, nps_baixo: NPS_BAIXO, excluidos: [...EXCLUIR].map((u) => nome[u] ?? u),
+  ativacao: ATIVACAO, teto_diario: TETO, horas_por_dia: HORAS, teto_por_dia: Object.fromEntries(Object.entries(HORAS).map(([d, h]) => [d, h ? Math.max(1, Math.floor(TETO * h / HORAS_REF)) : 0])),
+  nps_baixo: NPS_BAIXO, excluidos: [...EXCLUIR].map((u) => nome[u] ?? u),
   equipe: { roleta_por_loja: Object.fromEntries((lojas ?? []).map((l) => [l.nome, vendedoresDaLoja(l.id).map((u) => nome[u] ?? u)])), administradores: admins.map((u) => nome[u] ?? u) },
   janela_projecao: { de: janelaIni, ate: somar(seg0, -1), vendas: janela.length, por_semana: +(janela.length / 8).toFixed(1) },
   resumo, estouros_de_teto: estouros,
