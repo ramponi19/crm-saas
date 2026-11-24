@@ -29,6 +29,10 @@ begin
     'de_novo', posvenda_instalar(1),
     'empresa_5_intocada', (select count(*) from posvenda_chamado_status where empresa_id = 5)));
 
+  -- prazos deste teste em horas corridas (horas de loja aberta: teste-posvenda-sla-loja-aberta)
+  delete from configuracoes_sistema where empresa_id = 1 and chave = 'posvenda.sla_horas';
+  insert into configuracoes_sistema (empresa_id, chave, valor) values (1, 'posvenda.sla_horas', '{"empresa": "corridas", "lojas": {}}');
+
   -- base: régua e acompanhamentos pendentes de M1 (amanhã ao meio-dia), como a jornada criaria
   insert into posvenda_cadencias (empresa_id, nome) values (1, 'Régua de teste') returning id into c_cad;
   insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo) values (1, c_cad, 1, 1, 'whatsapp', 'D+1') returning id into c_passo;
