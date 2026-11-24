@@ -28,8 +28,8 @@ begin
     values (1, cad, 2, 30, 'ligacao', 'a cada 30 dias, até 3', 30, 'dias', 3) returning id into p_rep;
   insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo, repetir_intervalo, repetir_unidade)
     values (1, cad, 3, 0, 'tarefa_interna', 'todo mês no dia da venda', 1, 'meses') returning id into p_mes;
-  insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo, ancora_tipo, ancora_mes_dia)
-    values (1, cad, 4, -5, 'whatsapp', '5 dias antes do Natal', 'data_fixa', '12-25') returning id into p_fixa;
+  insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo, ancora_tipo, ancora_mes_dia, repetir_intervalo, repetir_unidade)
+    values (1, cad, 4, -5, 'whatsapp', '5 dias antes do Natal', 'data_fixa', '12-25', 12, 'meses') returning id into p_fixa;
   insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo, ancora_tipo, ancora_mes_dia)
     values (1, cad, 5, 0, 'tarefa_interna', '29/02', 'data_fixa', '02-29') returning id into p_bis;
   insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo, ancora_tipo, ancora_campo)
@@ -63,7 +63,7 @@ begin
     'bissexto', posvenda_data_do_passo(n, p_bis),
     'revisao', posvenda_data_do_passo(n, p_campo),
     'aniversario_1a', posvenda_data_do_passo(n, p_aniv),
-    'aniversario_38a', posvenda_data_do_passo(n, p_aniv, 38),
+    'aniversario_2a', posvenda_data_do_passo(n, p_aniv, 2),
     'uso_padrao', posvenda_data_do_passo(n, p_uso),
     'uso_padrao_2a', posvenda_data_do_passo(n, p_uso, 2),
     'uso_campo', posvenda_data_do_passo(n, p_uso_campo),
