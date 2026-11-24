@@ -188,8 +188,8 @@ function FormRegua({ dados, regua, aoFechar }: { dados: DadosConfigPosVenda; reg
         <Select label="Condição da venda" value={f.condicao} onChange={(e) => setF({ ...f, condicao: e.target.value })}>
           <option value="">Qualquer</option><option value="novo">Só novo</option><option value="usado">Só usado</option>
         </Select>
-        <Select label="Quando o cliente compra de novo" value={f.ao_recomprar} onChange={(e) => setF({ ...f, ao_recomprar: e.target.value })}>
-          <option value="reiniciar">Começa a régua de novo</option><option value="manter">Mantém a régua atual</option><option value="encerrar">Encerra a régua</option>
+        <Select label="Se o cliente comprar de novo na mesma categoria" value={f.ao_recomprar} onChange={(e) => setF({ ...f, ao_recomprar: e.target.value })}>
+          <option value="reiniciar">Cancela os passos do produto desta compra</option><option value="manter">Mantém todos os passos desta compra</option><option value="encerrar">Encerra esta régua</option>
         </Select>
       </div>
       <label className="flex items-center gap-2 text-[13px] text-ink-2"><input type="checkbox" checked={f.ativo} onChange={(e) => setF({ ...f, ativo: e.target.checked })} /> Régua ativa</label>

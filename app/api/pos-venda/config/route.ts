@@ -61,6 +61,11 @@ export async function POST(req: Request) {
     const cadencia = Number(b.cadencia_id)
     const { data: cad } = await s.from('posvenda_cadencias').select('id').eq('id', cadencia).eq('empresa_id', empresaId).maybeSingle()
     if (!cad) return erro('Régua não encontrada.', 404)
+    if (r.v.responsavel.startsWith('usuario:')) {
+      const { data: pessoa } = await service.from('empresa_usuarios').select('usuario_id').eq('empresa_id', empresaId)
+        .eq('usuario_id', r.v.responsavel.slice(8)).eq('ativo', true).eq('conta_servico', false).maybeSingle()
+      if (!pessoa) return erro('Escolha uma pessoa ativa da equipe.', 422)
+    }
     if (r.v.modelo_id != null) {
       const [{ data: m }, { data: cfg }] = await Promise.all([
         s.from('modelos_mensagem').select('id, nome, categoria, status').eq('id', r.v.modelo_id).eq('empresa_id', empresaId).maybeSingle(),

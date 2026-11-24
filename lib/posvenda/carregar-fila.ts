@@ -60,8 +60,11 @@ export async function carregarFilaPosVenda(db: SupabaseClient<any>, opcoes: {
   const catIds = [...new Set(linhas.map((l) => um(l.negocio)?.venda?.categoria_id).filter((x): x is number => typeof x === 'number'))]
   const pessoas = [...new Set(linhas.flatMap((l) => [l.responsavel_id, um(l.negocio)?.responsavel_id ?? null]).filter((x): x is string => !!x))]
   const lojas = [...new Set(linhas.map((l) => l.filial_id).filter((x): x is number => x != null))]
+  // O nome da categoria vem da mesma origem do modal de venda (Estoque ou próprias do Pós-venda: posvenda.categorias_fonte).
+  const { data: fonte } = catIds.length ? await s.rpc('config_valor', { p_modulo: 'posvenda', p_chave: 'categorias_fonte' }) : { data: null }
+  const tabelaCat = fonte === 'proprias' ? 'posvenda_categorias_venda' : 'estoque_categorias'
   const [{ data: cats }, { data: users }, { data: fils }] = await Promise.all([
-    catIds.length ? s.from('estoque_categorias').select('id, nome').in('id', catIds) : Promise.resolve({ data: [] }),
+    catIds.length ? s.from(tabelaCat).select('id, nome').in('id', catIds) : Promise.resolve({ data: [] }),
     pessoas.length ? s.from('usuarios').select('id, nome').in('id', pessoas) : Promise.resolve({ data: [] }),
     lojas.length ? s.from('filiais').select('id, nome').in('id', lojas) : Promise.resolve({ data: [] }),
   ])
