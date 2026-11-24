@@ -1,0 +1,18 @@
+{
+  "1_sem_modulo": "o módulo Pós-venda não está ligado nesta empresa",
+  "2_sem_regua": "nenhuma régua ativa com passos",
+  "3_ativou": {
+    "vendas_lidas_4_ou_mais": true,
+    "jornadas_4_ou_mais": true,
+    "passos_por_venda": {
+      "100": ["D+330:cancelado"],
+      "20": ["D+30:pendente", "D+330:pendente"],
+      "10": ["D+30:pendente", "D+330:pendente"],
+      "2": ["D+7:pendente", "D+30:pendente", "D+330:pendente"],
+      "400": null
+    },
+    "so_futuros": true
+  },
+  "4_de_novo_sem_passos": 0,
+  "5_so_servidor": false
+}

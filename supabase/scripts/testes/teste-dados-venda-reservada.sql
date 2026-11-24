@@ -23,7 +23,7 @@ begin
   exception when others then res := res || jsonb_build_object('2_venda_conciliacao', 'FALHOU: ' || sqlerrm); end;
 
   -- 3..6. formas erradas: recusa
-  begin update negocios set dados = dados || '{"venda":{"condicao":"usado"}}' where id = v_neg;
+  begin update negocios set dados = dados || '{"venda":{"condicao":"meio-usado"}}' where id = v_neg;
     res := res || '{"3_condicao_invalida":"FALHOU: aceitou"}';
   exception when others then res := res || jsonb_build_object('3_condicao_invalida', 'recusou: ' || sqlerrm); end;
   begin update negocios set dados = dados || '{"venda":{"data":"23/11/2026"}}' where id = v_neg;
