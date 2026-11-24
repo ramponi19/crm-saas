@@ -1,0 +1,6 @@
+{
+  "1_corrigir_com_venda": { "venda_data_igual_ganho_em": true, "venda_data_e_a_nova": true, "resto_da_venda_intacto": true },
+  "1b_corrigir_sem_venda_nao_cria_a_chave": true,
+  "2_reabrir": { "negocio_sem_venda": true, "status": "aberto", "historico_tem_a_venda": true },
+  "3_ganho_de_novo": { "status": "ganho", "categoria": 10 }
+}

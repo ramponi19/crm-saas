@@ -24,12 +24,12 @@
   },
   "5a_outra_categoria_aparelho": { "anterior": { "90": "pendente", "330": "pendente" } },
   "5b_mesma_categoria": {
-    "anterior": { "90": "pendente", "330": "cancelado:recompra" },
+    "anterior": { "90": "cancelado:recompra", "330": "cancelado:recompra" },
     "ipad_intacto": { "1": "pendente", "7": "pendente", "330": "pendente" }
   },
   "5c_acessorio_nao_cancela": {
     "iphone_novo": { "1": "juntado", "7": "juntado", "330": "juntado" },
-    "cancelados_por_recompra": 1
+    "cancelados_por_recompra": 2
   },
   "6_mesmo_dia": {
     "jornadas": 2,

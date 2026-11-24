@@ -1,7 +1,7 @@
 -- Teste da 20261124000400_posvenda_jornada (C3): os casos pedidos pelo Lucas em 24/11/2026.
 -- Banco local descartável, JM de teste (empresa 1, loja 3, vendedor M1 …0101, admin A …0201). Termina com RAISE.
 -- Réguas de teste: Aparelhos (categorias 1-4, prioridade 100): D+1 whatsapp, D+7 pesquisa, D+90 whatsapp (só
--- seminovo), D+330 ligação (ciclo de troca). Acessórios (6, prioridade 50): D+1 whatsapp, D+30 whatsapp.
+-- seminovo; do aparelho), D+330 ligação (ciclo de troca; do aparelho). Os demais são de relacionamento. Acessórios (6, prioridade 50): D+1 whatsapp, D+30 whatsapp.
 -- Geral (sem categorias): D+7 pesquisa, D+330 ligação (ciclo de troca).
 
 -- A venda como a rota grava: negócio aberto → ganho com dados.venda e ganho_em (o gatilho age no UPDATE).
@@ -37,15 +37,15 @@ declare
 begin
   meio_dia := (hoje + time '12:00') at time zone 'America/Sao_Paulo';
   insert into posvenda_cadencias (empresa_id, nome, prioridade, filtros) values (1, 'Aparelhos', 100, '{"categorias":[1,2,3,4]}') returning id into c_ap;
-  insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo, filtros, ciclo_troca) values
-    (1, c_ap, 1, 1, 'whatsapp', 'D+1 chegou bem?', '{}', false), (1, c_ap, 2, 7, 'pesquisa', 'D+7 NPS', '{}', false),
-    (1, c_ap, 3, 90, 'whatsapp', 'D+90 bateria', '{"condicao":"seminovo"}', false), (1, c_ap, 4, 330, 'ligacao', 'D+330 troca', '{}', true);
+  insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo, filtros, grupo) values
+    (1, c_ap, 1, 1, 'whatsapp', 'D+1 chegou bem?', '{}', 'relacionamento'), (1, c_ap, 2, 7, 'pesquisa', 'D+7 NPS', '{}', 'relacionamento'),
+    (1, c_ap, 3, 90, 'whatsapp', 'D+90 bateria', '{"condicao":"seminovo"}', 'aparelho'), (1, c_ap, 4, 330, 'ligacao', 'D+330 troca', '{}', 'aparelho');
   insert into posvenda_cadencias (empresa_id, nome, prioridade, filtros) values (1, 'Acessórios', 50, '{"categorias":[6]}') returning id into c_ac;
   insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo) values
     (1, c_ac, 1, 1, 'whatsapp', 'D+1 acessório'), (1, c_ac, 2, 30, 'whatsapp', 'D+30 acessório');
   insert into posvenda_cadencias (empresa_id, nome, prioridade, filtros) values (1, 'Geral', 0, '{}') returning id into c_ge;
-  insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo, ciclo_troca) values
-    (1, c_ge, 1, 7, 'pesquisa', 'D+7 NPS geral', false), (1, c_ge, 2, 330, 'ligacao', 'D+330 geral', true);
+  insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo, grupo) values
+    (1, c_ge, 1, 7, 'pesquisa', 'D+7 NPS geral', 'relacionamento'), (1, c_ge, 2, 330, 'ligacao', 'D+330 geral', 'aparelho');
 
   -- 1. módulo desligado: nada acontece
   delete from empresa_modulos where empresa_id = 1 and modulo = 'posvenda';
@@ -89,7 +89,10 @@ begin
   res := res || jsonb_build_object('3_reabrir', jsonb_build_object(
     'passos', (select jsonb_object_agg(pp.dia_offset::text, a.status || coalesce(':' || a.motivo, '')) from posvenda_acompanhamentos a join posvenda_cadencia_passos pp on pp.id = a.passo_id where a.negocio_id = n),
     'jornada', (select status || ':' || motivo_fim from posvenda_jornadas where negocio_id = n)));
-  update negocios set status = 'ganho', etapa_id = 15, ganho_em = meio_dia where id = n;
+  -- desde a C4 a reabertura tira dados.venda do negócio: o ganho de novo traz a venda nova, como a rota faz
+  update negocios set status = 'ganho', etapa_id = 15, ganho_em = meio_dia,
+         dados = dados || jsonb_build_object('venda', jsonb_build_object('data', hoje::text, 'categoria_id', 1, 'condicao', 'novo', 'valor', 1000))
+   where id = n;
   res := res || jsonb_build_object('7_ganho_de_novo', jsonb_build_object(
     'jornadas', (select jsonb_agg(status order by id) from posvenda_jornadas where negocio_id = n),
     'pendentes_novos', pg_temp.passos(n),
@@ -108,7 +111,7 @@ begin
                                  join posvenda_cadencia_passos pp on pp.id = a.passo_id where a.negocio_id = n and a.status = 'pendente'),
     'atrasados', (select count(*) from posvenda_acompanhamentos where negocio_id = n and status = 'pendente' and posvenda_dia_local(1, previsto_para) < hoje)));
 
-  -- 5. recompra: mesma categoria cancela só o ciclo de troca da jornada anterior; outra categoria não cancela nada
+  -- 5. recompra: mesma categoria cancela os passos DO APARELHO da jornada anterior (D+90, D+330); outra categoria não cancela nada
   insert into contatos (empresa_id, filial_id, nome) values (1, 3, 'C3 caso 5') returning id into ct;
   n := pg_temp.vender(ct, M1, meio_dia - interval '60 days', 1, 'seminovo');   -- D+90 e D+330 ainda pela frente
   n2 := pg_temp.vender(ct, M1, meio_dia, 2, 'novo');                           -- iPad: OUTRA categoria (2)
