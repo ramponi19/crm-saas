@@ -22,9 +22,9 @@ interface Linha {
   responsavel_id: string
   previsto_para: string
   tentativas: number
-  contato: Embed<{ nome: string | null; telefone: string | null }>
+  contato: Embed<{ nome: string | null; telefone: string | null; dados: Record<string, unknown> | null }>
   passo: Embed<{ titulo: string; tipo_acao: TipoAcao; roteiro: string | null; dia_offset: number; modelo_id: number | null }>
-  negocio: Embed<{ ganho_em: string | null; responsavel_id: string | null; produto: string | null; venda: { data?: string; categoria_id?: number | null; condicao?: string } | null }>
+  negocio: Embed<{ ganho_em: string | null; responsavel_id: string | null; produto: string | null; dados: Record<string, unknown> | null; venda: { data?: string; categoria_id?: number | null; condicao?: string } | null }>
   jornada: Embed<{ cadencia: Embed<{ nome: string }> }>
 }
 
@@ -43,9 +43,9 @@ export async function carregarFilaPosVenda(db: SupabaseClient<any>, opcoes: {
 
   let q = s.from('posvenda_acompanhamentos')
     .select(`id, negocio_id, contato_id, filial_id, responsavel_id, previsto_para, tentativas,
-      contato:contatos!contato_id(nome, telefone),
+      contato:contatos!contato_id(nome, telefone, dados),
       passo:posvenda_cadencia_passos!passo_id(titulo, tipo_acao, roteiro, dia_offset, modelo_id),
-      negocio:negocios!negocio_id(ganho_em, responsavel_id, produto:dados->>produto_interessado, venda:dados->venda),
+      negocio:negocios!negocio_id(ganho_em, responsavel_id, dados, produto:dados->>produto_interessado, venda:dados->venda),
       jornada:posvenda_jornadas!jornada_id(cadencia:posvenda_cadencias!cadencia_id(nome))`)
     .eq('empresa_id', opcoes.empresaId).eq('status', 'pendente')
     .lt('previsto_para', ate.toISOString())
@@ -81,7 +81,9 @@ export async function carregarFilaPosVenda(db: SupabaseClient<any>, opcoes: {
     const produto = descricaoDaCompra(negocio?.produto, categoria, negocio?.venda?.condicao, opcoes.rotuloUsado)
     const loja = l.filial_id != null ? nomeLoja.get(l.filial_id) ?? null : null
     const vendedor = negocio?.responsavel_id ? nomePessoa.get(negocio.responsavel_id) ?? null : null
-    const mensagem = montarMensagem(passo?.roteiro, { nome: contato?.nome, produto: negocio?.produto?.trim() || categoria, loja, vendedor })
+    // campos personalizados para {{campo:chave}}: os do negócio vencem os do contato
+    const campos = { ...(contato?.dados ?? {}), ...(negocio?.dados ?? {}) }
+    const mensagem = montarMensagem(passo?.roteiro, { nome: contato?.nome, produto: negocio?.produto?.trim() || categoria, loja, vendedor, campos })
     return {
       id: l.id,
       negocioId: l.negocio_id,

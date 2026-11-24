@@ -90,7 +90,7 @@ function Regua({ regua, dados }: { regua: DadosConfigPosVenda['reguas'][number];
           </div>
           <div className="mt-0.5 text-[12px] text-ink-3">
             {cats.length ? cats.join(', ') : 'Geral (toda venda sem régua da categoria)'}
-            {regua.filtros.condicao ? ` · só ${regua.filtros.condicao === 'seminovo' ? 'usado' : 'novo'}` : ''} · prioridade {regua.prioridade}
+            {regua.filtros.condicao ? ` · só ${regua.filtros.condicao === 'novo' ? 'novo' : 'usado'}` : ''} · prioridade {regua.prioridade}
           </div>
         </div>
         <Button variant="ghost" size="sm" icon={<Pencil size={13} strokeWidth={1.8} />} onClick={() => setEditando((v) => !v)}>Editar</Button>
@@ -120,7 +120,7 @@ function Passo({ passo, dados }: { passo: DadosConfigPosVenda['passos'][number];
         <div className="min-w-0">
           <div className="text-[13.5px] text-ink">
             <span className="font-medium">{rotuloDoPasso(passo.dia_offset, passo.titulo)}</span>
-            <span className="text-ink-3"> · {TIPOS[passo.tipo_acao] ?? passo.tipo_acao}{passo.filtros.condicao ? ` · só ${passo.filtros.condicao === 'seminovo' ? 'usado' : 'novo'}` : ''}{!passo.ativo ? ' · desligado' : ''}</span>
+            <span className="text-ink-3"> · {TIPOS[passo.tipo_acao] ?? passo.tipo_acao}{passo.filtros.condicao ? ` · só ${passo.filtros.condicao === 'novo' ? 'novo' : 'usado'}` : ''}{!passo.ativo ? ' · desligado' : ''}</span>
           </div>
           {modelo ? (
             <div className="text-[12px] text-ink-3">Janela fechada: modelo <span className="text-ink-2">{modelo.nome}</span> <Badge tone={modelo.categoria === 'MARKETING' ? 'warn' : 'acc'}>{ROTULO_CATEGORIA[modelo.categoria] ?? modelo.categoria}</Badge></div>
@@ -169,7 +169,7 @@ function FormRegua({ dados, regua, aoFechar }: { dados: DadosConfigPosVenda; reg
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <Select label="Condição da venda" value={f.condicao} onChange={(e) => setF({ ...f, condicao: e.target.value })}>
-          <option value="">Qualquer</option><option value="novo">Só novo</option><option value="seminovo">Só usado</option>
+          <option value="">Qualquer</option><option value="novo">Só novo</option><option value="usado">Só usado</option>
         </Select>
         <Select label="Quando o cliente compra de novo" value={f.ao_recomprar} onChange={(e) => setF({ ...f, ao_recomprar: e.target.value })}>
           <option value="reiniciar">Começa a régua de novo</option><option value="manter">Mantém a régua atual</option><option value="encerrar">Encerra a régua</option>
@@ -218,7 +218,7 @@ function FormPasso({ dados, cadenciaId, passo, ordem, aoFechar }: {
       {f.tipo_acao !== 'tarefa_interna' && (
         <div>
           <Textarea label="Roteiro (mensagem com a janela de 24 h aberta)" rows={3} value={f.roteiro} onChange={(e) => setF({ ...f, roteiro: e.target.value })} />
-          <p className="mt-1 text-[11.5px] text-ink-3">Variáveis: {'{{nome}}'} (primeiro nome), {'{{produto}}'}, {'{{loja}}'}, {'{{vendedor}}'}.</p>
+          <p className="mt-1 text-[11.5px] text-ink-3">Variáveis: {'{{nome}}'} (primeiro nome), {'{{produto}}'}, {'{{loja}}'}, {'{{vendedor}}'} e {'{{campo:chave}}'} para um campo personalizado do negócio ou do cliente (ex.: {'{{campo:placa}}'}).</p>
           {previa && <div className="mt-1.5 rounded-control border border-line-soft bg-card p-2 text-[12.5px] text-ink-2"><span className="text-ink-3">Prévia: </span>{previa}</div>}
         </div>
       )}
@@ -246,7 +246,7 @@ function FormPasso({ dados, cadenciaId, passo, ordem, aoFechar }: {
           <option value="relacionamento">Relacionamento</option><option value="produto">Do produto (recompra cancela)</option>
         </Select>
         <Select label="Só para" value={f.condicao} onChange={(e) => setF({ ...f, condicao: e.target.value })}>
-          <option value="">Novo e usado</option><option value="novo">Só novo</option><option value="seminovo">Só usado</option>
+          <option value="">Novo e usado</option><option value="novo">Só novo</option><option value="usado">Só usado</option>
         </Select>
         <Select label="Responsável" value={f.responsavel.startsWith('usuario:') ? f.responsavel : f.responsavel} onChange={(e) => setF({ ...f, responsavel: e.target.value })}>
           <option value="acompanhamento">Quem vendeu (regra padrão)</option>
@@ -277,6 +277,7 @@ function Parametros({ dados }: { dados: DadosConfigPosVenda }) {
   const so = (p['core.sem_ofertas']?.empresa ?? null) as { botoes?: string[]; confirmacao?: string } | null
   const [botoesSo, setBotoesSo] = useState((so?.botoes ?? [BOTAO_SEM_OFERTAS_PADRAO]).join('\n'))
   const [confirmaSo, setConfirmaSo] = useState(so?.confirmacao ?? CONFIRMACAO_SEM_OFERTAS_PADRAO)
+  const [condVenda, setCondVenda] = useState(String(p['core.condicao_venda']?.empresa ?? 'exigida'))
   const [links, setLinks] = useState<Record<string, string>>(() => Object.fromEntries(dados.lojas.map((l) => [String(l.id), String(p.link_avaliacao?.lojas?.[String(l.id)] ?? '')])))
   const [ocupado, setOcupado] = useState<string | null>(null)
   async function salvar(chave: string, valor: unknown, filialId?: number) {
@@ -301,6 +302,17 @@ function Parametros({ dados }: { dados: DadosConfigPosVenda }) {
           </div>
         </div>
         <Button size="sm" disabled={cats.length === 0} loading={ocupado === 'categorias_modelo'} onClick={() => salvar('categorias_modelo', cats)}>Salvar</Button>
+      </div>
+      <div className={linha}>
+        <Select label="Condição na venda (novo ou usado)" value={condVenda} onChange={(e) => setCondVenda(e.target.value)} wrapperClassName="sm:w-64">
+          <option value="exigida">Exigida ao marcar a venda</option><option value="opcional">Opcional</option><option value="nao_usa">Não usa (ex.: serviços)</option>
+        </Select>
+        <Button size="sm" loading={ocupado === 'condicao_venda'} onClick={async () => {
+          setOcupado('condicao_venda')
+          const r = await gravar({ acao: 'condicao_venda', valor: condVenda })
+          setOcupado(null)
+          if (r.ok) { notify.ok('Salvo'); router.refresh() }
+        }}>Salvar</Button>
       </div>
       <div className={linha}>
         <Input label="Passos por pessoa por dia (teto)" type="number" value={teto} onChange={(e) => setTeto(e.target.value)} wrapperClassName="sm:w-64" />

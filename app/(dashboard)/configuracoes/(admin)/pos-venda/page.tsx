@@ -24,7 +24,7 @@ export default async function Page() {
       .eq('empresa_id', empresaId).order('ordem'),
     s.from('modelos_mensagem').select('id, nome, categoria, corpo, status').eq('empresa_id', empresaId).order('nome'),
     s.from('estoque_categorias').select('id, nome').eq('empresa_id', empresaId).order('nome'),
-    semTipo(service).from('configuracoes_sistema').select('chave, valor').eq('empresa_id', empresaId).or('chave.like.posvenda.%,chave.eq.core.sem_ofertas'),
+    semTipo(service).from('configuracoes_sistema').select('chave, valor').eq('empresa_id', empresaId).or('chave.like.posvenda.%,chave.eq.core.sem_ofertas,chave.eq.core.condicao_venda'),
     service.from('filiais').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('id'),
     service.from('empresa_usuarios').select('usuario_id, usuarios(nome)').eq('empresa_id', empresaId).eq('ativo', true).eq('conta_servico', false),
     s.from('posvenda_chamado_categorias').select('id, nome, ativo').eq('empresa_id', empresaId).order('id'),

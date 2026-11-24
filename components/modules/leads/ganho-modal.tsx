@@ -6,14 +6,14 @@ import { createClient } from '@/lib/supabase/client'
 import { useEmpresa } from '@/lib/empresa-context'
 import { useFuso } from '@/components/fuso-provider'
 import { diaNoFuso } from '@/lib/datas'
-import { CONDICOES, DATA_MINIMA, validarVendaGanho, valorDigitado, type CampoVenda, type CondicaoVenda } from '@/lib/venda-ganho'
+import { CONDICOES, DATA_MINIMA, modoCondicao, validarVendaGanho, valorDigitado, type CampoVenda, type CondicaoVenda, type ModoCondicao } from '@/lib/venda-ganho'
 import { cn } from '@/lib/utils'
 
 /** O que o modal devolve — vai no corpo de /api/leads/mover como `venda`. */
 export interface VendaDoModal {
   data: string
   categoria_id: number | null
-  condicao: CondicaoVenda
+  condicao: CondicaoVenda | null
   valor: string
 }
 
@@ -53,6 +53,8 @@ export function GanhoModal({ leadNome, valorInicial, criadoEm, confirmar = 'Marc
   // Valor ainda é o que veio do negócio: a primeira digitação/colagem SUBSTITUI (lib/venda-ganho.ts).
   const [valorIntocado, setValorIntocado] = useState(true)
   const [categorias, setCategorias] = useState<{ id: number; nome: string }[] | null>(null)
+  // Condição na venda por empresa (core.condicao_venda): exigida, opcional ou não usa.
+  const [modo, setModo] = useState<ModoCondicao | null>(null)
   const [tentou, setTentou] = useState(false)
 
   useEffect(() => {
@@ -61,12 +63,14 @@ export function GanhoModal({ leadNome, valorInicial, criadoEm, confirmar = 'Marc
     createClient().from('estoque_categorias').select('id, nome')
       .eq('empresa_id', empresa.id).eq('ativo', true).order('ordem').order('nome')
       .then(({ data: cats }) => { if (vivo) setCategorias(((cats ?? []) as { id: number; nome: string }[])) })
+    createClient().rpc('config_valor' as never, { p_modulo: 'core', p_chave: 'condicao_venda' } as never)
+      .then(({ data: m }) => { if (vivo) setModo(modoCondicao(m)) }, () => { if (vivo) setModo('exigida') })
     return () => { vivo = false }
   }, [empresa?.id])
 
   const checagem = validarVendaGanho(
     { data, categoria_id: categoria, condicao: condicao ?? undefined, valor },
-    { hoje, criadoEm: criadoEm ?? DATA_MINIMA, categorias: (categorias ?? []).map((c) => c.id) },
+    { hoje, criadoEm: criadoEm ?? DATA_MINIMA, categorias: (categorias ?? []).map((c) => c.id), condicao: modo ?? 'exigida' },
   )
   const erroDe = (campo: CampoVenda): string | undefined => {
     if (erroServidor?.campo === campo) return erroServidor.erro
@@ -75,8 +79,8 @@ export function GanhoModal({ leadNome, valorInicial, criadoEm, confirmar = 'Marc
 
   function enviar() {
     setTentou(true)
-    if (!checagem.ok || categorias == null || condicao == null) return
-    onConfirm({ data, categoria_id: categoria, condicao, valor })
+    if (!checagem.ok || categorias == null || modo == null) return
+    onConfirm({ data, categoria_id: categoria, condicao: checagem.venda.condicao, valor })
   }
 
   const botao = 'min-h-[40px] rounded-lg border px-3 text-[13px] font-medium transition-colors'
@@ -128,18 +132,18 @@ export function GanhoModal({ leadNome, valorInicial, criadoEm, confirmar = 'Marc
           </Select>
         )}
 
-        <fieldset>
-          <legend className="mb-1.5 text-[12.5px] font-medium text-ink-2">Condição <span className="text-bad">*</span></legend>
+        {modo !== 'nao_usa' && <fieldset>
+          <legend className="mb-1.5 text-[12.5px] font-medium text-ink-2">Condição {modo === 'opcional' ? <span className="text-ink-3">(opcional)</span> : <span className="text-bad">*</span>}</legend>
           <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Condição">
             {CONDICOES.map((c) => (
               <button key={c.id} type="button" role="radio" aria-checked={condicao === c.id}
                 className={cn(botao, condicao === c.id ? ativo : inativo)} onClick={() => setCondicao(c.id)}>
-                {c.id === 'seminovo' && rotuloUsado ? rotuloUsado : c.rotulo}
+                {c.id === 'usado' && rotuloUsado ? rotuloUsado : c.rotulo}
               </button>
             ))}
           </div>
           {erroDe('condicao') && <p className="mt-1 text-[12px] text-bad">{erroDe('condicao')}</p>}
-        </fieldset>
+        </fieldset>}
 
         <Input label="Valor da venda (R$)" inputMode="decimal" autoComplete="off" placeholder="0,00"
           value={valor} error={erroDe('valor')} required

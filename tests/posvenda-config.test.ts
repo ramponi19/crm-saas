@@ -25,7 +25,7 @@ test('aviso de passo sem modelo: WhatsApp ou pesquisa a partir de D+3, ligado e 
 test('régua: nome, prioridade, categorias sem repetição, condição e o que fazer na recompra', () => {
   const r = validarRegua({ nome: '  iPhone  ', prioridade: '100', categorias: [1, '2', 2, 'x'], condicao: 'seminovo' })
   assert.ok(r.ok)
-  if (r.ok) assert.deepEqual(r.v, { nome: 'iPhone', ativo: true, prioridade: 100, categorias: [1, 2], condicao: 'seminovo', ao_recomprar: 'reiniciar' })
+  if (r.ok) assert.deepEqual(r.v, { nome: 'iPhone', ativo: true, prioridade: 100, categorias: [1, 2], condicao: 'usado', ao_recomprar: 'reiniciar' })
   assert.equal(validarRegua({ nome: 'x' }).ok, false)
   assert.equal(validarRegua({ nome: 'Geral', ao_recomprar: 'sumir' }).ok, false)
 })

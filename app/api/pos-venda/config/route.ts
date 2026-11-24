@@ -112,6 +112,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true })
   }
 
+  // Condição na venda (core.condicao_venda): exigida | opcional | nao_usa — vale para o modal de venda de toda a empresa.
+  if (b.acao === 'condicao_venda') {
+    if (!['exigida', 'opcional', 'nao_usa'].includes(b.valor as string)) return erro('Escolha exigida, opcional ou não usa.', 422)
+    const { error } = await supabase.rpc('config_salvar', { p_modulo: 'core', p_chave: 'condicao_venda', p_valor: b.valor } as never)
+    if (error) return /SEM_PERMISSAO|SOMENTE_LEITURA/.test(error.message) ? semPermissao() : erro(error.message)
+    return NextResponse.json({ ok: true })
+  }
+
   if (b.acao === 'categoria_chamado') {
     const nome = typeof b.nome === 'string' ? b.nome.trim().slice(0, 60) : ''
     if (nome.length < 2) return erro('Dê um nome à categoria.', 422)

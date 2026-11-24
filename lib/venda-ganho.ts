@@ -16,12 +16,25 @@
  */
 import { diaNoFuso, instanteLocal, somarDias } from '@/lib/datas'
 
-export type CondicaoVenda = 'novo' | 'seminovo'
+/** Valor interno neutro desde 24/11/2026 (migração 20261124002000; antes 'seminovo', que ainda é aceito na entrada). */
+export type CondicaoVenda = 'novo' | 'usado'
 /** Rótulos padrão; o de "usado" a empresa troca pelo vocabulário (PerfilDoLead.rotuloUsado). */
 export const CONDICOES: { id: CondicaoVenda; rotulo: string }[] = [
   { id: 'novo', rotulo: 'Novo' },
-  { id: 'seminovo', rotulo: 'Usado' },
+  { id: 'usado', rotulo: 'Usado' },
 ]
+/**
+ * A condição na venda, por empresa (`core.condicao_venda`): exigida (padrão, como sempre foi), opcional ou não usa
+ * (ex.: serviços). No banco ela sempre foi opcional.
+ */
+export type ModoCondicao = 'exigida' | 'opcional' | 'nao_usa'
+export function modoCondicao(v: unknown): ModoCondicao {
+  return v === 'opcional' || v === 'nao_usa' ? v : 'exigida'
+}
+/** 'seminovo' (valor antigo) vira 'usado'; o resto que não for novo/usado, nulo. */
+export function condicaoNeutra(v: unknown): CondicaoVenda | null {
+  return v === 'novo' ? 'novo' : v === 'usado' || v === 'seminovo' ? 'usado' : null
+}
 /** Primeiro dia aceito (o grupo de pedidos da JM começa em mar/2024). Igual ao corrigir_data_venda. */
 export const DATA_MINIMA = '2024-01-01'
 /** Quantos dias antes da criação do negócio a venda ainda pode ser datada pela tela. */
@@ -39,7 +52,7 @@ export interface VendaInformada {
 export interface VendaValida {
   data: string
   categoria_id: number | null
-  condicao: CondicaoVenda
+  condicao: CondicaoVenda | null
   valor: number
 }
 
@@ -50,6 +63,8 @@ export interface ContextoVenda {
   criadoEm: string
   /** Ids das categorias ativas da empresa. Vazio = a empresa não usa categoria (não exigida). */
   categorias: number[]
+  /** Condição na venda (core.condicao_venda); sem informar, exigida. */
+  condicao?: ModoCondicao
 }
 
 export type CampoVenda = 'data' | 'categoria_id' | 'condicao' | 'valor'
@@ -114,13 +129,15 @@ export function validarVendaGanho(entrada: VendaInformada | null | undefined, ct
     categoria = c
   }
 
-  if (v.condicao !== 'novo' && v.condicao !== 'seminovo') return { ok: false, campo: 'condicao', erro: 'Escolha a condição.' }
+  const modo = ctx.condicao ?? 'exigida'
+  const condicao = modo === 'nao_usa' ? null : condicaoNeutra(v.condicao)
+  if (modo === 'exigida' && !condicao) return { ok: false, campo: 'condicao', erro: 'Escolha a condição.' }
 
   const valor = lerValor(v.valor)
   if (!Number.isFinite(valor) || valor <= 0) return { ok: false, campo: 'valor', erro: 'Informe o valor da venda.' }
   if (valor > VALOR_MAXIMO) return { ok: false, campo: 'valor', erro: 'Valor alto demais — confira os zeros.' }
 
-  return { ok: true, venda: { data, categoria_id: categoria, condicao: v.condicao, valor: Math.round(valor * 100) / 100 } }
+  return { ok: true, venda: { data, categoria_id: categoria, condicao, valor: Math.round(valor * 100) / 100 } }
 }
 
 /** `ganho_em` da data da venda: hoje = o instante atual; outro dia = meio-dia no fuso da empresa. */

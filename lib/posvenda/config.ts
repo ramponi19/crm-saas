@@ -66,14 +66,15 @@ export const PARAMETROS: Record<Parametro, DefParametro> = {
 export const ehParametro = (k: unknown): k is Parametro => typeof k === 'string' && k in PARAMETROS
 
 // ── Régua e passo ───────────────────────────────────────────────────────────────────────────────
-export interface ReguaEntrada { nome: string; ativo: boolean; prioridade: number; categorias: number[]; condicao: 'novo' | 'seminovo' | null; ao_recomprar: string }
+export interface ReguaEntrada { nome: string; ativo: boolean; prioridade: number; categorias: number[]; condicao: 'novo' | 'usado' | null; ao_recomprar: string }
 export interface PassoEntrada {
   ordem: number; dia_offset: number; tipo_acao: string; titulo: string; roteiro: string | null; grupo: string; ativo: boolean
-  responsavel: string; modelo_id: number | null; condicao: 'novo' | 'seminovo' | null; tolerancia_dias: number
+  responsavel: string; modelo_id: number | null; condicao: 'novo' | 'usado' | null; tolerancia_dias: number
 }
 
 const texto = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
-const condicao = (v: unknown): 'novo' | 'seminovo' | null => (v === 'novo' || v === 'seminovo' ? v : null)
+// 'seminovo' (valor antigo) é aceito e gravado como 'usado' (migração 20261124002000)
+const condicao = (v: unknown): 'novo' | 'usado' | null => (v === 'novo' ? 'novo' : v === 'usado' || v === 'seminovo' ? 'usado' : null)
 
 export function validarRegua(b: Record<string, unknown>): { ok: true; v: ReguaEntrada } | { ok: false; erro: string } {
   const nome = texto(b.nome, 80)
