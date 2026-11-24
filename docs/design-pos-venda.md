@@ -1022,3 +1022,31 @@ Cada etapa segue o ritual do §8.6.1: migração e teste no banco local descart�
 - aprovar este plano (§8) antes de qualquer migração ou código do MVP;
 - marcar o `conciliacao_revisar.csv`;
 - confirmar o 5096 com a equipe.
+
+## 10. Universalidade — lacunas para outros segmentos (Lucas, 24/11/2026)
+
+O Pós-venda é universal: cada empresa monta e parametriza a própria régua pela tela, sem réguas prontas nem modelos por
+segmento. A auditoria de 24/11 não achou régua, texto ou valor da JM no código; os pontos abaixo prendem o módulo ao
+varejo de produto. Tamanho: **P** (até 1 dia, migração simples + tela), **M** (2–4 dias, regra nova no banco + tela +
+testes), **G** (mais de uma semana, modelo novo).
+
+**AGORA (antes de ligar na JM), pelo ritual:**
+| Lacuna | O que muda | Tamanho |
+|---|---|---|
+| Condição da venda opcional por empresa | `vendas.condicao` = exigida / opcional / não usa; o modal de venda e o validador do banco seguem a escolha | P |
+| Valor interno neutro | `dados.venda.condicao` passa de `seminovo` para `usado` (migração dos dados gravados; filtros de régua e passo também); o rótulo continua do vocabulário | P |
+| Campo personalizado no roteiro | `{{campo:chave}}` no roteiro do passo, lido de `negocios.dados` (e do contato) | P |
+
+**DEPOIS de ligar na JM e ANTES da Aletrini:**
+| Lacuna | O que muda | Tamanho |
+|---|---|---|
+| Categorias de venda próprias | tabela do módulo (ou core) com as categorias da venda; o Estoque, quando ligado, oferece as dele; o modal e a régua leem dali | M |
+| Passo por data de calendário | âncora do passo: data da venda (hoje), data fixa no ano (dia/mês), data de um campo (aniversário, vencimento); a jornada cria o passo na próxima ocorrência | M |
+| Repetição de passos | "repetir a cada N dias/meses, até X vezes ou até a recompra"; o passo feito agenda o próximo | M |
+| Tela para a empresa criar os campos da venda | Configurações › Campos: nome, tipo (texto, número, data, lista), obrigatório no ganho; grava em `campos_personalizados` (entidade negócio) | M |
+| Filtros por campo | régua e passo filtram por valor de campo (igual, contém, maior/menor, data) | M |
+
+**SEM DATA:**
+| Lacuna | O que muda | Tamanho |
+|---|---|---|
+| Passo por uso estimado (ex.: revisão aos 10.000 km) | uso na venda + ritmo estimado por dia (campos) → data prevista; recalcula quando o cliente informa o uso; o passo nasce na data estimada | G |
