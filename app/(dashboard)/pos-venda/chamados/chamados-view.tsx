@@ -17,7 +17,7 @@ const um = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 export interface ChamadoLinha {
   id: number; numero: number; titulo: string; descricao: string | null; prioridade: string; origem: string
   aberto_em: string; primeira_resposta_em: string | null; resolvido_em: string | null
-  sla_resposta_vence: string | null; sla_resolucao_vence: string | null; responsavel_id: string; negocio_id: number | null
+  sla_resposta_vence: string | null; sla_resolucao_vence: string | null; sla_pausado_desde?: string | null; responsavel_id: string; negocio_id: number | null
   contato: Embed<{ nome: string | null; telefone: string | null }>
   categoria: Embed<{ nome: string }>
   status: Embed<{ id: number; nome: string; tipo: string }>
@@ -150,6 +150,10 @@ function Cartao({ c, status, equipe, podeRepassar, meu, responsavel, aberto, alt
                 </li>
               ))}
           </ol>
+          {/* Vendedor do cliente vê em leitura: mover, anotar e repassar são do responsável e dos administradores. */}
+          {!meu && !podeRepassar ? (
+            <p className="text-[12px] text-ink-3">Só leitura: quem cuida deste chamado é {responsavel}.</p>
+          ) : <>
           <div className="grid gap-2 sm:grid-cols-2">
             <Select label="Status" value={novoStatus} onChange={(e) => setNovoStatus(e.target.value)}>
               {status.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
@@ -163,6 +167,7 @@ function Cartao({ c, status, equipe, podeRepassar, meu, responsavel, aberto, alt
           </div>
           <Textarea label="Anotação (o que foi feito, o que falta)" rows={2} value={texto} onChange={(e) => setTexto(e.target.value)} />
           <Button size="sm" loading={salvando} disabled={!mudou} onClick={salvar}>Salvar</Button>
+          </>}
         </div>
       )}
     </li>

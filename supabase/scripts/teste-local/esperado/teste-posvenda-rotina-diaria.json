@@ -1,0 +1,33 @@
+{
+  "1_rodou": {
+    "perdidos_por_tolerancia": 2,
+    "reatribuidos_por_ausencia": 1
+  },
+  "5_m1_ve": 1,
+  "4_pausou": true,
+  "1_de_novo": "já rodou hoje",
+  "4_retomou": {
+    "pausado_seg": 36000,
+    "pausa_zerada": true,
+    "prazo_andou_horas": 10
+  },
+  "3_ausencia": {
+    "futuro_fica": true,
+    "hoje_saiu_do_ausente": true
+  },
+  "5_m2_nao_ve": 0,
+  "2_tolerancia": {
+    "atrasado_1_dia": "pendente",
+    "mensal_perdido": "perdido",
+    "mensal_proxima": 1,
+    "atrasado_5_dias": "perdido:atraso acima da tolerância"
+  },
+  "5_m1_nao_mexe": "SEM_PERMISSAO",
+  "7_agendamento": "10 * * * *",
+  "8_so_servidor": false,
+  "5_m1_ve_historico": true,
+  "6_nome_com_espacos": true,
+  "1_antes_da_abertura": "antes da abertura",
+  "4_terceiro_com_config_pausa": true,
+  "4_terceiro_sem_config_nao_pausa": true
+}
