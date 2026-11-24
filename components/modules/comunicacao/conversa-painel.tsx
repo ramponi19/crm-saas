@@ -37,7 +37,8 @@ type ModeloAprovado = { id: number; nome: string; idioma: string; corpo: string;
  * envia é a pessoa) e `modelo` para abrir os modelos aprovados quando a janela de 24 h do
  * WhatsApp está fechada (D8 do pós-venda: só UTILITY no começo).
  */
-export type FiltroDeModelos = { categorias: string[]; preferido: number | null }
+/** `variaveis`: valores de {{1}}, {{2}}… que a outra tela já sabe (pós-venda: nome e produto); a pessoa confere e envia. */
+export type FiltroDeModelos = { categorias: string[]; preferido: number | null; variaveis?: string[] }
 export type RascunhoDaConversa = { texto?: string | null; modelo?: FiltroDeModelos | null }
 
 export function ConversaPainel({
@@ -307,7 +308,7 @@ export function ConversaPainel({
       setModelos(lista)
       // o modelo do passo do pós-venda já vem escolhido (as variáveis a pessoa confere e completa)
       const pref = filtro?.preferido != null ? lista.find((m) => m.id === filtro.preferido) ?? null : null
-      if (pref) setModelo(pref)
+      if (pref) { setModelo(pref); if (filtro?.variaveis?.length) setParams(filtro.variaveis) }
       setAvisosPagamento((j.envio?.avisosPagamento ?? []) as AvisoPagamento[])
     } catch {
       setModelos([]); notify.bad('Não foi possível carregar os modelos.')

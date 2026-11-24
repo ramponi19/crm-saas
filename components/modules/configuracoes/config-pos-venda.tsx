@@ -8,7 +8,8 @@ import { Badge, Button, Input, Select, Textarea, Tabs, notify } from '@/componen
 import { cn } from '@/lib/utils'
 import { montarMensagem, rotuloDoPasso } from '@/lib/posvenda/fila'
 import {
-  AVISO_SEM_MODELO, CATEGORIAS_MODELO, DIA_JANELA_PROVAVELMENTE_FECHADA, ROTULO_CATEGORIA, categoriasPermitidas, passoPrecisaDeModelo,
+  AVISO_SEM_MODELO, CATEGORIAS_MODELO, DIA_JANELA_PROVAVELMENTE_FECHADA, MENSAGEM_NEUTRO_PADRAO, MENSAGEM_PROMOTOR_PADRAO, ROTULO_CATEGORIA,
+  categoriasPermitidas, passoPrecisaDeModelo,
 } from '@/lib/posvenda/config'
 
 type Filtros = { categorias?: number[]; condicao?: string }
@@ -232,6 +233,7 @@ function FormPasso({ dados, cadenciaId, passo, ordem, aoFechar }: {
             ))}
           </Select>
           {modeloEscolhido && <div className="mt-1.5 rounded-control border border-line-soft bg-card p-2 text-[12.5px] text-ink-2 whitespace-pre-line">{modeloEscolhido.corpo}</div>}
+          <p className="mt-1 text-[11.5px] text-ink-3">Na fila, o Nexus preenche {'{{1}}'} com o primeiro nome do cliente e {'{{2}}'} com o produto comprado; crie os modelos nessa ordem.</p>
           {aprovados.length === 0 && <p className="mt-1 text-[11.5px] text-ink-3">Nenhum modelo aprovado ainda. Crie em <Link href="/modelos" className="underline">Automações › Modelos</Link>.</p>}
           {precisa && <p className="mt-1 flex items-center gap-1 text-[12px] text-warn"><AlertTriangle size={12} strokeWidth={1.9} /> {AVISO_SEM_MODELO}</p>}
           {!precisa && !f.modelo_id && Number(f.dia_offset) < DIA_JANELA_PROVAVELMENTE_FECHADA && (
@@ -270,6 +272,9 @@ function Parametros({ dados }: { dados: DadosConfigPosVenda }) {
   const [sla, setSla] = useState(String(p.sla_horas?.empresa ?? 'loja_aberta'))
   const [nota, setNota] = useState(String(p.nps_limite_chamado?.empresa ?? 6))
   const [janela, setJanela] = useState(String(p.janela_acompanhamento_dias?.empresa ?? 3))
+  const [promotor, setPromotor] = useState(String(p.mensagem_promotor?.empresa ?? ''))
+  const [neutro, setNeutro] = useState(String(p.mensagem_neutro?.empresa ?? ''))
+  const [links, setLinks] = useState<Record<string, string>>(() => Object.fromEntries(dados.lojas.map((l) => [String(l.id), String(p.link_avaliacao?.lojas?.[String(l.id)] ?? '')])))
   const [ocupado, setOcupado] = useState<string | null>(null)
   async function salvar(chave: string, valor: unknown, filialId?: number) {
     setOcupado(chave + (filialId ?? ''))
@@ -311,6 +316,31 @@ function Parametros({ dados }: { dados: DadosConfigPosVenda }) {
       <div className={linha}>
         <Input label="Dias em que a resposta do cliente fica no pós-venda" type="number" value={janela} onChange={(e) => setJanela(e.target.value)} wrapperClassName="sm:w-64" />
         <Button size="sm" loading={ocupado === 'janela_acompanhamento_dias'} onClick={() => salvar('janela_acompanhamento_dias', Number(janela))}>Salvar</Button>
+      </div>
+      <div className="border-b border-line-soft py-4">
+        <div className="text-[13.5px] font-medium text-ink">Depois da nota</div>
+        <p className="mb-2 text-[12px] text-ink-3">
+          Logo depois de registrar a nota, a fila sugere a próxima mensagem (vai como mensagem normal: o cliente acabou de responder).
+          9 ou 10: pedido de avaliação no Google com o link da loja. 7 ou 8: pergunta do que poderia ter sido melhor. Até a nota que abre chamado: o chamado.
+          Variáveis: {'{{nome}}'} e {'{{link}}'}.
+        </p>
+        <div className="flex flex-col gap-2">
+          {dados.lojas.map((l) => (
+            <div key={l.id} className="flex items-end gap-2">
+              <Input label={`Link da avaliação no Google · ${l.nome}`} placeholder="https://g.page/r/…/review" value={links[String(l.id)] ?? ''}
+                onChange={(e) => setLinks({ ...links, [String(l.id)]: e.target.value })} wrapperClassName="flex-1" />
+              <Button size="sm" loading={ocupado === 'link_avaliacao' + l.id} onClick={() => salvar('link_avaliacao', links[String(l.id)]?.trim() || null, l.id)}>Salvar</Button>
+            </div>
+          ))}
+          <div className="flex items-end gap-2">
+            <Textarea label="Mensagem para quem deu 9 ou 10" rows={2} placeholder={MENSAGEM_PROMOTOR_PADRAO} value={promotor} onChange={(e) => setPromotor(e.target.value)} wrapperClassName="flex-1" />
+            <Button size="sm" disabled={promotor.trim().length < 3} loading={ocupado === 'mensagem_promotor'} onClick={() => salvar('mensagem_promotor', promotor)}>Salvar</Button>
+          </div>
+          <div className="flex items-end gap-2">
+            <Textarea label="Mensagem para quem deu 7 ou 8" rows={2} placeholder={MENSAGEM_NEUTRO_PADRAO} value={neutro} onChange={(e) => setNeutro(e.target.value)} wrapperClassName="flex-1" />
+            <Button size="sm" disabled={neutro.trim().length < 3} loading={ocupado === 'mensagem_neutro'} onClick={() => salvar('mensagem_neutro', neutro)}>Salvar</Button>
+          </div>
+        </div>
       </div>
       <div className="py-4">
         <div className="text-[13.5px] font-medium text-ink">Responsável padrão por loja</div>

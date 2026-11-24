@@ -6,7 +6,7 @@ import { carregarConfigEmpresa } from '@/lib/empresa-config'
 import { posvendaLigado, semTipo } from '@/lib/posvenda/ligado'
 import { categoriasPermitidas } from '@/lib/posvenda/config'
 import { carregarFilaPosVenda } from '@/lib/posvenda/carregar-fila'
-import { FilaPosVenda } from './fila-pos-venda'
+import { FilaPosVenda, type AposNota } from './fila-pos-venda'
 
 export const metadata = { title: 'Pós-venda' }
 
@@ -24,7 +24,7 @@ export default async function PosVendaPage({ searchParams }: { searchParams: Pro
   if (!empresaId) redirect('/dashboard')
 
   const service = createServiceClient()
-  const [ligado, { data: vinc }, { data: eu }, fuso, cfg, sp, { data: cats }] = await Promise.all([
+  const [ligado, { data: vinc }, { data: eu }, fuso, cfg, sp, { data: cats }, { data: cfgPv }] = await Promise.all([
     posvendaLigado(service, empresaId),
     service.from('empresa_usuarios').select('role').eq('empresa_id', empresaId).eq('usuario_id', user.id).eq('ativo', true).maybeSingle(),
     supabase.from('usuarios').select('is_super_admin').eq('id', user.id).maybeSingle(),
@@ -32,6 +32,8 @@ export default async function PosVendaPage({ searchParams }: { searchParams: Pro
     carregarConfigEmpresa(supabase, empresaId),
     searchParams,
     semTipo(service).rpc('config_valor_emp', { p_empresa: empresaId, p_modulo: 'posvenda', p_chave: 'categorias_modelo' }),
+    semTipo(service).from('configuracoes_sistema').select('chave, valor').eq('empresa_id', empresaId)
+      .in('chave', ['posvenda.nps_limite_chamado', 'posvenda.link_avaliacao', 'posvenda.mensagem_promotor', 'posvenda.mensagem_neutro']),
   ])
   if (!ligado) return <FilaPosVenda desligado itens={[]} hoje="" podeVerTodos={false} ver="meus" cortado={false} />
 
@@ -41,6 +43,16 @@ export default async function PosVendaPage({ searchParams }: { searchParams: Pro
     empresaId, fuso, rotuloUsado: cfg.vocabulario.usado ?? 'Usado', so: ver === 'meus' ? user.id : null,
     categoriasModelo: categoriasPermitidas(cats),
   })
+  // Depois da nota: limite do chamado, link de avaliação (loja → empresa) e os textos da empresa.
+  const valor = (k: string) => ((cfgPv ?? []) as { chave: string; valor: { empresa?: unknown; lojas?: Record<string, unknown> } | null }[])
+    .find((c) => c.chave === `posvenda.${k}`)?.valor ?? null
+  const aposNota: AposNota = {
+    limite: Number(valor('nps_limite_chamado')?.empresa ?? 6),
+    linkEmpresa: (valor('link_avaliacao')?.empresa as string | null) ?? null,
+    linkPorLoja: (valor('link_avaliacao')?.lojas ?? {}) as Record<string, string>,
+    textoPromotor: (valor('mensagem_promotor')?.empresa as string | null) ?? null,
+    textoNeutro: (valor('mensagem_neutro')?.empresa as string | null) ?? null,
+  }
   // key: trocar Meus/Todos monta a fila de novo com os itens da outra visão (o estado local começa das props).
-  return <FilaPosVenda key={ver} itens={itens} hoje={hoje} podeVerTodos={podeVerTodos} ver={ver} cortado={cortado} />
+  return <FilaPosVenda key={ver} itens={itens} hoje={hoje} podeVerTodos={podeVerTodos} ver={ver} cortado={cortado} aposNota={aposNota} />
 }

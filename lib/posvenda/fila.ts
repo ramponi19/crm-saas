@@ -12,6 +12,7 @@ export type TipoAcao = 'whatsapp' | 'ligacao' | 'pesquisa' | 'tarefa_interna'
 export interface ItemPosVenda {
   id: number
   negocioId: number | null
+  filialId: number | null
   /** Dia previsto no fuso da empresa (YYYY-MM-DD). */
   previsto: string
   grupo: GrupoFila
@@ -45,7 +46,9 @@ export interface ItemPosVenda {
  *   sem_numero sem conversa e sem telefone válido.
  */
 export type ModoContato = 'nexus' | 'modelo' | 'externo' | 'sem_numero'
-export interface ContatoDoPasso { modo: ModoContato; href: string | null; aviso: string | null }
+export interface ContatoDoPasso { modo: ModoContato; href: string | null; aviso: string | null
+  /** A conversa no WhatsApp da loja (modos nexus e modelo): a mensagem depois da nota vai por ela. */
+  conversaId?: number | null }
 export interface ConversaDoCanal {
   conversaId: number
   /** tipo do canal (whatsapp, instagram…) e se é a API oficial da Meta (tem WABA). */
@@ -55,7 +58,11 @@ export interface ConversaDoCanal {
 }
 export const JANELA_META_MS = 24 * 60 * 60 * 1000
 
-export interface ModeloDoPasso { id: number | null; categorias: string[] }
+/**
+ * O modelo do passo. Convenção dos modelos do pós-venda (dita na tela de Configurações): {{1}} = primeiro nome do
+ * cliente, {{2}} = produto comprado. Os valores vão no endereço (v1, v2) e o modal já os preenche.
+ */
+export interface ModeloDoPasso { id: number | null; categorias: string[]; variaveis?: string[] }
 
 export function decidirContato(conversa: ConversaDoCanal | null, telefone: string | null | undefined, mensagem: string, agora: Date,
                                modelo: ModeloDoPasso = { id: null, categorias: ['UTILITY'] }): ContatoDoPasso {
@@ -63,11 +70,12 @@ export function decidirContato(conversa: ConversaDoCanal | null, telefone: strin
     const ultima = conversa.ultimaRecebida ? new Date(conversa.ultimaRecebida).getTime() : null
     if (conversa.oficial && (ultima == null || agora.getTime() - ultima > JANELA_META_MS)) {
       const cat = (modelo.categorias.length ? modelo.categorias : ['UTILITY']).join(',')
-      return { modo: 'modelo', href: `/comunicacao?c=${conversa.conversaId}&modelo=posvenda&cat=${cat}${modelo.id ? `&m=${modelo.id}` : ''}`,
+      const vs = modelo.id ? (modelo.variaveis ?? []).map((v, i) => `&v${i + 1}=${encodeURIComponent(v)}`).join('') : ''
+      return { modo: 'modelo', conversaId: conversa.conversaId, href: `/comunicacao?c=${conversa.conversaId}&modelo=posvenda&cat=${cat}${modelo.id ? `&m=${modelo.id}` : ''}${vs}`,
                aviso: modelo.id ? 'Janela de 24 h fechada: vai o modelo do passo' : 'Janela de 24 h fechada e o passo não tem modelo: ligue ou escolha um modelo' }
     }
     const t = mensagem.trim()
-    return { modo: 'nexus', href: `/comunicacao?c=${conversa.conversaId}${t ? `&texto=${encodeURIComponent(t)}` : ''}`, aviso: null }
+    return { modo: 'nexus', conversaId: conversa.conversaId, href: `/comunicacao?c=${conversa.conversaId}${t ? `&texto=${encodeURIComponent(t)}` : ''}`, aviso: null }
   }
   const wa = linkWhatsApp(telefone, mensagem)
   if (wa) return { modo: 'externo', href: wa, aviso: 'Fora do Nexus: a conversa não fica registrada' }

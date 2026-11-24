@@ -8,6 +8,8 @@ import { Topbar } from '@/components/layout/topbar'
 import { Button, Input, Badge, EmptyState, Tabs, notify } from '@/components/ui'
 import { textoDias, type ContatoDoPasso, type GrupoFila, type ItemPosVenda } from '@/lib/posvenda/fila'
 import { cn } from '@/lib/utils'
+import { linkWhatsApp } from '@/lib/whatsapp-link'
+import { depoisDaNota, type DepoisDaNota } from '@/lib/posvenda/config'
 
 interface Props {
   itens: ItemPosVenda[]
@@ -16,7 +18,10 @@ interface Props {
   ver: 'meus' | 'todos'
   cortado: boolean
   desligado?: boolean
+  /** Depois da nota (bloco 4): limite que abre chamado, link de avaliação por loja e os textos da empresa. */
+  aposNota?: AposNota
 }
+export interface AposNota { limite: number; linkEmpresa: string | null; linkPorLoja: Record<string, string>; textoPromotor: string | null; textoNeutro: string | null }
 
 const ABAS: { value: GrupoFila; rotulo: string }[] = [
   { value: 'atrasados', rotulo: 'Atrasados' },
@@ -29,11 +34,12 @@ const ABAS: { value: GrupoFila; rotulo: string }[] = [
  * desde a venda; o que comprou; o passo; os botões), para caber vários na tela sem rolar muito. O WhatsApp abre com a
  * mensagem do roteiro já escrita; quem envia é a pessoa. Depois, "Feito" (ou, no menu, sem resposta, reagendar, pular).
  */
-export function FilaPosVenda({ itens: iniciais, podeVerTodos, ver, cortado, desligado }: Props) {
+export function FilaPosVenda({ itens: iniciais, podeVerTodos, ver, cortado, desligado, aposNota }: Props) {
   const router = useRouter()
   const [itens, setItens] = useState(iniciais)
   const [aberto, setAberto] = useState<number | null>(null)
   const [ocupado, setOcupado] = useState<number | null>(null)
+  const [seguimentos, setSeguimentos] = useState<Record<number, DepoisDaNota & { nota: number }>>({})
 
   const contagem = useMemo(() => {
     const c: Record<GrupoFila, number> = { atrasados: 0, hoje: 0, proximos: 0 }
@@ -52,8 +58,15 @@ export function FilaPosVenda({ itens: iniciais, podeVerTodos, ver, cortado, desl
       })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) { notify.bad(j.error ?? 'Não foi possível registrar'); return false }
-      setItens((prev) => prev.filter((x) => x.id !== item.id))
       setAberto(null)
+      // Nota registrada: o cartão fica com a próxima mensagem sugerida (promotor ou neutro) até a pessoa concluir.
+      const seg = corpo.acao === 'nota' && aposNota
+        ? depoisDaNota(Number(corpo.nota), { limiteChamado: aposNota.limite, nome: item.cliente,
+            link: (item.filialId != null ? aposNota.linkPorLoja[String(item.filialId)] : null) ?? aposNota.linkEmpresa,
+            textoPromotor: aposNota.textoPromotor, textoNeutro: aposNota.textoNeutro })
+        : null
+      if (seg && seg.faixa !== 'detrator') setSeguimentos((m) => ({ ...m, [item.id]: { ...seg, nota: Number(corpo.nota) } }))
+      else setItens((prev) => prev.filter((x) => x.id !== item.id))
       notify.ok(aviso)
       if (j.resultado?.chamado_id) notify.ok('Nota baixa: chamado aberto para os administradores')
       router.refresh()
@@ -79,7 +92,11 @@ export function FilaPosVenda({ itens: iniciais, podeVerTodos, ver, cortado, desl
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <Topbar title="Pós-venda" />
       <div className="mx-auto w-full max-w-[640px] min-h-0 flex-1 overflow-y-auto px-3 pb-6 pt-3 sm:px-4 scrollbar-thin">
-        {/* O título já está na barra de cima: aqui só o "Meus / Todos" de quem pode ver todos. */}
+        {/* O título já está na barra de cima. Fila | Chamados e, para quem pode ver todos, Meus | Todos. */}
+        <div className="mb-3 flex gap-1 rounded-control border border-line bg-card p-0.5 text-[12.5px]">
+          <span className="flex-1 rounded-[6px] bg-ink px-2.5 py-1.5 text-center font-medium text-white">Fila</span>
+          <Link href="/pos-venda/chamados" className="flex-1 rounded-[6px] px-2.5 py-1.5 text-center font-medium text-ink-2">Chamados</Link>
+        </div>
         {podeVerTodos && (
           <div className="mb-1 flex justify-end">
             <div className="flex rounded-control border border-line bg-card p-0.5 text-[12px]">
@@ -107,7 +124,9 @@ export function FilaPosVenda({ itens: iniciais, podeVerTodos, ver, cortado, desl
               <CartaoPasso key={item.id} item={item} mostrarResponsavel={ver === 'todos'}
                 aberto={aberto === item.id} ocupado={ocupado === item.id}
                 alternar={() => setAberto((a) => (a === item.id ? null : item.id))}
-                registrar={(corpo, aviso) => registrar(item, corpo, aviso)} />
+                registrar={(corpo, aviso) => registrar(item, corpo, aviso)}
+                seguimento={seguimentos[item.id] ?? null}
+                concluir={() => { setItens((prev) => prev.filter((x) => x.id !== item.id)); setSeguimentos((m) => { const c = { ...m }; delete c[item.id]; return c }) }} />
             ))}
           </ul>
         )}
@@ -117,13 +136,15 @@ export function FilaPosVenda({ itens: iniciais, podeVerTodos, ver, cortado, desl
   )
 }
 
-function CartaoPasso({ item, mostrarResponsavel, aberto, ocupado, alternar, registrar }: {
+function CartaoPasso({ item, mostrarResponsavel, aberto, ocupado, alternar, registrar, seguimento, concluir }: {
   item: ItemPosVenda
   mostrarResponsavel: boolean
   aberto: boolean
   ocupado: boolean
   alternar: () => void
   registrar: (corpo: Record<string, unknown>, aviso: string) => Promise<boolean>
+  seguimento: (DepoisDaNota & { nota: number }) | null
+  concluir: () => void
 }) {
   const [modo, setModo] = useState<'menu' | 'reagendar' | 'pular' | 'nota'>('menu')
   const [data, setData] = useState('')
@@ -159,8 +180,9 @@ function CartaoPasso({ item, mostrarResponsavel, aberto, ocupado, alternar, regi
       {item.tipo !== 'ligacao' && item.contato.aviso && (
         <div className={cn('mt-1 text-[11.5px]', item.contato.modo === 'modelo' ? 'text-warn' : 'text-ink-3')}>{item.contato.aviso}</div>
       )}
+      {seguimento && <Seguimento item={item} seguimento={seguimento} concluir={concluir} />}
       {/* 4. ações */}
-      <div className="mt-2.5 flex items-center gap-2">
+      <div className={cn('mt-2.5 flex items-center gap-2', seguimento && 'hidden')}>
         {item.tipo === 'ligacao' ? (
           <a href={tel ? `tel:${tel}` : undefined} className={cn('flex-1', !tel && 'pointer-events-none opacity-50')}>
             <Button variant="outline" size="sm" className="w-full" icon={<Phone size={14} strokeWidth={1.8} />}>Ligar</Button>
@@ -264,5 +286,33 @@ function BotaoContato({ contato }: { contato: ContatoDoPasso }) {
         {contato.modo === 'modelo' ? 'Enviar modelo' : 'WhatsApp'}
       </Button>
     </Link>
+  )
+}
+
+/**
+ * DEPOIS DA NOTA (bloco 4): promotor (9–10) recebe o pedido de avaliação no Google com o link da loja; neutro (7–8), a
+ * pergunta do que poderia ter sido melhor. O cliente acabou de responder: vai como mensagem normal pela conversa da
+ * loja no Nexus (sem conversa: wa.me). Quem envia é a pessoa.
+ */
+function Seguimento({ item, seguimento, concluir }: { item: ItemPosVenda; seguimento: DepoisDaNota & { nota: number }; concluir: () => void }) {
+  const t = seguimento.texto
+  const href = t ? (item.contato.conversaId ? `/comunicacao?c=${item.contato.conversaId}&texto=${encodeURIComponent(t)}` : linkWhatsApp(item.telefone, t)) : null
+  const externo = !item.contato.conversaId
+  return (
+    <div className="mt-2.5 rounded-control border border-line-soft bg-bg p-2.5" data-seguimento={seguimento.faixa}>
+      <div className="mb-1 text-[12px] font-medium text-ink">
+        Nota {seguimento.nota} · {seguimento.faixa === 'promotor' ? 'promotor' : 'neutro'}
+      </div>
+      {t ? <div className="mb-2 whitespace-pre-line text-[12.5px] text-ink-2">{t}</div>
+         : seguimento.aviso && <div className="mb-2 text-[12px] text-warn">{seguimento.aviso}</div>}
+      <div className="flex gap-2">
+        {href && (
+          externo
+            ? <a href={href} target="_blank" rel="noopener noreferrer" className="flex-1"><Button size="sm" variant="outline" className="w-full" icon={<ExternalLink size={14} strokeWidth={1.8} />}>Enviar</Button></a>
+            : <Link href={href} className="flex-1"><Button size="sm" variant="outline" className="w-full" icon={<MessageCircle size={14} strokeWidth={1.8} />}>Enviar pelo WhatsApp</Button></Link>
+        )}
+        <Button size="sm" className="flex-1" onClick={concluir}>Concluir</Button>
+      </div>
+    </div>
   )
 }

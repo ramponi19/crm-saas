@@ -81,8 +81,9 @@ test('contato: API oficial com a janela de 24 h fechada (ou o cliente nunca escr
   assert.equal(fechada.href, '/comunicacao?c=42&modelo=posvenda&cat=UTILITY')
   assert.match(fechada.aviso ?? '', /não tem modelo/)
   // o modelo do passo e as categorias liberadas pela empresa (D8 revista) vão no endereço
-  const comModelo = decidirContato({ conversaId: 42, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: null }, null, MSG, AGORA, { id: 12, categorias: ['UTILITY', 'MARKETING'] })
-  assert.equal(comModelo.href, '/comunicacao?c=42&modelo=posvenda&cat=UTILITY,MARKETING&m=12')
+  const comModelo = decidirContato({ conversaId: 42, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: null }, null, MSG, AGORA,
+    { id: 12, categorias: ['UTILITY', 'MARKETING'], variaveis: ['Ana', 'iPhone 15 Pro'] })
+  assert.equal(comModelo.href, '/comunicacao?c=42&modelo=posvenda&cat=UTILITY,MARKETING&m=12&v1=Ana&v2=iPhone%2015%20Pro')
   assert.match(comModelo.aviso ?? '', /modelo do passo/)
   assert.equal(decidirContato({ conversaId: 7, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: null }, null, MSG, AGORA).modo, 'modelo')
 })

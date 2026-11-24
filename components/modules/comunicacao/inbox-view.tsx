@@ -122,8 +122,10 @@ export function InboxView(props: InboxProps) {
     const tipo = params.get('modelo')
     const cats = (params.get('cat') ?? '').split(',').filter((c) => c === 'UTILITY' || c === 'MARKETING')
     const m = Number(params.get('m')) || null
+    // v1, v2…: valores das variáveis do modelo ({{1}} nome, {{2}} produto, no pós-venda)
+    const variaveis = [1, 2, 3, 4, 5].map((i) => params.get(`v${i}`)).filter((v): v is string => v != null).map((v) => v.slice(0, 200))
     const modelo = tipo === 'utilidade' ? { categorias: ['UTILITY'], preferido: null }
-      : tipo === 'posvenda' ? { categorias: cats.length ? cats : ['UTILITY'], preferido: m } : null
+      : tipo === 'posvenda' ? { categorias: cats.length ? cats : ['UTILITY'], preferido: m, variaveis } : null
     return c && (texto || modelo) ? { conversa: c, r: { texto: texto?.slice(0, 4000) ?? null, modelo } } : null
   })
   const [canais, setCanais] = useState<CanalInbox[] | null>(null)

@@ -35,7 +35,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   if (!neg?.contato_id) return NextResponse.json({ error: 'Negócio não encontrado' }, { status: 404 })
 
   const s = semTipo(service)
-  const [fuso, { data: acomp }, { data: notas }, { data: chamados }] = await Promise.all([
+  const [fuso, { data: acomp }, { data: notas }, { data: chamados }, { data: cats }] = await Promise.all([
     fusoDaEmpresa(supabase, empresaId),
     s.from('posvenda_acompanhamentos')
       .select(`id, negocio_id, previsto_para, status, resultado, motivo, feito_em, tentativas, responsavel_id,
@@ -49,6 +49,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     s.from('posvenda_chamados')
       .select('id, numero, titulo, prioridade, aberto_em, resolvido_em, sla_resolucao_vence, status:posvenda_chamado_status!status_id(nome, tipo)')
       .eq('empresa_id', empresaId).eq('contato_id', neg.contato_id).order('aberto_em', { ascending: false }).limit(10),
+    s.from('posvenda_chamado_categorias').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('id'),
   ])
 
   type A = { id: number; negocio_id: number | null; previsto_para: string; status: string; resultado: string | null; motivo: string | null
@@ -62,6 +63,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
   return NextResponse.json({
     hoje,
+    contatoId: neg.contato_id,
+    categorias: (cats ?? []) as { id: number; nome: string }[],
     passos: linhas.map((l) => ({
       id: l.id,
       desteNegocio: l.negocio_id === id,
