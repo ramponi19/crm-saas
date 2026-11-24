@@ -583,6 +583,14 @@ branches abertas antes de numerar).
   - rota do alerta: abre, não duplica, resolve e responde 401 sem o segredo;
   - o dono vê o aviso no card.
 
+## Mais de um número por loja — Transmissão guarda o número (APLICADA 23/11 11:06 UTC; Edge v85, volta v84; app e9be2cac — 06 seção 59)
+
+- **`20261123000100_transmissao_canal`:** `transmissoes.canal_id` (número que envia; nulo nas antigas, que seguem pela regra da loja); gatilho `transmissoes_canal_valido` (WhatsApp, desta empresa, da loja da transmissão ou da rede; ativo ao escolher); `modelo_aprovado_no_canal`; `transmissao_montar` confere o número e a aprovação NELE quando há `canal_id`, e como antes quando não há. Volta: `supabase/scripts/volta/volta-transmissao-canal.sql` (o `transmissao_montar` volta ao corpo da 20261111000300 — conferir por md5 em produção antes de aplicar).
+- **Edge `webhook-leads`:** `envioTransmissao` lê `canal_id` e envia por ele (conferido como no card: empresa, loja do negócio, WhatsApp, ativo); `envioAutomatico` aceita `canalId` do app (o WhatsApp em que o cliente falou por último na loja), senão a última recebida na loja, senão `canalDaLoja`.
+- **App:** tela de Canais com todos os números de cada tipo; Transmissão escolhe o número quando a loja tem mais de um; Automatize escolhe o número da conversa; `/api/modelos?negocio=&canal=` (card e Comunicação) e a tela de modelos dizem o final do número.
+- **Ordem (obrigatória):** migração (IOwait < 10%, leitura de 65 s separada) → Edge (`tools/deploy-edge.sh <commit>`; volta = v84 = `27b7390c`) → push do app → smoke. **A Edge nova NUNCA antes da migração:** ela pede `transmissoes.canal_id`; sem a coluna o select falha e toda transmissão em andamento seria recusada ("transmissão pausada, encerrada ou de outra empresa").
+- **Prova local:** ida/volta/ida limpas; `tests/e2e/multinumero-e2e.mjs` (tudo ok; 2 itens não verificáveis no local, ditos no próprio teste); `transmissao-e2e` 103/103 com a Edge local e a Graph falsa; `canal-resposta-e2e` ok; `automatize-e2e` 29/29 (corrigido para aprovação por número); 421 unitários; Deno 16/16.
+
 ## Mensagem recebida nunca é descartada (regra permanente do Lucas, 18/11/2026)
 
 **Mensagem recebida nunca é descartada; webhook só responde 200 depois de gravar.**

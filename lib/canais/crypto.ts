@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { barrarCifraNoPreview } from '@/lib/segredo-no-preview'
 
 // ============================================================
 // Criptografia dos tokens de canal (WhatsApp Cloud / Instagram / Messenger).
@@ -37,6 +38,7 @@ function getKey(): Buffer {
 
 /** Cifra o token do canal para gravar em canais_conectados.access_token_enc. */
 export function cifrarToken(token: string): string {
+  barrarCifraNoPreview('cofre de canais')
   const key = getKey()
   const iv = crypto.randomBytes(12)
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv)

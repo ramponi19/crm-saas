@@ -4,6 +4,7 @@ import { requireOwnerOrAdminApi } from '@/lib/owner'
 import { cofreConfigurado } from '@/lib/canais/crypto'
 import { basePublica } from '@/lib/url-publica'
 import { configurado, urlAutorizacao, urlRetorno } from '@/lib/canais/instagram-login'
+import { recusaNoPreview } from '@/lib/segredo-no-preview'
 
 /**
  * Abre o login do Instagram — o caminho SEM Página do Facebook.
@@ -14,6 +15,8 @@ import { configurado, urlAutorizacao, urlRetorno } from '@/lib/canais/instagram-
 export const COOKIE_STATE = 'ig_login_state'
 
 export async function POST(req: Request) {
+  // Preview: banco da produção com chave de teste → não grava segredo (lib/segredo-no-preview.ts)
+  const recusa = recusaNoPreview(); if (recusa) return recusa
   const auth = await requireOwnerOrAdminApi()
   if (auth.error) return auth.error
 

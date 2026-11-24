@@ -27,6 +27,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { timingSafeEqual } from "node:crypto";
 import { bancoIndisponivel, chaveMid, contaDoEvento, ErroDeBanco, ErroDeGravacao, esquecer, hashCorpo, jaRecebido, LIMITE_GRANDE, primeiraEntrega, tamanhoCorpo } from "./reenvio.ts";
 import { conferirCanalDeResposta, destinoNaConta, type TipoCanal } from "./canal-resposta.ts";
+import { direcaoNoHistorico, numeroDoCanalNoEvento } from "./historico.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -1198,6 +1199,22 @@ async function registrarRecebida(canal: Canal, p: {
 
   if (msgId == null) { console.log("msg duplicada ignorada:", p.externalId); return; }
 
+  // "NÃO QUERO RECEBER OFERTAS" (24/11/2026; migração 20261124001900). O banco decide (texto do botão da empresa,
+  // só WhatsApp) e marca o contato; na primeira vez devolve a confirmação, que sai já, pelo mesmo número — o toque
+  // acabou de abrir a janela de 24 h. Falha aqui NUNCA derruba o recebimento (a mensagem já está gravada).
+  if (canal.tipo === "whatsapp") {
+    try {
+      const { data: so, error: eSo } = await db.rpc("core_sem_ofertas_pelo_botao", { p_mensagem: msgId });
+      const r = so as { marcado?: boolean; confirmacao?: string | null; telefone?: string | null; negocio_id?: number | null } | null;
+      if (eSo) console.error("sem ofertas:", msgId, eSo.message);
+      else if (r?.marcado && r.confirmacao && r.telefone) {
+        await enviarWhatsApp(canal, { number: r.telefone, text: r.confirmacao, leadId: r.negocio_id != null ? String(r.negocio_id) : undefined });
+      }
+    } catch (e) {
+      console.error("sem ofertas (confirmação):", msgId, e instanceof Error ? e.message : String(e));
+    }
+  }
+
   /**
    * O contador de não lidas e a última mensagem da conversa NÃO são mexidos
    * aqui — quem mantém é o gatilho em `mensagens`, disparado pelo insert acima.
@@ -1343,7 +1360,13 @@ async function guardarBruto(canal: Canal, tipo: string, value: unknown) {
 //      TODA conversa vira lead: reativa o inativo se houver, cria se não houver.
 //      O lead criado recebe ultima_mensagem_at da última mensagem REAL, então
 //      conversa antiga afunda na lista e não atropela o atendimento do dia.
-async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]) {
+/**
+ * `numeroDoCanal` = `value.metadata.display_phone_number` do evento (23/11/2026). O conserto de 13/10 lia o número
+ * da loja em `bloco.metadata`, que só traz `phase`, `progress` e `chunk_order`: o número saía vazio, a comparação
+ * nunca batia e o histórico continuou entrando TODO como "recebida" (Aletrini: 2.082 mensagens da loja, 19/11).
+ * Conferido no cofre: `payload.metadata.display_phone_number` = o número do canal; `payload.history[].metadata` não o tem.
+ */
+async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[], numeroDoCanal: string) {
   let importadas = 0, criados = 0, reativados = 0, falhas = 0, ignorados = 0;
   let progresso: number | null = null;
 
@@ -1394,9 +1417,7 @@ async function importarHistorico(canal: Canal, blocos: Record<string, unknown>[]
          * `display_phone_number` é o número do canal que está sincronizando;
          * `from` igual a ele significa que a mensagem saiu daqui.
          */
-        const numeroDaLoja = String(meta?.display_phone_number ?? "").replace(/\D/g, "");
-        const remetente = String(m.from ?? "").replace(/\D/g, "");
-        const doNegocio = !!numeroDaLoja && remetente === numeroDaLoja;
+        const doNegocio = direcaoNoHistorico(numeroDoCanal || String(meta?.display_phone_number ?? ""), m.from) === "enviada";
         // O histórico não traz arquivo (vem depois, por outro evento), mas o rótulo
         // precisa ser legível: `[${tipo}]` cru virava "[errors]" e "[edit]" no chat
         // — nome interno do payload da Meta na cara de quem atende.
@@ -1822,10 +1843,16 @@ async function envioAutomatico(req: Request, body: Record<string, unknown>): Pro
   const { data: c } = await db.from("contatos").select("id, ativo, opt_out_em").eq("id", neg.contato_id ?? 0).maybeSingle();
   if (!c || c.opt_out_em || c.ativo === false) return json({ error: "contato com opt-out, bloqueado ou inexistente" }, 409);
 
-  const canal = await canalDaLoja(empresaId, "whatsapp", (neg.filial_id as number | null) ?? null);
+  // O número da CONVERSA (23/11/2026): o app manda o WhatsApp em que o cliente falou por último
+  // nesta loja (`canalId`, conferido aqui); sem ele, o da última recebida na loja, senão canalDaLoja.
+  const r = await canalDaResposta(
+    { empresa_id: empresaId, filial_id: (neg.filial_id as number | null) ?? null, contato_id: neg.contato_id as number },
+    "whatsapp", body.canalId);
+  if ("recusa" in r) return r.recusa;
+  const canal = r.canal;
   if (!canal) return json({ error: "WhatsApp não conectado nesta loja" }, 502);
   if (!(await aprovadoNoNumero(empresaId, modeloId, canal))) return json({ error: "modelo não aprovado no WhatsApp desta loja" }, 409);
-  console.log(`envio automático: automação ${automacaoId}, modelo ${m.nome}, negócio ${negocioId}`);
+  console.log(`envio automático: automação ${automacaoId}, modelo ${m.nome}, negócio ${negocioId}, canal ${canal.id}`);
   return await enviarModelo(canal, { ...body, leadId: negocioId, modelo: m.nome, idioma: m.idioma }, null, "automacao");
 }
 
@@ -1851,7 +1878,7 @@ async function envioTransmissao(req: Request, body: Record<string, unknown>): Pr
   const empresaId = e.empresa_id as number;
   if (await somenteLeitura(empresaId)) return json({ error: "empresa em modo somente leitura", codigo: "somente_leitura" }, 423);
 
-  const { data: t } = await db.from("transmissoes").select("id, empresa_id, filial_id, status, modelo_id")
+  const { data: t } = await db.from("transmissoes").select("id, empresa_id, filial_id, status, modelo_id, canal_id")
     .eq("id", e.transmissao_id).eq("empresa_id", empresaId).maybeSingle();
   if (!t || t.status !== "enviando") return json({ error: "transmissão pausada, encerrada ou de outra empresa" }, 409);
   const { data: m } = await db.from("modelos_mensagem").select("id, nome, idioma, status")
@@ -1863,7 +1890,21 @@ async function envioTransmissao(req: Request, body: Record<string, unknown>): Pr
   if (!e.negocio_id || !e.telefone) return json({ error: "envio sem negócio ou sem telefone" }, 409);
 
   const lojaT = (t.filial_id as number | null) ?? null;
-  const canal = await canalDaLoja(empresaId, "whatsapp", lojaT);
+  // O NÚMERO DA TRANSMISSÃO (23/11/2026): escolhido na criação (`transmissoes.canal_id`) e
+  // conferido aqui (empresa, loja, WhatsApp, ativo) — com dois números na loja, sai pelo escolhido,
+  // não pelo conectado por último. Transmissão antiga, sem número: a regra de antes.
+  let canal: Canal | null;
+  if (t.canal_id != null) {
+    // A loja que conta é a do NEGÓCIO deste envio (na transmissão de loja, a mesma; na de empresa
+    // com uma loja só, a transmissão vem sem loja e o número pode ter a loja marcada).
+    const { data: negE } = await db.from("negocios").select("filial_id").eq("id", e.negocio_id).maybeSingle();
+    const lojaN = lojaT ?? ((negE?.filial_id as number | null) ?? null);
+    const r = await canalDaResposta({ empresa_id: empresaId, filial_id: lojaN, contato_id: e.contato_id as number }, "whatsapp", t.canal_id);
+    if ("recusa" in r) return r.recusa;
+    canal = r.canal;
+  } else {
+    canal = await canalDaLoja(empresaId, "whatsapp", lojaT);
+  }
   // canalDaLoja cai no WhatsApp de OUTRA loja quando esta não tem: na transmissão, não — a
   // lista é da loja e sai pelo número dela (canal sem loja, o da empresa inteira, vale).
   if (!canal || (lojaT != null && canal.filial_id != null && canal.filial_id !== lojaT)) {
@@ -2354,7 +2395,8 @@ serve(async (req: Request) => {
             // corpo do webhook não existia em lugar nenhum para reprocessar.
             await guardarBruto(canal, "history", value);
             const h = value?.history as Record<string, unknown>[] | undefined;
-            if (h) await importarHistorico(canal, h);
+            // O número da loja vem nos metadados do EVENTO (value.metadata), não nos de cada bloco do histórico.
+            if (h) await importarHistorico(canal, h, numeroDoCanalNoEvento(value));
             // Mesmo campo "history", outra forma: aviso só com as mídias.
             const soltas = value?.messages as Record<string, unknown>[] | undefined;
             if (soltas?.length) await enriquecerMidiaDoHistorico(canal, soltas);

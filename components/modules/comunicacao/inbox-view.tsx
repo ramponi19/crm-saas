@@ -16,7 +16,7 @@ import type { KanbanColumn, Motivo, Usuario } from '@/components/modules/leads/t
 import type { PerfilDoLead } from '@/lib/empresa-config'
 import { useFuso } from '@/components/fuso-provider'
 import { FUSO_PADRAO, agora, formatarDiaMes, formatarHora, mesmoDia, paraData } from '@/lib/datas'
-import { ConversaPainel } from './conversa-painel'
+import { ConversaPainel, type RascunhoDaConversa } from './conversa-painel'
 import { EtiquetasDoContato, FiltroEtiquetasBotao } from '@/components/modules/etiquetas/etiquetas'
 import { filtroEtiquetasAtivo, filtroEtiquetasDaUrl, filtroEtiquetasNaUrl, passaNoFiltro } from '@/lib/etiquetas'
 
@@ -114,6 +114,20 @@ export function InboxView(props: InboxProps) {
   const [filtros, setFiltros] = useState<FiltrosInbox>(() => lerFiltrosDaUrl(new URLSearchParams(params.toString())))
   const [busca, setBusca] = useState(filtros.busca)
   const [aberta, setAberta] = useState<number | null>(() => Number(params.get('c')) || null)
+  // Rascunho vindo de outra tela (fila do pós-venda): só para a conversa do endereço, uma vez.
+  const [rascunho] = useState<{ conversa: number; r: RascunhoDaConversa } | null>(() => {
+    const c = Number(params.get('c')) || null
+    const texto = params.get('texto')
+    // modelo=utilidade (fila de 24/11, só Utilidade) | modelo=posvenda&cat=UTILITY,MARKETING&m=<id do modelo do passo>
+    const tipo = params.get('modelo')
+    const cats = (params.get('cat') ?? '').split(',').filter((c) => c === 'UTILITY' || c === 'MARKETING')
+    const m = Number(params.get('m')) || null
+    // v1, v2…: valores das variáveis do modelo ({{1}} nome, {{2}} produto, no pós-venda)
+    const variaveis = [1, 2, 3, 4, 5].map((i) => params.get(`v${i}`)).filter((v): v is string => v != null).map((v) => v.slice(0, 200))
+    const modelo = tipo === 'utilidade' ? { categorias: ['UTILITY'], preferido: null }
+      : tipo === 'posvenda' ? { categorias: cats.length ? cats : ['UTILITY'], preferido: m, variaveis } : null
+    return c && (texto || modelo) ? { conversa: c, r: { texto: texto?.slice(0, 4000) ?? null, modelo } } : null
+  })
   const [canais, setCanais] = useState<CanalInbox[] | null>(null)
   const [lista, setLista] = useState<ConversaInbox[]>([])
   const [previas, setPrevias] = useState<Record<number, Previa>>({})
@@ -414,6 +428,7 @@ export function InboxView(props: InboxProps) {
             conversaId={aberta}
             inicial={conversaAberta}
             {...props}
+            rascunho={rascunho?.conversa === aberta ? rascunho.r : null}
             onVoltar={() => setAberta(null)}
             onAbrirConversa={(id) => setAberta(id)}
           />

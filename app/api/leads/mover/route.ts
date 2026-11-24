@@ -7,9 +7,12 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { nadaGravado, SEM_PERMISSAO_CONTATO, SEM_PERMISSAO_NEGOCIO } from '@/lib/linhas-afetadas'
 import { formatarData } from '@/lib/datas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { diaNoFuso } from '@/lib/datas'
+import { ganhoEmDaData, validarVendaGanho, type VendaInformada, modoCondicao } from '@/lib/venda-ganho'
+import { camposDaVenda, validarCamposDaVenda } from '@/lib/venda-campos'
 
 /** `string`, não literal: o parser de tipos do supabase-js estoura com relação embutida. */
-const SELECT_NEGOCIO: string = 'id, empresa_id, funil_id, responsavel_id, status, ganho_em, perdido_em, dados, etapa:funil_etapas!negocios_etapa_id_fkey(slug), contato:contatos!negocios_contato_id_fkey(id, nome, observacoes)'
+const SELECT_NEGOCIO: string = 'id, empresa_id, funil_id, responsavel_id, status, ganho_em, perdido_em, created_at, dados, etapa:funil_etapas!negocios_etapa_id_fkey(slug), contato:contatos!negocios_contato_id_fkey(id, nome, observacoes)'
 
 /**
  * Move um lead de etapa e dispara as automações de "entrou_na_etapa".
@@ -35,6 +38,18 @@ export async function POST(req: Request) {
      * observações (04/11/2026), então montar o texto lá apagaria o que já havia.
      */
     justificativa?: string
+    /**
+     * Tirar uma VENDA FECHADA do ganho (23/11/2026, migração 20261123000200): só pela RPC
+     * `reabrir_negocio`, que exige dono/admin e este motivo. Sem ele a rota responde 409
+     * com `codigo: 'GANHO_REABRIR'` e nada se move.
+     */
+    motivo_reabertura?: string
+    /**
+     * Os dados da VENDA, obrigatórios ao ENTRAR no ganho (23/11/2026, Entrega A do pós-venda):
+     * data (vira `ganho_em`), categoria, condição e valor — lib/venda-ganho.ts. Sem eles a rota
+     * responde 422 com `codigo: 'GANHO_DADOS'` e o campo que falta; nada se move.
+     */
+    venda?: VendaInformada
   }
   if (!body.leadId || (!body.kanban_status && !body.funilId)) {
     return NextResponse.json({ error: 'Dados incompletos' }, { status: 400 })
@@ -67,7 +82,7 @@ export async function POST(req: Request) {
    */
   type NegocioAtual = {
     id: number; empresa_id: number; funil_id: number | null; responsavel_id: string | null; perdido_em: string | null
-    status: string; ganho_em: string | null
+    status: string; ganho_em: string | null; created_at: string
     dados: Record<string, unknown> | null; etapa: { slug: string } | null
     contato: { id: number; nome: string | null; observacoes: string | null } | null
   }
@@ -111,6 +126,59 @@ export async function POST(req: Request) {
     : etapaRow?.tipo === 'perdido' ? 'perdido'
     : !etapaRow && (body.perdido_em ?? n.perdido_em) ? 'perdido' : 'aberto'
 
+  /**
+   * VENDA FECHADA NÃO SAI DO GANHO PELO ARRASTO (23/11/2026). O banco recusa (gatilho
+   * `negocios_ganho_protegido`); aqui a recusa vira uma resposta que a tela entende. Com o
+   * motivo, a RPC confere a permissão (dono/admin), grava `reaberto_manual` no histórico e
+   * devolve o negócio aberto na primeira etapa — daí em diante é um movimento comum.
+   */
+  const reabrindoVenda = n.status === 'ganho' && status !== 'ganho'
+  const motivoReabertura = body.motivo_reabertura?.trim()
+  if (reabrindoVenda && !motivoReabertura) {
+    return NextResponse.json({
+      error: 'Esta venda já está fechada. Para tirá-la do ganho, informe o motivo da reabertura (só dono ou administrador).',
+      codigo: 'GANHO_REABRIR',
+    }, { status: 409 })
+  }
+
+  /**
+   * ENTRAR NO GANHO EXIGE A VENDA (23/11/2026). Qualquer tela que marca ganho passa por aqui
+   * (quadro, ficha do lead, "Converter em cliente", ficha imobiliária): sem data, categoria,
+   * condição e valor válidos, 422 e nada se move. Ganho → ganho (outra etapa de ganho) mantém tudo.
+   */
+  const entrandoNoGanho = status === 'ganho' && n.status !== 'ganho'
+  let ganhoEmNovo: string | null = null
+  let dadosVenda: Record<string, unknown> | null = null
+  let valorVenda: number | null = null
+  let camposVenda: Record<string, string | number> = {}
+  if (entrandoNoGanho) {
+    const fuso = await fusoDaEmpresa(supabase, empresaId)
+    const [{ data: cats }, { data: modo }, { data: camposCfg }] = await Promise.all([
+      // as categorias da venda da empresa: as do Estoque ou as próprias do Pós-venda (core_venda_categorias, 24/11/2026)
+      supabase.rpc('core_venda_categorias' as never),
+      // condição exigida | opcional | não usa, por empresa (core.condicao_venda; 24/11/2026)
+      supabase.rpc('config_valor' as never, { p_modulo: 'core', p_chave: 'condicao_venda' } as never),
+      // campos da venda que a empresa pede (os do Pós-venda, só com o módulo ligado; senão lista vazia)
+      supabase.rpc('core_venda_campos' as never),
+    ])
+    const v = validarVendaGanho(body.venda, {
+      hoje: diaNoFuso(new Date(), fuso),
+      criadoEm: diaNoFuso(new Date(n.created_at), fuso),
+      categorias: ((cats ?? []) as { id: number }[]).map((c) => Number(c.id)),
+      condicao: modoCondicao(modo),
+    })
+    if (!v.ok) return NextResponse.json({ error: v.erro, codigo: 'GANHO_DADOS', campo: v.campo }, { status: 422 })
+    const cs = validarCamposDaVenda(camposDaVenda(camposCfg), (body.venda as { campos?: unknown } | undefined)?.campos)
+    if (!cs.ok) return NextResponse.json({ error: cs.erro, codigo: 'GANHO_DADOS', campo: cs.campo }, { status: 422 })
+    camposVenda = cs.valores
+    ganhoEmNovo = ganhoEmDaData(v.venda.data, fuso)
+    valorVenda = v.venda.valor
+    dadosVenda = {
+      data: v.venda.data, categoria_id: v.venda.categoria_id, condicao: v.venda.condicao, valor: v.venda.valor,
+      registrada_por: user.id, registrada_em: new Date().toISOString(),
+    }
+  }
+
   const agora = new Date().toISOString()
   const patch: Record<string, unknown> = {
     funil_id: funilAlvo,
@@ -124,9 +192,20 @@ export async function POST(req: Request) {
      * (ganho há até N dias) ou abre negócio novo. Ganho → ganho mantém a data; sair do
      * ganho a limpa, como a reabertura pelo canal (`core_negocio_do_canal`) faz.
      */
-    ganho_em: status === 'ganho' ? (n.status === 'ganho' && n.ganho_em ? n.ganho_em : agora) : null,
+    ganho_em: status === 'ganho' ? (n.status === 'ganho' && n.ganho_em ? n.ganho_em : (ganhoEmNovo ?? agora)) : null,
   }
-  if (!etapaRow) patch.dados = { ...(n.dados ?? {}), _lead: { ...dadosLead, kanban_status: etapa } }
+  if (!etapaRow) {
+    // Reabrindo, a RPC já tirou a venda do negócio (C4): o `dados` lido antes dela não a traz de volta
+    // (o banco recusaria — VENDA_SO_POR_RPC, 24/11/2026).
+    const base: Record<string, unknown> = { ...((n.dados ?? {}) as Record<string, unknown>) }
+    if (reabrindoVenda) delete base.venda
+    patch.dados = { ...base, _lead: { ...dadosLead, kanban_status: etapa } }
+  }
+  // A venda informada: valor do negócio e `dados.venda` (data, categoria, condição, valor, quem e quando).
+  if (dadosVenda) {
+    patch.valor_estimado = valorVenda
+    patch.dados = { ...((patch.dados as Record<string, unknown> | undefined) ?? n.dados ?? {}), ...camposVenda, venda: dadosVenda }
+  }
 
   /**
    * Perda exige motivo da EMPRESA — a regra estava só na tela (porte do 58d7d3f).
@@ -155,6 +234,19 @@ export async function POST(req: Request) {
    * justificativa sumia (contato de uma loja, negócio na outra). Agora, se o
    * contato não aceita a gravação, nada se move e a tela mostra o motivo.
    */
+  // A reabertura da venda é a PRIMEIRA gravação: tudo o que podia recusar o movimento (etapa,
+  // motivo de perda) já foi conferido acima, então não sobra venda reaberta sem movimento.
+  if (reabrindoVenda) {
+    const { error: errReabrir } = await supabase.rpc('reabrir_negocio', { p_negocio: n.id, p_motivo: motivoReabertura ?? '' })
+    if (errReabrir) {
+      const semPermissao = errReabrir.message.includes('SEM_PERMISSAO')
+      return NextResponse.json({
+        error: semPermissao ? 'Só o dono ou um administrador reabre uma venda fechada.' : errReabrir.message,
+        codigo: semPermissao ? 'GANHO_SEM_PERMISSAO' : 'GANHO_REABRIR_FALHOU',
+      }, { status: semPermissao ? 403 : 400 })
+    }
+  }
+
   const justificativa = body.justificativa?.trim()
   const observacoes = body.observacoes ?? (justificativa
     ? (n.contato?.observacoes ? n.contato.observacoes + '\n' : '')

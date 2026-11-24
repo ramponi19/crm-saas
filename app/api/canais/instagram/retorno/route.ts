@@ -8,6 +8,7 @@ import {
   assinarWebhook, cifrar, ehErro, perfil, tokenLongo, trocarCodigo,
 } from '@/lib/canais/instagram-login'
 import { COOKIE_STATE } from '../iniciar/route'
+import { recusaNoPreview } from '@/lib/segredo-no-preview'
 
 /**
  * Volta do login do Instagram. TODO o trabalho acontece aqui, no servidor.
@@ -25,6 +26,8 @@ const voltar = (base: string, params: Record<string, string>) => {
 }
 
 export async function GET(req: Request) {
+  // Preview: banco da produção com chave de teste → não grava segredo (lib/segredo-no-preview.ts)
+  const recusa = recusaNoPreview(); if (recusa) return recusa
   const url = new URL(req.url)
   const { base } = basePublica(url.origin)
 

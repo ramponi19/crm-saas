@@ -1151,14 +1151,14 @@ isOneToOne: false
                   ]
                 },"empresa_usuarios": {
                   Row: {
-                    "ativo": boolean | null,"ausente": boolean,"ausente_em": string | null,"created_at": string | null,"empresa_id": number,"filial_id": number | null,"id": number,"role": string,"usuario_id": string
+                    "ativo": boolean | null,"ausente": boolean,"ausente_em": string | null,"conta_servico": boolean,"created_at": string | null,"empresa_id": number,"filial_id": number | null,"id": number,"participa_roleta": boolean,"role": string,"usuario_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "ativo"?: boolean | null,"ausente"?: boolean,"ausente_em"?: string | null,"created_at"?: string | null,"empresa_id": number,"filial_id"?: number | null,"id"?: number,"role"?: string,"usuario_id": string
+                    "ativo"?: boolean | null,"ausente"?: boolean,"ausente_em"?: string | null,"conta_servico"?: boolean,"created_at"?: string | null,"empresa_id": number,"filial_id"?: number | null,"id"?: number,"participa_roleta"?: boolean,"role"?: string,"usuario_id": string
                   }
                   Update: {
-                    "ativo"?: boolean | null,"ausente"?: boolean,"ausente_em"?: string | null,"created_at"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"id"?: number,"role"?: string,"usuario_id"?: string
+                    "ativo"?: boolean | null,"ausente"?: boolean,"ausente_em"?: string | null,"conta_servico"?: boolean,"created_at"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"id"?: number,"participa_roleta"?: boolean,"role"?: string,"usuario_id"?: string
                   }
                   Relationships: [
                     {
@@ -2771,14 +2771,14 @@ isOneToOne: false
                   ]
                 },"transmissoes": {
                   Row: {
-                    "agendada_para": string | null,"canal_tipo": string,"concluida_em": string | null,"created_at": string,"criado_por": string | null,"empresa_id": number,"filial_id": number | null,"filtro": NonNullable<Json>,"id": number,"iniciada_em": string | null,"modelo_id": number,"nome": string,"parametros": NonNullable<Json>,"pausada_em": string | null,"publico_id": number | null,"status": string,"total": number,"updated_at": string
+                    "agendada_para": string | null,"canal_id": number | null,"canal_tipo": string,"concluida_em": string | null,"created_at": string,"criado_por": string | null,"empresa_id": number,"filial_id": number | null,"filtro": NonNullable<Json>,"id": number,"iniciada_em": string | null,"modelo_id": number,"nome": string,"parametros": NonNullable<Json>,"pausada_em": string | null,"publico_id": number | null,"status": string,"total": number,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "agendada_para"?: string | null,"canal_tipo"?: string,"concluida_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id": number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"iniciada_em"?: string | null,"modelo_id": number,"nome": string,"parametros"?: NonNullable<Json>,"pausada_em"?: string | null,"publico_id"?: number | null,"status"?: string,"total"?: number,"updated_at"?: string
+                    "agendada_para"?: string | null,"canal_id"?: number | null,"canal_tipo"?: string,"concluida_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id": number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"iniciada_em"?: string | null,"modelo_id": number,"nome": string,"parametros"?: NonNullable<Json>,"pausada_em"?: string | null,"publico_id"?: number | null,"status"?: string,"total"?: number,"updated_at"?: string
                   }
                   Update: {
-                    "agendada_para"?: string | null,"canal_tipo"?: string,"concluida_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"iniciada_em"?: string | null,"modelo_id"?: number,"nome"?: string,"parametros"?: NonNullable<Json>,"pausada_em"?: string | null,"publico_id"?: number | null,"status"?: string,"total"?: number,"updated_at"?: string
+                    "agendada_para"?: string | null,"canal_id"?: number | null,"canal_tipo"?: string,"concluida_em"?: string | null,"created_at"?: string,"criado_por"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"filtro"?: NonNullable<Json>,"id"?: never,"iniciada_em"?: string | null,"modelo_id"?: number,"nome"?: string,"parametros"?: NonNullable<Json>,"pausada_em"?: string | null,"publico_id"?: number | null,"status"?: string,"total"?: number,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -3437,6 +3437,9 @@ isOneToOne: true
 "mensagem_registrar":
 { Args: { "p_canal_id": number,"p_dados": Json,"p_empresa": number,"p_external_id": string }; Returns: number
                            },
+"modelo_aprovado_no_canal":
+{ Args: { "p_canal": number,"p_empresa": number,"p_modelo": number }; Returns: boolean
+                           },
 "modelo_aprovado_na_loja":
 { Args: { "p_empresa": number,"p_filial": number,"p_modelo": number,"p_qualquer_loja"?: boolean }; Returns: boolean
                            },
@@ -3484,6 +3487,21 @@ isOneToOne: true
                            },
 "rate_limit_bump":
 { Args: { "p_chave": string,"p_janela": string }; Returns: number
+                           },
+"reabrir_negocio":
+{ Args: { "p_motivo": string,"p_negocio": number }; Returns: Json
+                           },
+"config_salvar":
+{ Args: { "p_chave": string,"p_filial"?: number,"p_modulo": string,"p_valor": Json }; Returns: Json
+                           },
+"config_valor":
+{ Args: { "p_chave": string,"p_filial"?: number,"p_modulo": string }; Returns: Json
+                           },
+"config_valor_emp":
+{ Args: { "p_chave": string,"p_empresa": number,"p_filial"?: number,"p_modulo": string }; Returns: Json
+                           },
+"corrigir_data_venda":
+{ Args: { "p_motivo": string,"p_negocio": number,"p_nova_data": string }; Returns: Json
                            },
 "refresh_status_atrasados":
 { Args: Record<PropertyKey, never>; Returns: undefined

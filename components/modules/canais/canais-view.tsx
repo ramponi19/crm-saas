@@ -5,6 +5,8 @@ import { MessageCircle, Instagram, Send, RefreshCw, Unplug, AlertTriangle, Loade
 import { Button, Badge, ConfirmDialog, Modal, Textarea, notify } from '@/components/ui'
 import { useFuso } from '@/components/fuso-provider'
 import { formatarData, formatarDataHora } from '@/lib/datas'
+import { rotuloDaLoja } from '@/lib/canais/rotulo-loja'
+import { abrirVigiandoJanela, AVISO_JANELA_BLOQUEADA } from '@/lib/canais/janela-bloqueada'
 
 // ⚠️ Zona sensível (Meta). Esta tela dispara o fluxo oficial de conexão.
 // O token do cliente nunca passa por aqui: o navegador recebe só um código de
@@ -132,6 +134,8 @@ export function CanaisView({ appId }: { appId: string }) {
   //      usuário e o navegador bloqueia a janela.
   const [sdkPronto, setSdkPronto] = useState(false)
   const sessao = useRef<{ phoneNumberId?: string; wabaId?: string }>({})
+  /** A última tentativa teve a janela da Meta bloqueada pelo navegador (já avisado). */
+  const janelaBloqueada = useRef(false)
 
   useEffect(() => {
     if (!appId) return
@@ -196,11 +200,16 @@ export function CanaisView({ appId }: { appId: string }) {
       return notify.bad('O conector da Meta ainda está carregando. Tente de novo em alguns segundos.')
     }
     sessao.current = {}
+    janelaBloqueada.current = false
     setConectando('whatsapp')
     registrar('sdk_clique', { canal: 'whatsapp' })
     try {
+      const fb = window.FB
+      // A janela da Meta pode ser BLOQUEADA pelo navegador (23/11/2026): o SDK não chama o retorno
+      // e o botão ficava em "Aguardando a Meta…" para sempre. Vigiamos o window.open da chamada.
+      const janela = abrirVigiandoJanela(window, () => {
       // Callback SÍNCRONO de propósito — o SDK recusa função async.
-      window.FB.login((resp) => { void concluirWhatsApp(resp) }, {
+      fb.login((resp) => { void concluirWhatsApp(resp) }, {
         config_id: configId,
         response_type: 'code',
         override_default_response_type: true,
@@ -223,6 +232,13 @@ export function CanaisView({ appId }: { appId: string }) {
           version: 'v4',
         },
       })
+      })
+      if (janela.bloqueada && !janela.abriu) {
+        janelaBloqueada.current = true
+        setConectando(null)
+        registrar('sdk_janela_bloqueada', { canal: 'whatsapp' })
+        notify.warn(AVISO_JANELA_BLOQUEADA)
+      }
     } catch (e) {
       setConectando(null)
       registrar('sdk_login_excecao', { msg: (e as Error).message })
@@ -231,6 +247,8 @@ export function CanaisView({ appId }: { appId: string }) {
   }
 
   async function concluirWhatsApp(resp: RespostaFb) {
+    // Janela bloqueada já foi avisada; um retorno vazio do SDK depois disso não vira "cancelada".
+    if (janelaBloqueada.current && !resp?.authResponse?.code) return
     const code = resp?.authResponse?.code
     if (!code) {
       setConectando(null)
@@ -557,27 +575,32 @@ export function CanaisView({ appId }: { appId: string }) {
             telefone de uma loja deve ser marcado com o nome dela: assim so quem
             trabalha nela ve aquele canal.{' '}
             <span className="text-ink-3">
-              Por enquanto, o lead que chega por qualquer canal nasce na loja
-              principal; a entrega na loja do canal ainda esta sendo feita.
+              A conversa que chega por um canal fica na loja que ele atende.
             </span>
           </p>
         </div>
       )}
 
       {(['whatsapp', 'instagram', 'messenger'] as const).map((tipo) => {
-        const c = por(tipo)
-        const { nome, icone: Icone, cor } = META[tipo]
-        const st = c ? ROTULO_STATUS[c.status] : null
-        const acessoExpira = dataBr(c?.data_access_expira_em ?? null, fuso)
         /**
-         * Dias até o token vencer, e SÓ quando já está em zona de risco.
+         * MAIS DE UM NÚMERO/CONTA POR TIPO (23/11/2026, item 1 do levantamento de multinúmero).
          *
-         * O token do Instagram-login vale 60 dias e é renovado por conta própria
-         * com 15 de antecedência (ver `lib/canais/renovacao.ts`). Chegar a 7 dias
-         * significa que a renovação falhou uns oito dias seguidos: aí, sim, é
-         * assunto do lojista. Acima disso, nada aparece.
+         * Era UM cartão por tipo (`por(tipo)`): conectar um segundo número somava uma linha em
+         * `canais`, mas a tela mostrava só o mais recente — o outro ficava sem "Atende", sem
+         * Desconectar e sem nome na tela. Agora cada número/conta é uma linha, com a sua loja e os
+         * seus botões, e "Conectar outro…" soma em vez de esconder. Ativos primeiro; entre eles, o
+         * mais recente (a rota já devolve nessa ordem).
          */
-        const tokenVencendo = diasParaVencer(c?.token_expira_em ?? null)
+        const lista = canais.filter((x) => x.tipo === tipo)
+          .sort((a, b) => Number(b.status === 'ativo') - Number(a.status === 'ativo'))
+        const { nome, icone: Icone, cor } = META[tipo]
+        const conectarNovo = () => (tipo === 'whatsapp' ? setAvisoWhats(true) : tipo === 'instagram' ? conectarInstagramSemPagina() : irParaMeta('meta'))
+        const travado = voltandoDaMeta || conectando === tipo || abrindoInstagram
+          || (tipo !== 'instagram' && !!faltaConfig) || (tipo === 'whatsapp' && !sdkPronto)
+        const rotuloNovo = tipo === 'whatsapp' ? 'Conectar outro número' : tipo === 'instagram' ? 'Conectar outra conta' : 'Conectar outra Página'
+        // Dois ou mais números ativos na MESMA loja (ou da rede): dizer como o CRM escolhe por qual sai.
+        const ativos = lista.filter((x) => x.status === 'ativo')
+        const lojaRepetida = ativos.some((x, i) => ativos.findIndex((y) => (y.filial_id ?? 0) === (x.filial_id ?? 0)) !== i)
 
         return (
           <div key={tipo} className="rounded-control border border-line bg-surface p-4 sm:p-5">
@@ -587,37 +610,8 @@ export function CanaisView({ appId }: { appId: string }) {
                   <Icone className="h-5 w-5" />
                 </span>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">{nome}</h3>
-                    {st && <Badge tone={st.tom}>{st.texto}</Badge>}
-                    {c?.coexistencia && <Badge tone="acc">Também no celular</Badge>}
-                  </div>
-                  {c ? (
-                    <div className="mt-1 space-y-0.5 text-sm text-ink-2">
-                      <p>{c.nome_exibicao ?? c.external_id}</p>
-                      {c.ultima_msg_em && <p className="text-xs text-ink-3">Última mensagem: {formatarDataHora(c.ultima_msg_em, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }, '', fuso)}</p>}
-                      {c.sync_historico_pct != null && c.sync_historico_pct < 100 && (
-                        <p className="text-xs text-ink-3">Copiando conversas anteriores: {c.sync_historico_pct}%</p>
-                      )}
-                      {c.ultimo_erro && <p className="text-xs text-bad">{c.ultimo_erro}</p>}
-                      {acessoExpira && (
-                        <p className="text-xs text-warn">
-                          Precisa reconectar até {acessoExpira} — é um prazo da Meta, não do sistema.
-                        </p>
-                      )}
-                      {/* Só aparece quando a renovação automática já vem falhando
-                          há dias — no caminho normal o token se renova sozinho e
-                          esta linha nunca existe. Avisar sempre treinaria o
-                          lojista a ignorar o aviso justamente no dia que importa. */}
-                      {tokenVencendo != null && (
-                        <p className="text-xs text-bad">
-                          {tokenVencendo > 0
-                            ? `O acesso ao Instagram vence em ${tokenVencendo === 1 ? '1 dia' : `${tokenVencendo} dias`} e a renovação automática não está passando. Clique em Reconectar.`
-                            : 'O acesso ao Instagram venceu. Clique em Reconectar para voltar a receber mensagens.'}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
+                  <h3 className="font-semibold">{nome}</h3>
+                  {lista.length === 0 && (
                     <p className="mt-1 text-sm text-ink-2">
                       {tipo === 'whatsapp'
                         ? 'Conecte o número que você já usa no WhatsApp Business — ele continua funcionando no celular.'
@@ -626,105 +620,29 @@ export function CanaisView({ appId }: { appId: string }) {
                           : 'Receba e responda as mensagens da sua Página aqui.'}
                     </p>
                   )}
+                  {lista.length > 1 && (
+                    <p className="mt-1 text-xs text-ink-3">
+                      {lista.length} {tipo === 'whatsapp' ? 'números' : tipo === 'instagram' ? 'contas' : 'Páginas'} conectados
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/*
-                A QUEM O CANAL ATENDE.
-                A JM cadastrou a segunda loja e esta tela mostrou o Instagram, o
-                Messenger e o WhatsApp da primeira, sem dizer por que. Canal sem loja
-                e da REDE — certo para o Instagram da marca, errado para o telefone
-                de uma loja. Agora a tela diz qual dos dois e deixa mudar.
-              */}
-              {c && lojas.length >= 2 && (
-                <label className="flex w-full flex-wrap items-center gap-2 border-t border-line-soft pt-3 text-[12.5px] text-ink-2 sm:w-auto sm:border-0 sm:pt-0">
-                  <span className="text-ink-3">Atende</span>
-                  <select
-                    value={c.filial_id ?? ''}
-                    disabled={mudandoLoja === c.id}
-                    onChange={(e) => definirLoja(c, e.target.value)}
-                    className="rounded-control border border-line bg-card px-2 py-1 text-[12.5px] text-ink disabled:opacity-60"
-                  >
-                    <option value="">Toda a rede</option>
-                    {lojas.map((l) => (
-                      <option key={l.id} value={l.id}>{l.cidade ? `${l.nome} · ${l.cidade}` : l.nome}</option>
-                    ))}
-                  </select>
-                </label>
-              )}
-
               <div className="flex flex-none items-center gap-2">
-                {c ? (
-                  <>
-                    {/*
-                      RECONECTAR VOLTA PELO MESMO CAMINHO da conexão original.
-                      Mandava todo mundo para o diálogo da Página, inclusive um
-                      Instagram conectado por login — que não tem Página. O
-                      lojista clicaria em Reconectar, atravessaria a autorização
-                      do Facebook e voltaria sem resolver, justamente no momento
-                      em que o canal caiu e ele está com pressa.
-                    */}
-                    <Button
-                      variant="ghost" size="sm"
-                      onClick={() => (
-                        tipo === 'whatsapp' ? setAvisoWhats(true)
-                        : c.via === 'instagram' ? conectarInstagramSemPagina()
-                        : irParaMeta('meta')
-                      )}
-                      disabled={conectando === tipo || voltandoDaMeta || abrindoInstagram || (c.via !== 'instagram' && !!faltaConfig) || (tipo === 'whatsapp' && !sdkPronto)}
-                    >
-                      {conectando === tipo
-                        ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                        : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
-                      {tipo === 'whatsapp' && !sdkPronto ? 'Carregando conector…' : 'Reconectar'}
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setADesconectar(c)} disabled={conectando === tipo}>
-                      <Unplug className="mr-1.5 h-3.5 w-3.5" /> Desconectar
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                  {/*
+                {lista.length === 0 ? (
+                  /*
                     INSTAGRAM CONECTA PELO PRÓPRIO LOGIN, e só por ele.
-                    Uma Página do Facebook aceita UM Instagram profissional, então
-                    o caminho da Página nunca serviu para a segunda loja da rede
-                    nem para quem não tem Página — e era a maioria. Com o acesso
-                    avançado aprovado pela Meta em 28/08/2026, qualquer conta
-                    autoriza direto: some a Página, some o portfólio, some a
-                    escolha entre dois botões que o lojista não tinha como fazer.
-                    ⚠️ AQUI ESTAVA ESCRITO "o que já está conectado pela Página
-                    continua funcionando; é a coluna `via` que decide o envio".
-                    NÃO CONTINUA — e a suposição custou 10 dias de silêncio.
-
-                    A coluna `via` decide para onde o envio VAI, mas não dá ao
-                    app a permissão de chegar lá. O acesso avançado aprovado em
-                    28/08/2026 é do Instagram Login
-                    (`instagram_business_manage_messages`); o caminho da Página
-                    precisa de OUTRAS permissões, que o app não tem. Canal em
-                    `via = 'pagina'` RECEBE normalmente e falha ao ENVIAR, com
-                    `(#3) Application does not have the capability to make this
-                    API call`.
-
-                    Foi o que aconteceu com o @jmstore_importados: parou de
-                    enviar por volta de 25/08 e ninguém soube até 04/09, porque
-                    o recebimento seguia intacto e a equipe respondia pelo
-                    celular. Conserto: reconectar por este botão, que faz upsert
-                    em (tipo, external_id) e vira o `via` sem duplicar canal nem
-                    perder a loja.
-
-                    Ou seja: quem estiver em `via = 'pagina'` precisa reconectar.
-                    O Messenger segue pela Página porque Página é da natureza dele.
-                  */}
-                  {tipo === 'instagram' ? (
-                    <Button size="sm" loading={abrindoInstagram} onClick={conectarInstagramSemPagina}>
-                      Conectar
-                    </Button>
-                  ) : (
-                  <Button
-                    size="sm"
-                    onClick={() => (tipo === 'whatsapp' ? setAvisoWhats(true) : irParaMeta('meta'))}
-                    disabled={voltandoDaMeta || !!faltaConfig || conectando === tipo || (tipo === 'whatsapp' && !sdkPronto)}
-                  >
+                    Uma Página do Facebook aceita UM Instagram profissional, então o caminho da
+                    Página nunca serviu para a segunda loja da rede nem para quem não tem Página.
+                    Com o acesso avançado aprovado pela Meta em 28/08/2026, qualquer conta autoriza
+                    direto. ⚠️ Canal em `via = 'pagina'` RECEBE e falha ao ENVIAR (`(#3) Application
+                    does not have the capability…`): a coluna `via` decide para onde o envio vai,
+                    não dá ao app a permissão de chegar lá (o @jmstore_importados ficou 10 dias
+                    assim, 25/08–04/09/2026). Quem estiver em `via = 'pagina'` precisa reconectar
+                    por este botão, que faz upsert em (tipo, external_id) e vira o `via` sem
+                    duplicar canal nem perder a loja. O Messenger segue pela Página.
+                  */
+                  <Button size="sm" loading={tipo === 'instagram' && abrindoInstagram} onClick={conectarNovo} disabled={travado}>
                     {(voltandoDaMeta || conectando === tipo) ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
                     {conectando === tipo
                       ? 'Aguardando a Meta…'
@@ -734,16 +652,116 @@ export function CanaisView({ appId }: { appId: string }) {
                           ? 'Carregando conector…'
                           : 'Conectar'}
                   </Button>
-                  )}
-                  </>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={conectarNovo} disabled={travado}>
+                    {conectando === tipo ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                    {conectando === tipo ? 'Aguardando a Meta…' : tipo === 'whatsapp' && !sdkPronto ? 'Carregando conector…' : rotuloNovo}
+                  </Button>
                 )}
               </div>
             </div>
 
+            {lista.length > 0 && (
+              <ul className="mt-3 divide-y divide-line-soft border-t border-line-soft">
+                {lista.map((c) => {
+                  const st = ROTULO_STATUS[c.status]
+                  const acessoExpira = dataBr(c.data_access_expira_em ?? null, fuso)
+                  /**
+                   * Dias até o token vencer, e SÓ quando já está em zona de risco. O token do
+                   * Instagram-login vale 60 dias e é renovado sozinho com 15 de antecedência
+                   * (`lib/canais/renovacao.ts`): chegar a 7 dias significa que a renovação falhou
+                   * uns oito dias seguidos. Acima disso, nada aparece.
+                   */
+                  const tokenVencendo = diasParaVencer(c.token_expira_em ?? null)
+                  return (
+                    <li key={c.id} data-canal-id={c.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
+                      <div className="min-w-0 space-y-0.5 text-sm text-ink-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-ink">{c.nome_exibicao ?? c.external_id}</span>
+                          <Badge tone={st.tom}>{st.texto}</Badge>
+                          {c.coexistencia && <Badge tone="acc">Também no celular</Badge>}
+                        </div>
+                        {c.ultima_msg_em && <p className="text-xs text-ink-3">Última mensagem: {formatarDataHora(c.ultima_msg_em, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }, '', fuso)}</p>}
+                        {c.sync_historico_pct != null && c.sync_historico_pct < 100 && (
+                          <p className="text-xs text-ink-3">Copiando conversas anteriores: {c.sync_historico_pct}%</p>
+                        )}
+                        {c.ultimo_erro && <p className="text-xs text-bad">{c.ultimo_erro}</p>}
+                        {acessoExpira && (
+                          <p className="text-xs text-warn">
+                            Precisa reconectar até {acessoExpira} — é um prazo da Meta, não do sistema.
+                          </p>
+                        )}
+                        {/* Só aparece quando a renovação automática já vem falhando há dias. */}
+                        {tokenVencendo != null && (
+                          <p className="text-xs text-bad">
+                            {tokenVencendo > 0
+                              ? `O acesso ao Instagram vence em ${tokenVencendo === 1 ? '1 dia' : `${tokenVencendo} dias`} e a renovação automática não está passando. Clique em Reconectar.`
+                              : 'O acesso ao Instagram venceu. Clique em Reconectar para voltar a receber mensagens.'}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/*
+                          A QUEM O CANAL ATENDE. Canal sem loja é da REDE — certo para o Instagram da
+                          marca, errado para o telefone de uma loja. Cada número tem a sua escolha.
+                        */}
+                        {lojas.length >= 2 && (
+                          <label className="flex items-center gap-2 text-[12.5px] text-ink-2">
+                            <span className="text-ink-3">Atende</span>
+                            <select
+                              value={c.filial_id ?? ''}
+                              disabled={mudandoLoja === c.id}
+                              onChange={(e) => definirLoja(c, e.target.value)}
+                              className="rounded-control border border-line bg-card px-2 py-1 text-[12.5px] text-ink disabled:opacity-60"
+                            >
+                              <option value="">Toda a rede</option>
+                              {lojas.map((l) => (
+                                <option key={l.id} value={l.id}>{rotuloDaLoja(l)}</option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                        {/*
+                          RECONECTAR VOLTA PELO MESMO CAMINHO da conexão original: um Instagram
+                          conectado por login não tem Página, e o diálogo da Página não resolveria.
+                        */}
+                        <Button
+                          variant="ghost" size="sm"
+                          onClick={() => (
+                            tipo === 'whatsapp' ? setAvisoWhats(true)
+                            : c.via === 'instagram' ? conectarInstagramSemPagina()
+                            : irParaMeta('meta')
+                          )}
+                          disabled={conectando === tipo || voltandoDaMeta || abrindoInstagram || (c.via !== 'instagram' && !!faltaConfig) || (tipo === 'whatsapp' && !sdkPronto)}
+                        >
+                          {conectando === tipo
+                            ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+                          {tipo === 'whatsapp' && !sdkPronto ? 'Carregando conector…' : 'Reconectar'}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setADesconectar(c)} disabled={conectando === tipo}>
+                          <Unplug className="mr-1.5 h-3.5 w-3.5" /> Desconectar
+                        </Button>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+
+            {lojaRepetida && (
+              <p className="mt-3 flex gap-2 text-xs text-ink-3">
+                <Info className="h-3.5 w-3.5 flex-none" />
+                {tipo === 'whatsapp'
+                  ? 'Mais de um número atende a mesma loja: a resposta sai pelo número em que o cliente escreveu, e cada transmissão escolhe o seu.'
+                  : 'Mais de uma conta atende a mesma loja: a resposta sai pela conta em que o cliente escreveu.'}
+              </p>
+            )}
+
             {/*
-              Só vale quando o Instagram veio PELA PÁGINA. Conectado pelo login,
-              ele não tem Página nenhuma, e a frase mandaria o lojista procurar
-              algo que não existe.
+              Só vale quando o Instagram veio PELA PÁGINA. Conectado pelo login, ele não tem
+              Página nenhuma, e a frase mandaria o lojista procurar algo que não existe.
             */}
             {tipo === 'messenger' && !por('messenger') && por('instagram')?.via !== 'instagram' && por('instagram') && (
               <p className="mt-3 flex gap-2 text-xs text-ink-3">

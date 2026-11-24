@@ -1,0 +1,15 @@
+{
+  "tabelas": 14,
+  "rls_ligada_em_todas": true,
+  "responsavel_obrigatorio": "recusou",
+  "origem_conferida": "recusou",
+  "chave_da_roleta_conferida": "recusou",
+  "vendedora_ve_so_os_dela": 1,
+  "vendedora_nao_ve_a_roleta": "recusou",
+  "vendedora_nao_cria_regua": "recusou",
+  "vendedor_matriz_ve_so_os_dele": 1,
+  "admin_ve_todos": 2,
+  "admin_cria_regua": "ok",
+  "admin_nao_grava_acompanhamento_direto": "recusou",
+  "anonimo": "recusou"
+}

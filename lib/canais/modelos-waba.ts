@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { decifrarToken } from '@/lib/canais/crypto'
+import { finalDoNumero } from '@/lib/canais/rotulo-loja'
 import { apagarModelo, criarModelo, ehErro, listarModelos, statusDoModelo } from '@/lib/canais/meta'
 
 /**
@@ -22,23 +23,29 @@ export interface NumeroWhatsApp {
   filiais: (number | null)[]
   /** Os canais (ids) desta WABA — para ligar uma mensagem ao número. */
   canais: number[]
+  /** Final de cada número desta WABA ("2028"), para a tela dizer QUAL número (23/11/2026). */
+  finais: string[]
 }
+
+// A regra do final do número mora em rotulo-loja.ts (pura, vale também no navegador).
+export { finalDoNumero }
 
 /** As WABAs de WhatsApp da empresa (canais ativos com token), uma entrada por WABA. */
 export async function numerosWhatsApp(svc: Db, empresaId: number): Promise<NumeroWhatsApp[]> {
   const { data } = await svc.from('canais')
-    .select('id, waba_id, filial_id, access_token_enc, conectado_em')
+    .select('id, waba_id, filial_id, access_token_enc, conectado_em, nome_exibicao, external_id')
     .eq('empresa_id', empresaId).eq('tipo', 'whatsapp').eq('status', 'ativo')
     .order('conectado_em', { ascending: false })
   const porWaba = new Map<string, NumeroWhatsApp>()
-  for (const c of (data ?? []) as { id: number; waba_id: string | null; filial_id: number | null; access_token_enc: string | null }[]) {
+  for (const c of (data ?? []) as { id: number; waba_id: string | null; filial_id: number | null; access_token_enc: string | null; nome_exibicao: string | null; external_id: string | null }[]) {
     const waba = (c.waba_id ?? '').trim()
     if (!waba || !c.access_token_enc) continue
+    const final = finalDoNumero(c.nome_exibicao, c.external_id)
     const ja = porWaba.get(waba)
-    if (ja) { ja.filiais.push(c.filial_id); ja.canais.push(Number(c.id)); continue }
+    if (ja) { ja.filiais.push(c.filial_id); ja.canais.push(Number(c.id)); ja.finais.push(final); continue }
     let token: string
     try { token = decifrarToken(c.access_token_enc) } catch { continue }
-    porWaba.set(waba, { wabaId: waba, token, filiais: [c.filial_id], canais: [Number(c.id)] })
+    porWaba.set(waba, { wabaId: waba, token, filiais: [c.filial_id], canais: [Number(c.id)], finais: [final] })
   }
   return [...porWaba.values()]
 }
@@ -178,6 +185,40 @@ export async function aprovadosNoNumeroDaLoja(svc: Db, empresaId: number, filial
   const { data } = await svc.from('modelos_mensagem_wabas').select('modelo_id')
     .eq('empresa_id', empresaId).eq('waba_id', wabaId).eq('status', 'aprovado')
   return { wabaId, ids: ((data ?? []) as { modelo_id: number }[]).map((r) => Number(r.modelo_id)) }
+}
+
+/**
+ * Envio MANUAL pelo número ESCOLHIDO (23/11/2026, item 6): o card manda o "Responder por" e a
+ * Comunicação o canal da conversa. Os aprovados na WABA DAQUELE número. Quem chama já conferiu
+ * que o canal é da empresa e da loja do negócio; a Edge confere de novo (aprovadoNoNumero).
+ */
+export async function aprovadosNoCanal(svc: Db, empresaId: number, wabaId: string | null): Promise<{ wabaId: string | null; ids: number[] }> {
+  if (!wabaId) return { wabaId: null, ids: [] }
+  const { data } = await svc.from('modelos_mensagem_wabas').select('modelo_id')
+    .eq('empresa_id', empresaId).eq('waba_id', wabaId).eq('status', 'aprovado')
+  return { wabaId, ids: ((data ?? []) as { modelo_id: number }[]).map((r) => Number(r.modelo_id)) }
+}
+
+/**
+ * O WhatsApp em que o cliente falou por último NESTA loja (23/11/2026, item 5). O Automatize
+ * manda por ele — o mesmo número da conversa, a mesma regra do card (lib/canais/resolver-canal.ts,
+ * passo 1). Só canal ativo, da loja ou da rede. Nulo: cai na regra da loja (`aprovadoNaLoja`).
+ */
+export async function whatsappDoClienteNaLoja(
+  svc: Db, empresaId: number, contatoId: number, filialId: number | null,
+): Promise<{ canalId: number; wabaId: string | null } | null> {
+  let q = svc.from('canais').select('id, waba_id').eq('empresa_id', empresaId).eq('tipo', 'whatsapp').eq('status', 'ativo')
+  q = filialId != null ? q.or(`filial_id.is.null,filial_id.eq.${Number(filialId)}`) : q.is('filial_id', null)
+  const { data: canais } = await q
+  const lista = (canais ?? []) as { id: number; waba_id: string | null }[]
+  if (!lista.length) return null
+  let m = svc.from('mensagens').select('canal_id').eq('contato_id', contatoId).eq('direcao', 'recebida')
+    .in('canal_id', lista.map((c) => c.id))
+  m = filialId != null ? m.eq('filial_id', filialId) : m.is('filial_id', null)
+  const { data: ult } = await m.order('created_at', { ascending: false }).limit(1)
+  const canalId = (ult?.[0] as { canal_id: number } | undefined)?.canal_id
+  if (!canalId) return null
+  return { canalId, wabaId: (lista.find((c) => c.id === canalId)?.waba_id ?? null) }
 }
 
 /** Aprovado no número que envia pela loja (p_qualquer_loja = a regra do Automatize). */

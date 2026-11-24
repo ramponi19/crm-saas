@@ -196,6 +196,10 @@ export const MODULOS: ModuloManifesto[] = [
     frase: 'O prazo de garantia de cada venda e o aviso do que está vencendo.' },
   { chave: 'assistencia', href: '/assistencia', nome: 'Assistência', grupo: 'posvenda', requer: ['estoque'], abasConfiguracoes: ['pagamentos'],
     frase: 'Ordem de serviço com status, peças e aviso ao cliente.' },
+  // Módulo Pós-venda (Entrega C, docs/design-pos-venda.md §8.8). Em preparação: tabelas `posvenda_*` (C1) e a
+  // regra do responsável (C2) já existem; a tela e a jornada vêm nas etapas seguintes. Ninguém liga antes disso.
+  { chave: 'posvenda', href: '/pos-venda', nome: 'Pós-venda', grupo: 'posvenda', emPreparacao: true, abasConfiguracoes: ['posvenda'],
+    frase: 'Acompanha cada venda depois do caixa: régua de contatos, pesquisa de satisfação e chamados, com responsável certo.' },
 
   { chave: 'relatorios', href: '/relatorios', nome: 'Relatórios', grupo: 'insights', plano: 'bi',
     frase: 'Vendas, conversão e equipe por período, com exportação.' },

@@ -89,6 +89,20 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
   const funilPadrao = funis?.find(f => f.padrao)?.id ?? funis?.[0]?.id
   const [funilId, setFunilId] = useState<number | undefined>(funilPadrao)
   const [soEsteira, setSoEsteira] = useState(false)
+  const [liberando, setLiberando] = useState(false)
+  /** "Liberar lote do dia": explica o resultado por loja (liberados ou por que não saiu). */
+  async function liberarLote() {
+    setLiberando(true)
+    try {
+      const r = await fetch('/api/leads/liberar-lote', { method: 'POST' })
+      const j = await r.json().catch(() => ({})) as { error?: string; liberados?: number; lojas?: Record<string, { liberados?: number; pulado?: string }> }
+      if (!r.ok) { notify.bad(j.error ?? 'Não foi possível liberar o lote'); return }
+      const motivos = Object.values(j.lojas ?? {}).map((l) => l.pulado).filter(Boolean)
+      if (j.liberados) notify.ok(`${j.liberados} leads liberados para a equipe`)
+      else notify.warn('Nenhum lead liberado', motivos.length ? [...new Set(motivos)].join(' · ') : undefined)
+      router.refresh()
+    } finally { setLiberando(false) }
+  }
   // Automatize: mostra o que cada etapa faz sozinha (04/11/2026).
   const [automatize, setAutomatize] = useState(false)
   const auto = useAutomatize(funilId, automatize)
@@ -379,6 +393,16 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
           >
             Esteira{contagens.esteira > 0 ? ` (${contagens.esteira})` : ''}
           </button>
+          {/* Liberação diária da esteira (24/11/2026): o mesmo que o agendamento faz; a rota confere dono/admin. */}
+          {soEsteira && !restringe && (
+            <button
+              onClick={liberarLote}
+              disabled={liberando}
+              className="whitespace-nowrap rounded-control border border-line bg-card px-3 py-1.5 text-[12.5px] font-semibold text-ink-2 transition-colors hover:text-ink disabled:opacity-60"
+            >
+              {liberando ? 'Liberando…' : 'Liberar lote do dia'}
+            </button>
+          )}
           <FiltroEtiquetasBotao valor={filtroEtiquetas} onChange={(f) => { setCarregando(true); setFiltroEtiquetas(f) }} />
           <button
             data-selecionar-cartoes
@@ -445,6 +469,7 @@ export function LeadsView({ usuarios, empresaId, perfil, funilEtapas, motivos, f
       {/* Kanban */}
       <div className={`flex-1 min-h-0 overflow-hidden transition-opacity ${carregando ? 'opacity-50' : ''}`}>
         <KanbanBoard
+          rotuloUsado={perfil.rotuloUsado}
           leads={leads}
           usuarios={usuarios}
           columns={columns}

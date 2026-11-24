@@ -82,6 +82,8 @@ const DONOS = {
   '/api/taxas': CORE,
   // o Assistente (chat com os dados da loja) é do core desde 17/11/2026: o widget é de todo usuário
   '/api/assistente': CORE,
+  // Horário de funcionamento por dia e por loja (24/11/2026): core, toda empresa tem.
+  '/api/configuracoes/horario': CORE,
 
   // plataforma
   '/termos': PLAT, '/dpa': PLAT, '/aceite': PLAT, '/api/termos': PLAT,
@@ -104,6 +106,8 @@ const DONOS = {
   '/configuracoes/portais': mod('imoveis'), '/configuracoes/troca': mod('orcamentos'),
   '/configuracoes/contrato': mod('pdv'), '/configuracoes/documentos': mod('pdv'),
   '/configuracoes/pagamentos': mod('pdv'),
+  // Pós-venda (24/11/2026): a seção confere posvendaLigado na própria página.
+  '/configuracoes/pos-venda': mod('posvenda'),
 
   // módulo — telas públicas (link com token, site da loja)
   '/i': mod('rastreamento'), '/api/rastreamento': mod('rastreamento'),
@@ -120,7 +124,8 @@ const DONOS = {
 }
 const PREFIXOS = Object.keys(DONOS).sort((a, b) => b.length - a.length)
 
-const GUARDA = /\b(exigirModuloLigado|moduloLigado|moduloEstaLigado|exigirAbaDeModulo|ligadosDaEmpresa|inteligenciaLigada|zapintelAcesso)\s*\(|<SecaoConfiguracoes\b/
+// posvendaLigado (lib/posvenda/ligado.ts, 24/11/2026): o Pós-venda em preparação lê a linha de empresa_modulos.
+const GUARDA = /\b(exigirModuloLigado|moduloLigado|posvendaLigado|moduloEstaLigado|exigirAbaDeModulo|ligadosDaEmpresa|inteligenciaLigada|zapintelAcesso)\s*\(|<SecaoConfiguracoes\b/
 
 // ── As rotas ─────────────────────────────────────────────────────────────────
 function arquivos(dir) {

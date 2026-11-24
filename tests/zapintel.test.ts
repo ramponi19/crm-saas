@@ -9,7 +9,7 @@ import assert from 'node:assert/strict'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { bancoFalso, filtro, type Consulta } from './banco-falso'
 import { semAsQueSaoProva, retirarMidia, type Retirada } from '@/lib/storage/retencao'
-import { guardarPerfil, VERSAO_DO_PERFIL, type PerfilIA } from '@/lib/zapintel/perfil'
+import { ajustarAoNegocio, guardarPerfil, VERSAO_DO_PERFIL, type PerfilIA } from '@/lib/zapintel/perfil'
 import { excedeuLimiteDoUsuario } from '@/lib/rate-limit'
 
 const como = (db: unknown) => db as unknown as SupabaseClient
@@ -167,5 +167,26 @@ describe('teto de IA por pessoa', () => {
     const db = bancoFalso(() => ({ data: null, error: { message: 'down' } }))
     const erro = console.error; console.error = () => {}
     try { assert.equal(await excedeuLimiteDoUsuario(como(db), 'zapintel-perfil', 'u', 120), false) } finally { console.error = erro }
+  })
+})
+
+describe('a classe da ficha é do negócio (4A, 23/11/2026)', () => {
+  const ficha = (classificacao: PerfilIA['classificacao'], extra: Partial<PerfilIA> = {}) => ({ classificacao, ...extra }) as PerfilIA
+
+  test('negócio ganho é cliente, diga a IA o que disser', () => {
+    assert.equal(ajustarAoNegocio(ficha('hot'), 'ganho').classificacao, 'customer')
+    assert.equal(ajustarAoNegocio(ficha('followup', { jaCliente: true }), 'ganho').jaCliente, undefined)
+  })
+
+  test('negócio aberto nunca vira cliente: fica followup com o selo de recompra', () => {
+    const r = ajustarAoNegocio(ficha('customer'), 'aberto')
+    assert.equal(r.classificacao, 'followup')
+    assert.equal(r.jaCliente, true)
+    assert.equal(ajustarAoNegocio(ficha('hot'), 'aberto').classificacao, 'hot')
+  })
+
+  test('perdido ou status desconhecido: como a IA classificou', () => {
+    assert.equal(ajustarAoNegocio(ficha('customer'), 'perdido').classificacao, 'customer')
+    assert.equal(ajustarAoNegocio(ficha('customer'), null).classificacao, 'customer')
   })
 })

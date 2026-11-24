@@ -34,6 +34,10 @@ export async function membrosElegiveis(
       .eq('empresa_id', empresaId)
       .eq('ativo', true)
       .eq('ausente', false)
+      // Conta de serviço (não é uma pessoa) e quem está fora da distribuição automática
+      // (`participa_roleta = false`) não recebem lead (24/11/2026; migração 20261124001000).
+      .eq('conta_servico', false)
+      .eq('participa_roleta', true)
       .order('usuario_id', { ascending: true }),
     svc.from('filiais')
       .select('id, matriz')

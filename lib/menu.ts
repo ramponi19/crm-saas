@@ -322,6 +322,7 @@ export const CATALOGO: MenuGroupBase[] = [
       { href: '/compras', label: 'Compras', icon: 'ShoppingCart' },
       { href: '/garantia', label: 'Garantia', icon: 'ShieldCheck', badge: 'garantia' },
       { href: '/assistencia', label: 'Assistência', icon: 'Wrench' },
+      { href: '/pos-venda', label: 'Pós-venda', icon: 'HeartHandshake' },
       // Os itens abaixo são de módulos (core/modulos.ts); sem grupo com nome de ramo de negócio
       // no core (17/11/2026). Quem decide o grupo na barra é GRUPO_DO_HREF.
       { href: '/simular-financiamento', label: 'Financiamento', icon: 'Calculator', opcional: true },
@@ -655,7 +656,7 @@ export const GRUPO_DO_HREF: Record<string, GrupoMenuId> = {
   '/orcamentos': 'vendas', '/propostas': 'vendas', '/pdv': 'vendas', '/historico': 'vendas',
   '/simular-financiamento': 'vendas', '/avaliacoes': 'vendas', '/kds': 'vendas',
   '/estoque': 'estoque', '/catalogo': 'estoque', '/compras': 'estoque', '/imoveis': 'estoque', '/cardapio': 'estoque',
-  '/garantia': 'posvenda', '/assistencia': 'posvenda',
+  '/garantia': 'posvenda', '/assistencia': 'posvenda', '/pos-venda': 'posvenda',
   '/executivo': 'insights', '/relatorios': 'insights', '/financeiro': 'insights', '/ranking': 'insights', '/rastreamento': 'insights',
   '/visao-geral': 'insights', '/conversao': 'insights', '/metas': 'insights',
   '/cadencias': 'automacoes', '/distribuicao': 'automacoes', '/scoring': 'automacoes',
