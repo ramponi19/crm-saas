@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { diaNoFuso, instanteLocal, somarDias } from '@/lib/datas'
 import { semTipo } from '@/lib/posvenda/ligado'
 import {
-  decidirContato, descricaoDaCompra, diasDesdeAVenda, grupoDoDia, montarMensagem, ordenarFila, rotuloDoPasso,
+  decidirContato, descricaoDaCompra, primeiroNome, diasDesdeAVenda, grupoDoDia, montarMensagem, ordenarFila, rotuloDoPasso,
   type ConversaDoCanal, type ItemPosVenda, type TipoAcao,
 } from '@/lib/posvenda/fila'
 
@@ -85,6 +85,7 @@ export async function carregarFilaPosVenda(db: SupabaseClient<any>, opcoes: {
     return {
       id: l.id,
       negocioId: l.negocio_id,
+      filialId: l.filial_id,
       previsto,
       grupo,
       atraso: grupo === 'atrasados' ? diasDesdeAVenda(previsto, hoje) ?? 0 : 0,
@@ -101,7 +102,8 @@ export async function carregarFilaPosVenda(db: SupabaseClient<any>, opcoes: {
       loja,
       tentativas: l.tentativas ?? 0,
       contato: decidirContato(conversa.get(l.id) ?? null, contato?.telefone, mensagem, agora,
-        { id: passo?.modelo_id ?? null, categorias: opcoes.categoriasModelo ?? ['UTILITY'] }),
+        { id: passo?.modelo_id ?? null, categorias: opcoes.categoriasModelo ?? ['UTILITY'],
+          variaveis: [primeiroNome(contato?.nome), (negocio?.produto?.trim() || categoria || '')] }),
     }
   })
   return { itens: ordenarFila(itens), hoje, cortado: linhas.length >= LIMITE_FILA }

@@ -32,6 +32,7 @@ export function passoPrecisaDeModelo(p: { tipo_acao: string; dia_offset: number;
 
 // ── Parâmetros (config da M2/D6: {empresa, lojas}) ──────────────────────────────────────────────
 export type Parametro = 'teto_diario' | 'sla_horas' | 'nps_limite_chamado' | 'categorias_modelo' | 'responsavel_padrao' | 'janela_acompanhamento_dias'
+  | 'link_avaliacao' | 'mensagem_promotor' | 'mensagem_neutro'
 export interface DefParametro { porLoja: boolean; padrao: unknown; validar: (v: unknown) => unknown | undefined }
 
 const inteiro = (min: number, max: number) => (v: unknown) => {
@@ -39,6 +40,11 @@ const inteiro = (min: number, max: number) => (v: unknown) => {
   return typeof n === 'number' && Number.isInteger(n) && n >= min && n <= max ? n : undefined
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const textoLivre = (max: number) => (v: unknown) => (typeof v === 'string' && v.trim().length >= 3 ? v.trim().slice(0, max) : undefined)
+const url = (v: unknown) => {
+  if (typeof v !== 'string') return undefined
+  try { const u = new URL(v.trim()); return u.protocol === 'https:' ? u.toString() : undefined } catch { return undefined }
+}
 
 /** Os parâmetros que a tela grava; `undefined` do validar = valor recusado. Só a empresa ou também por loja. */
 export const PARAMETROS: Record<Parametro, DefParametro> = {
@@ -52,6 +58,10 @@ export const PARAMETROS: Record<Parametro, DefParametro> = {
       ? [...new Set(v as string[])] : undefined),
   },
   responsavel_padrao: { porLoja: true, padrao: null, validar: (v) => (typeof v === 'string' && UUID.test(v) ? v : undefined) },
+  // Depois da nota (bloco 4): link da avaliação no Google por loja (https) e as mensagens sugeridas.
+  link_avaliacao: { porLoja: true, padrao: null, validar: url },
+  mensagem_promotor: { porLoja: false, padrao: null, validar: textoLivre(600) },
+  mensagem_neutro: { porLoja: false, padrao: null, validar: textoLivre(600) },
 }
 export const ehParametro = (k: unknown): k is Parametro => typeof k === 'string' && k in PARAMETROS
 
@@ -96,4 +106,30 @@ export function validarPasso(b: Record<string, unknown>): { ok: true; v: PassoEn
     roteiro: texto(b.roteiro, 1500) || null, grupo: (b.grupo ?? 'relacionamento') as string, ativo: b.ativo !== false,
     responsavel: resp, modelo_id: modelo, condicao: condicao(b.condicao), tolerancia_dias: tol as number,
   } }
+}
+
+// ── Depois da nota (C7 bloco 4) ─────────────────────────────────────────────────────────────────
+/** Textos padrão do Nexus (a empresa troca em Configurações › Pós-venda). Variáveis: {{nome}} e {{link}}. */
+export const MENSAGEM_PROMOTOR_PADRAO = 'Que bom, {{nome}}! Obrigado pela nota. Se puder, conte como foi no Google, ajuda muito a loja: {{link}}'
+export const MENSAGEM_NEUTRO_PADRAO = 'Obrigado pela nota, {{nome}}! O que poderia ter sido melhor?'
+
+export type FaixaNota = 'promotor' | 'neutro' | 'detrator'
+export interface DepoisDaNota { faixa: FaixaNota; texto: string | null; aviso: string | null }
+
+/**
+ * O que a fila sugere logo depois da nota (o cliente acabou de responder: a janela de 24 h está aberta e vai como
+ * mensagem normal). 9–10 promotor: pedido de avaliação no Google com o link da loja; 7–8 (acima do limite que abre
+ * chamado): pergunta curta do que poderia ter sido melhor; até o limite: o chamado já foi aberto, nada a sugerir.
+ */
+export function depoisDaNota(nota: number, opcoes: { limiteChamado: number; nome: string; link: string | null
+  textoPromotor?: string | null; textoNeutro?: string | null }): DepoisDaNota {
+  const nome = (opcoes.nome ?? '').trim().split(/\s+/)[0] ?? ''
+  const trocar = (t: string) => t.replace(/\{\{\s*nome\s*\}\}/gi, nome).replace(/\{\{\s*link\s*\}\}/gi, opcoes.link ?? '')
+    .replace(/[ \t]{2,}/g, ' ').replace(/ ([,.!?])/g, '$1').trim()
+  if (nota <= opcoes.limiteChamado) return { faixa: 'detrator', texto: null, aviso: 'Chamado aberto para os administradores.' }
+  if (nota >= 9) {
+    if (!opcoes.link) return { faixa: 'promotor', texto: null, aviso: 'Promotor: configure o link de avaliação da loja em Configurações › Pós-venda para sugerir o pedido de avaliação.' }
+    return { faixa: 'promotor', texto: trocar(opcoes.textoPromotor || MENSAGEM_PROMOTOR_PADRAO), aviso: null }
+  }
+  return { faixa: 'neutro', texto: trocar(opcoes.textoNeutro || MENSAGEM_NEUTRO_PADRAO), aviso: null }
 }

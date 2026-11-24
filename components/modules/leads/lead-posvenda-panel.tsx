@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { HeartHandshake, Loader2, Check, Circle, X } from 'lucide-react'
-import { Badge } from '@/components/ui'
+import { Badge, Button, Input, Select, Textarea, notify } from '@/components/ui'
 import { cn } from '@/lib/utils'
 
 interface Passo {
@@ -12,7 +12,7 @@ interface Passo {
 }
 interface Nota { id: number; nota: number; comentario: string | null; dia: string }
 interface Chamado { id: number; numero: number; titulo: string; prioridade: string; status: string; resolvido: boolean; aberto: string; atrasado: boolean }
-interface Dados { hoje: string; passos: Passo[]; notas: Nota[]; chamados: Chamado[] }
+interface Dados { hoje: string; contatoId: number; categorias: { id: number; nome: string }[]; passos: Passo[]; notas: Nota[]; chamados: Chamado[] }
 
 const ddmm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`
 const STATUS: Record<string, string> = {
@@ -26,18 +26,17 @@ const STATUS: Record<string, string> = {
 export function LeadPosVendaPanel({ leadId }: { leadId: number }) {
   const [dados, setDados] = useState<Dados | null>(null)
   const [estado, setEstado] = useState<'carregando' | 'ok' | 'oculto'>('carregando')
+  const [form, setForm] = useState<'nota' | 'chamado' | null>(null)
 
-  useEffect(() => {
-    let vivo = true
-    fetch(`/api/pos-venda/lead/${leadId}`)
-      .then(async (r) => {
-        if (!vivo) return
-        if (!r.ok) { setEstado('oculto'); return }
-        setDados(await r.json()); setEstado('ok')
-      })
-      .catch(() => { if (vivo) setEstado('oculto') })
-    return () => { vivo = false }
+  const carregar = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/pos-venda/lead/${leadId}`)
+      if (!r.ok) { setEstado('oculto'); return }
+      setDados(await r.json()); setEstado('ok')
+    } catch { setEstado('oculto') }
   }, [leadId])
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- a primeira leitura do painel; o estado vem da rota
+  useEffect(() => { carregar() }, [carregar])
 
   if (estado === 'oculto') return null
   return (
@@ -102,9 +101,83 @@ export function LeadPosVendaPanel({ leadId }: { leadId: number }) {
               ))}
             </div>
           )}
-          <Link href="/pos-venda" className="text-[12px] font-medium text-ink-2 hover:text-ink">Abrir a fila do pós-venda</Link>
+          {form === 'nota' ? <FormNota leadId={leadId} aoFechar={(ok) => { setForm(null); if (ok) carregar() }} />
+            : form === 'chamado' ? <FormChamado leadId={leadId} contatoId={dados.contatoId} categorias={dados.categorias} aoFechar={(ok) => { setForm(null); if (ok) carregar() }} />
+            : (
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => setForm('nota')}>Registrar nota</Button>
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => setForm('chamado')}>Abrir chamado</Button>
+              </div>
+            )}
+          <div className="flex gap-3">
+            <Link href="/pos-venda" className="text-[12px] font-medium text-ink-2 hover:text-ink">Fila do pós-venda</Link>
+            <Link href="/pos-venda/chamados" className="text-[12px] font-medium text-ink-2 hover:text-ink">Chamados</Link>
+          </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Nota que o cliente deu fora da fila (balcão, ligação). Até o limite da empresa abre chamado. */
+function FormNota({ leadId, aoFechar }: { leadId: number; aoFechar: (ok: boolean) => void }) {
+  const [nota, setNota] = useState<number | null>(null)
+  const [comentario, setComentario] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  async function salvar() {
+    setSalvando(true)
+    const r = await fetch('/api/pos-venda/nps', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ negocio_id: leadId, nota, comentario }) })
+    const j = await r.json().catch(() => ({}))
+    setSalvando(false)
+    if (!r.ok) { notify.bad(j.error ?? 'Não foi possível registrar'); return }
+    notify.ok('Nota registrada')
+    if (j.resultado?.chamado_id) notify.ok('Nota baixa: chamado aberto para os administradores')
+    aoFechar(true)
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-control border border-line-soft bg-bg p-2.5">
+      <div className="text-[12px] text-ink-2">Nota de 0 a 10 que o cliente deu</div>
+      <div className="grid grid-cols-11 gap-1">
+        {Array.from({ length: 11 }, (_, n) => (
+          <button key={n} type="button" onClick={() => setNota(n)}
+            className={cn('num h-7 rounded-[6px] border text-[12px] font-medium', nota === n ? 'border-ink bg-ink text-white' : 'border-line bg-card text-ink')}>{n}</button>
+        ))}
+      </div>
+      <Input placeholder="Comentário do cliente (opcional)" value={comentario} onChange={(e) => setComentario(e.target.value)} />
+      <div className="flex gap-2"><Button size="sm" loading={salvando} disabled={nota == null} onClick={salvar}>Salvar nota</Button><Button size="sm" variant="ghost" onClick={() => aoFechar(false)}>Cancelar</Button></div>
+    </div>
+  )
+}
+
+/** Chamado aberto pela equipe, já com o cliente e a venda deste card. Vai para os administradores. */
+function FormChamado({ leadId, contatoId, categorias, aoFechar }: { leadId: number; contatoId: number; categorias: { id: number; nome: string }[]; aoFechar: (ok: boolean) => void }) {
+  const [f, setF] = useState({ titulo: '', descricao: '', categoria_id: '', prioridade: 'normal' })
+  const [salvando, setSalvando] = useState(false)
+  async function salvar() {
+    setSalvando(true)
+    const r = await fetch('/api/pos-venda/chamados', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ acao: 'abrir', contato_id: contatoId, negocio_id: leadId, ...f, categoria_id: f.categoria_id || null }) })
+    const j = await r.json().catch(() => ({}))
+    setSalvando(false)
+    if (!r.ok) { notify.bad(j.error ?? 'Não foi possível abrir o chamado'); return }
+    notify.ok(`Chamado #${j.chamado?.numero ?? ''} aberto`)
+    aoFechar(true)
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-control border border-line-soft bg-bg p-2.5">
+      <Input label="O que aconteceu" value={f.titulo} onChange={(e) => setF({ ...f, titulo: e.target.value })} />
+      <div className="grid grid-cols-2 gap-2">
+        <Select label="Categoria" value={f.categoria_id} onChange={(e) => setF({ ...f, categoria_id: e.target.value })}>
+          <option value="">Sem categoria</option>
+          {categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+        </Select>
+        <Select label="Prioridade" value={f.prioridade} onChange={(e) => setF({ ...f, prioridade: e.target.value })}>
+          <option value="baixa">Baixa</option><option value="normal">Normal</option><option value="alta">Alta</option><option value="urgente">Urgente</option>
+        </Select>
+      </div>
+      <Textarea label="Detalhes (opcional)" rows={2} value={f.descricao} onChange={(e) => setF({ ...f, descricao: e.target.value })} />
+      <div className="flex gap-2"><Button size="sm" loading={salvando} disabled={f.titulo.trim().length < 3} onClick={salvar}>Abrir chamado</Button><Button size="sm" variant="ghost" onClick={() => aoFechar(false)}>Cancelar</Button></div>
     </div>
   )
 }
