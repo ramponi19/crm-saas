@@ -2,7 +2,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { notFound } from 'next/navigation'
 import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { AgendarView } from './agendar-view'
-import { horarioDaAgenda } from '@/lib/agendar-slots'
+import { horarioDaEmpresa } from '@/lib/horario-empresa'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { agora } from '@/lib/datas'
 
@@ -22,13 +22,13 @@ export default async function AgendarPage({ params }: { params: Promise<{ slug: 
   // O "agora" do SERVIDOR vai para a tela: servidor e navegador marcam os mesmos
   // horários como passados (antes cada lado usava o seu relógio e o seu fuso).
   const agoraMs = agora().getTime()
-  const [{ data: horarioRow }, { data: ocupadasRaw }, fuso] = await Promise.all([
-    svc.from('configuracoes_sistema').select('valor').eq('empresa_id', empresa.id).eq('chave', 'horario_comercial').maybeSingle(),
+  // Horário por dia (24/11/2026): core.horario → horario_comercial → padrão.
+  const [horario, { data: ocupadasRaw }, fuso] = await Promise.all([
+    horarioDaEmpresa(svc, empresa.id),
     svc.from('agenda_visitas').select('data_hora').eq('empresa_id', empresa.id).neq('status', 'cancelada').gte('data_hora', new Date(agoraMs).toISOString()),
     fusoDaEmpresa(svc, empresa.id),
   ])
 
-  const horario = horarioDaAgenda(horarioRow?.valor)
   const ocupadas = ((ocupadasRaw ?? []) as { data_hora: string }[]).map((o) => o.data_hora)
 
   return <AgendarView slug={slug} nome={empresa.nome} cor={empresa.wl_cor || '#2E5CE6'} logo={empresa.wl_logo_url} horario={horario} ocupadas={ocupadas} fuso={fuso} agoraMs={agoraMs} />

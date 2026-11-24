@@ -2,6 +2,7 @@ import { nadaGravado } from '@/lib/linhas-afetadas'
 import { NextResponse } from 'next/server'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { aguardandoResposta } from '@/lib/esteira'
+import { aplicarSemDono } from '@/lib/sem-dono'
 import { conversasDosLeads } from '@/lib/leads'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -84,6 +85,8 @@ export async function POST(req: Request) {
         .update({ responsavel_id: null })
         .in('id', pendentes).eq('responsavel_id', user.id).select('id')
       liberados = data?.length ?? 0
+      // Nunca sem dono (24/11/2026): no modo 'roleta' da loja, os liberados vão para o próximo da roleta.
+      await aplicarSemDono(((data ?? []) as { id: number }[]).map((d) => d.id), [user.id])
     }
   }
 

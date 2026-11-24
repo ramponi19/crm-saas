@@ -119,7 +119,12 @@ export async function devolverLeadsSemResposta(
         devolucoes: (lead.devolucoes ?? 0) + 1,
       })
       .eq('id', id).eq('responsavel_id', lead.responsavel_id).select('id')
-    if (data?.length) devolvidos++
+    if (data?.length) {
+      devolvidos++
+      // Nunca sem dono (24/11/2026): no modo 'roleta' da loja, vai para o próximo da roleta (não para quem deixou).
+      const { aplicarSemDono } = await import('@/lib/sem-dono')
+      await aplicarSemDono([id], [lead.responsavel_id])
+    }
   }
   return { devolvidos, avaliados: leads.length }
 }
