@@ -82,6 +82,8 @@ const DONOS = {
   '/api/taxas': CORE,
   // o Assistente (chat com os dados da loja) é do core desde 17/11/2026: o widget é de todo usuário
   '/api/assistente': CORE,
+  // Horário de funcionamento por dia e por loja (24/11/2026): core, toda empresa tem.
+  '/api/configuracoes/horario': CORE,
 
   // plataforma
   '/termos': PLAT, '/dpa': PLAT, '/aceite': PLAT, '/api/termos': PLAT,
