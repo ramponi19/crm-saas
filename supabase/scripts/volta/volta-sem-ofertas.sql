@@ -6,3 +6,4 @@ drop function if exists public.contato_sem_ofertas(bigint, boolean);
 drop function if exists public.core_sem_ofertas_pelo_botao(bigint);
 drop function if exists public.core_sem_ofertas_aplicar(bigint, bigint, boolean, text);
 drop function if exists public.core_sem_ofertas_confirmacao_padrao();
+drop function if exists public.core_tel_digitos(text);

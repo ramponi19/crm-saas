@@ -30,14 +30,23 @@ returns text language sql immutable as $$
   select 'Pronto, {{nome}}: você não vai mais receber ofertas da nossa loja. Os avisos sobre a sua compra continuam chegando.'
 $$;
 
+-- Só os dígitos do telefone, com o 55 do Brasil quando vier sem DDI (10 ou 11 dígitos).
+create or replace function public.core_tel_digitos(p text)
+returns text language sql immutable as $$
+  select case when length(d) in (10, 11) then '55' || d else d end from (select regexp_replace(coalesce(p, ''), '\D', '', 'g') d) x
+$$;
+
 create or replace function public.core_sem_ofertas_aplicar(p_empresa bigint, p_contato bigint, p_ligar boolean, p_origem text)
 returns jsonb language plpgsql volatile security definer set search_path = public, pg_temp as $$
 declare v_tel text; v_ids bigint[]; v_pulados int := 0;
 begin
-  select telefone_e164 into v_tel from public.contatos where id = p_contato and empresa_id = p_empresa;
+  -- o mesmo cliente nas outras lojas: o telefone_e164 é único na empresa, então o outro contato costuma ter só o
+  -- `telefone`; compara os dígitos (com o 55 quando faltar)
+  select public.core_tel_digitos(coalesce(telefone_e164, telefone)) into v_tel from public.contatos where id = p_contato and empresa_id = p_empresa;
   if not found then raise exception using errcode = 'P0002', message = 'CONTATO_NAO_ENCONTRADO'; end if;
   select array_agg(id) into v_ids from public.contatos
-   where empresa_id = p_empresa and (id = p_contato or (v_tel is not null and telefone_e164 = v_tel));
+   where empresa_id = p_empresa
+     and (id = p_contato or (length(v_tel) >= 12 and (public.core_tel_digitos(telefone_e164) = v_tel or public.core_tel_digitos(telefone) = v_tel)));
 
   if p_ligar then
     update public.contatos set sem_ofertas_em = now(), sem_ofertas_origem = left(p_origem, 200)
@@ -120,7 +129,7 @@ end $$;
 do $$
 declare f text;
 begin
-  foreach f in array array['core_sem_ofertas_aplicar(bigint,bigint,boolean,text)', 'posvenda_sem_ofertas_no_passo()',
+  foreach f in array array['core_tel_digitos(text)', 'core_sem_ofertas_aplicar(bigint,bigint,boolean,text)', 'posvenda_sem_ofertas_no_passo()',
                            'core_sem_ofertas_pelo_botao(bigint)'] loop
     execute format('revoke all on function public.%s from public, anon, authenticated', f);
     execute format('grant execute on function public.%s to service_role', f);
