@@ -34,10 +34,11 @@ type ModeloAprovado = { id: number; nome: string; idioma: string; corpo: string;
 
 /**
  * Rascunho que outra tela manda pela URL (24/11/2026, fila do pós-venda): `texto` já escrito no campo de envio (quem
- * envia é a pessoa) e `modelo` = 'utilidade' para abrir os modelos aprovados de Utilidade quando a janela de 24 h do
+ * envia é a pessoa) e `modelo` para abrir os modelos aprovados quando a janela de 24 h do
  * WhatsApp está fechada (D8 do pós-venda: só UTILITY no começo).
  */
-export type RascunhoDaConversa = { texto?: string | null; modelo?: 'utilidade' | null }
+export type FiltroDeModelos = { categorias: string[]; preferido: number | null }
+export type RascunhoDaConversa = { texto?: string | null; modelo?: FiltroDeModelos | null }
 
 export function ConversaPainel({
   conversaId, inicial, empresaId, meuId, usuarios, etapas, funilPadrao, motivos, perfil, onVoltar, onAbrirConversa, rascunho,
@@ -66,7 +67,7 @@ export function ConversaPainel({
   const [modelos, setModelos] = useState<ModeloAprovado[] | null>(null)
   const [avisosPagamento, setAvisosPagamento] = useState<AvisoPagamento[]>([])
   const [modelo, setModelo] = useState<ModeloAprovado | null>(null)
-  const [soUtilidade, setSoUtilidade] = useState(false)
+  const [filtroModelos, setFiltroModelos] = useState<FiltroDeModelos | null>(null)
   const rascunhoAplicado = useRef(false)
   const [params, setParams] = useState<string[]>([])
   const fimRef = useRef<HTMLDivElement>(null)
@@ -192,11 +193,11 @@ export function ConversaPainel({
   const janelaFechada = canal === 'whatsapp' && (!ultimaDoCliente || agora - ultimaDoCliente > JANELA_WHATSAPP_MS)
   const podeResponder = !!canal && !!negocio && !janelaFechada
 
-  // Veio da fila do pós-venda com a janela fechada: abre os modelos de Utilidade uma vez, quando o negócio carregou.
+  // Veio da fila do pós-venda com a janela fechada: abre os modelos (categorias liberadas, o do passo já escolhido) uma vez.
   useEffect(() => {
-    if (rascunhoAplicado.current || rascunho?.modelo !== 'utilidade' || !negocio || !janelaFechada) return
+    if (rascunhoAplicado.current || !rascunho?.modelo || !negocio || !janelaFechada) return
     rascunhoAplicado.current = true
-    abrirModelos(true)
+    abrirModelos(rascunho.modelo)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só quando o negócio chega; abrirModelos lê o estado atual
   }, [negocio, janelaFechada])
 
@@ -290,9 +291,9 @@ export function ConversaPainel({
     }
   }
 
-  async function abrirModelos(utilidade = false) {
+  async function abrirModelos(filtro: FiltroDeModelos | null = null) {
     if (!negocio) return
-    setSoUtilidade(utilidade)
+    setFiltroModelos(filtro)
     setModelosAbertos(true); setModelo(null); setParams([]); setModelos(null); setAvisosPagamento([])
     try {
       // Só o que está aprovado NO NÚMERO que envia pela loja deste negócio (11/11/2026: a Meta
@@ -302,7 +303,11 @@ export function ConversaPainel({
       const j = await r.json()
       if (!r.ok) throw new Error(j.error)
       const aprovados = new Set<number>((j.envio?.aprovados ?? []) as number[])
-      setModelos(((j.modelos ?? []) as ModeloAprovado[]).filter((m) => aprovados.has(m.id) && (!utilidade || m.categoria === 'UTILITY')))
+      const lista = ((j.modelos ?? []) as ModeloAprovado[]).filter((m) => aprovados.has(m.id) && (!filtro || filtro.categorias.includes(m.categoria ?? '')))
+      setModelos(lista)
+      // o modelo do passo do pós-venda já vem escolhido (as variáveis a pessoa confere e completa)
+      const pref = filtro?.preferido != null ? lista.find((m) => m.id === filtro.preferido) ?? null : null
+      if (pref) setModelo(pref)
       setAvisosPagamento((j.envio?.avisosPagamento ?? []) as AvisoPagamento[])
     } catch {
       setModelos([]); notify.bad('Não foi possível carregar os modelos.')
@@ -486,8 +491,8 @@ export function ConversaPainel({
         ) : modelos.length === 0 ? (
           <div className="flex flex-col gap-3">
             <AvisoPagamentoMeta avisos={avisosPagamento} />
-            <p className="text-[13px] text-ink-3" data-sem-modelo-no-numero>{soUtilidade
-              ? 'Nenhum modelo de Utilidade aprovado pela Meta no WhatsApp desta loja. Crie (ou sincronize) em Modelos e espere a aprovação.'
+            <p className="text-[13px] text-ink-3" data-sem-modelo-no-numero>{filtroModelos
+              ? 'Nenhum modelo aprovado, nas categorias liberadas para o pós-venda, no WhatsApp desta loja. Crie (ou sincronize) em Modelos e espere a aprovação.'
               : 'Nenhum modelo aprovado pela Meta no WhatsApp desta loja. Crie (ou sincronize) e espere a aprovação em Modelos.'}</p>
           </div>
         ) : (

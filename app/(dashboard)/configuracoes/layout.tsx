@@ -1,6 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { getEmpresaRole } from '@/lib/owner'
-import { carregarConfigEmpresa, inteligenciaLigada, ligadosDaEmpresa } from '@/lib/empresa-config'
+import { carregarConfigEmpresa, inteligenciaLigada, ligadosDaEmpresa, moduloLigado } from '@/lib/empresa-config'
 import { rastrDb } from '@/lib/rastreamento/db'
 import { abasDosModulos } from '@/core/modulos'
 import { secoesDeConfiguracoes } from '@/lib/configuracoes-menu'
@@ -24,7 +24,10 @@ export default async function ConfiguracoesLayout({ children }: { children: Reac
     isAdmin && empresaId ? inteligenciaLigada(rastrDb(), empresaId) : Promise.resolve(false),
     carregarConfigEmpresa(supabase, empresaId ?? 0),
   ])
-  const secoes = secoesDeConfiguracoes({ isAdmin, abasDosModulos: abasDosModulos(ligadosDaEmpresa(cfg)), zapintel })
+  // Pós-venda em preparação (24/11/2026): a seção vale onde a linha do módulo está ligada (lib/posvenda/ligado.ts).
+  const abas = abasDosModulos(ligadosDaEmpresa(cfg))
+  if (moduloLigado(cfg.modulos, 'posvenda') && !abas.includes('posvenda')) abas.push('posvenda')
+  const secoes = secoesDeConfiguracoes({ isAdmin, abasDosModulos: abas, zapintel })
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">

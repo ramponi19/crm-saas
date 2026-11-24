@@ -106,6 +106,8 @@ const DONOS = {
   '/configuracoes/portais': mod('imoveis'), '/configuracoes/troca': mod('orcamentos'),
   '/configuracoes/contrato': mod('pdv'), '/configuracoes/documentos': mod('pdv'),
   '/configuracoes/pagamentos': mod('pdv'),
+  // Pós-venda (24/11/2026): a seção confere posvendaLigado na própria página.
+  '/configuracoes/pos-venda': mod('posvenda'),
 
   // módulo — telas públicas (link com token, site da loja)
   '/i': mod('rastreamento'), '/api/rastreamento': mod('rastreamento'),

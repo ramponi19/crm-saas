@@ -3,7 +3,8 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { carregarConfigEmpresa } from '@/lib/empresa-config'
-import { posvendaLigado } from '@/lib/posvenda/ligado'
+import { posvendaLigado, semTipo } from '@/lib/posvenda/ligado'
+import { categoriasPermitidas } from '@/lib/posvenda/config'
 import { carregarFilaPosVenda } from '@/lib/posvenda/carregar-fila'
 import { FilaPosVenda } from './fila-pos-venda'
 
@@ -23,13 +24,14 @@ export default async function PosVendaPage({ searchParams }: { searchParams: Pro
   if (!empresaId) redirect('/dashboard')
 
   const service = createServiceClient()
-  const [ligado, { data: vinc }, { data: eu }, fuso, cfg, sp] = await Promise.all([
+  const [ligado, { data: vinc }, { data: eu }, fuso, cfg, sp, { data: cats }] = await Promise.all([
     posvendaLigado(service, empresaId),
     service.from('empresa_usuarios').select('role').eq('empresa_id', empresaId).eq('usuario_id', user.id).eq('ativo', true).maybeSingle(),
     supabase.from('usuarios').select('is_super_admin').eq('id', user.id).maybeSingle(),
     fusoDaEmpresa(supabase, empresaId),
     carregarConfigEmpresa(supabase, empresaId),
     searchParams,
+    semTipo(service).rpc('config_valor_emp', { p_empresa: empresaId, p_modulo: 'posvenda', p_chave: 'categorias_modelo' }),
   ])
   if (!ligado) return <FilaPosVenda desligado itens={[]} hoje="" podeVerTodos={false} ver="meus" cortado={false} />
 
@@ -37,6 +39,7 @@ export default async function PosVendaPage({ searchParams }: { searchParams: Pro
   const ver = podeVerTodos && sp.ver === 'todos' ? 'todos' : 'meus'
   const { itens, hoje, cortado } = await carregarFilaPosVenda(supabase, {
     empresaId, fuso, rotuloUsado: cfg.vocabulario.usado ?? 'Usado', so: ver === 'meus' ? user.id : null,
+    categoriasModelo: categoriasPermitidas(cats),
   })
   // key: trocar Meus/Todos monta a fila de novo com os itens da outra visão (o estado local começa das props).
   return <FilaPosVenda key={ver} itens={itens} hoje={hoje} podeVerTodos={podeVerTodos} ver={ver} cortado={cortado} />

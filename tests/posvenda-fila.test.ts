@@ -78,8 +78,12 @@ test('contato: conversa no WhatsApp da loja com a janela aberta → abre no Nexu
 test('contato: API oficial com a janela de 24 h fechada (ou o cliente nunca escreveu) → modelo de Utilidade', () => {
   const fechada = decidirContato({ conversaId: 42, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: '2026-11-23T14:59:00Z' }, '11987654321', MSG, AGORA)
   assert.equal(fechada.modo, 'modelo')
-  assert.equal(fechada.href, '/comunicacao?c=42&modelo=utilidade')
-  assert.match(fechada.aviso ?? '', /24 h/)
+  assert.equal(fechada.href, '/comunicacao?c=42&modelo=posvenda&cat=UTILITY')
+  assert.match(fechada.aviso ?? '', /não tem modelo/)
+  // o modelo do passo e as categorias liberadas pela empresa (D8 revista) vão no endereço
+  const comModelo = decidirContato({ conversaId: 42, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: null }, null, MSG, AGORA, { id: 12, categorias: ['UTILITY', 'MARKETING'] })
+  assert.equal(comModelo.href, '/comunicacao?c=42&modelo=posvenda&cat=UTILITY,MARKETING&m=12')
+  assert.match(comModelo.aviso ?? '', /modelo do passo/)
   assert.equal(decidirContato({ conversaId: 7, canalTipo: 'whatsapp', oficial: true, ultimaRecebida: null }, null, MSG, AGORA).modo, 'modelo')
 })
 

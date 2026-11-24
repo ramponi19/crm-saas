@@ -40,7 +40,7 @@ export interface ItemPosVenda {
  *   nexus      há conversa do contato num WhatsApp conectado da loja: abre a conversa DENTRO do Nexus, com a mensagem
  *              no campo de envio (fica registrada; a resposta entra pelo roteamento do pós-venda);
  *   modelo     a mesma conversa, mas é API oficial e a janela de 24 h da Meta está fechada: só modelo aprovado
- *              (abre a lista dos de Utilidade, D8);
+ *              (abre a lista das categorias liberadas para o pós-venda, com o modelo do passo já escolhido; D8 revista);
  *   externo    sem conversa no WhatsApp da loja: wa.me, com o aviso de que a conversa não fica registrada;
  *   sem_numero sem conversa e sem telefone válido.
  */
@@ -55,12 +55,16 @@ export interface ConversaDoCanal {
 }
 export const JANELA_META_MS = 24 * 60 * 60 * 1000
 
-export function decidirContato(conversa: ConversaDoCanal | null, telefone: string | null | undefined, mensagem: string, agora: Date): ContatoDoPasso {
+export interface ModeloDoPasso { id: number | null; categorias: string[] }
+
+export function decidirContato(conversa: ConversaDoCanal | null, telefone: string | null | undefined, mensagem: string, agora: Date,
+                               modelo: ModeloDoPasso = { id: null, categorias: ['UTILITY'] }): ContatoDoPasso {
   if (conversa && conversa.canalTipo === 'whatsapp') {
     const ultima = conversa.ultimaRecebida ? new Date(conversa.ultimaRecebida).getTime() : null
     if (conversa.oficial && (ultima == null || agora.getTime() - ultima > JANELA_META_MS)) {
-      return { modo: 'modelo', href: `/comunicacao?c=${conversa.conversaId}&modelo=utilidade`,
-               aviso: 'Janela de 24 h fechada: só modelo aprovado' }
+      const cat = (modelo.categorias.length ? modelo.categorias : ['UTILITY']).join(',')
+      return { modo: 'modelo', href: `/comunicacao?c=${conversa.conversaId}&modelo=posvenda&cat=${cat}${modelo.id ? `&m=${modelo.id}` : ''}`,
+               aviso: modelo.id ? 'Janela de 24 h fechada: vai o modelo do passo' : 'Janela de 24 h fechada e o passo não tem modelo: ligue ou escolha um modelo' }
     }
     const t = mensagem.trim()
     return { modo: 'nexus', href: `/comunicacao?c=${conversa.conversaId}${t ? `&texto=${encodeURIComponent(t)}` : ''}`, aviso: null }

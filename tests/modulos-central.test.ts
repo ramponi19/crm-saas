@@ -90,7 +90,8 @@ test('zero-segmento: ligadosDaEmpresa = a conta antiga; seções saem do módulo
   // Troca é do módulo de celular (celulares), não de Orçamentos: o varejo sem ele não a tem.
   assert.deepEqual(abasDosModulos(new Set(VAREJO)).sort(), ['contrato', 'documentos', 'pagamentos'])
   assert.deepEqual(abasDosModulos(new Set([...VAREJO, '/check-imei'])).sort(), ['contrato', 'documentos', 'pagamentos', 'troca'])
-  assert.deepEqual([...ABAS_DE_MODULO].sort(), ['agendamento', 'cardapio', 'contrato', 'documentos', 'pagamentos', 'portais', 'troca', 'veiculos-portais'])
+  // Pós-venda (24/11/2026): a seção Configurações › Pós-venda.
+  assert.deepEqual([...ABAS_DE_MODULO].sort(), ['agendamento', 'cardapio', 'contrato', 'documentos', 'pagamentos', 'portais', 'posvenda', 'troca', 'veiculos-portais'])
 })
 
 test('dependências: requisitos transitivos, na ordem de instalar', () => {
