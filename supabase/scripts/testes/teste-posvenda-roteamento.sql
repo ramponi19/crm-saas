@@ -1,4 +1,5 @@
--- Teste da 20261124000700_posvenda_roteamento (C5 / antiga M7). Banco local descartável, JM de teste (empresa 1).
+-- Teste da 20261124000700_posvenda_roteamento (C5 / antiga M7) e do ajuste 20261124000800 (negócio aberto + chamado
+-- aberto: o chamado também registra cliente_respondeu). Banco local descartável, JM de teste (empresa 1).
 -- Parte A: módulo DESLIGADO → a função nova faz EXATAMENTE o que a de produção faz (cópia abaixo, pg_temp.canal_antigo),
 --          cenário por cenário, cada um numa transação desfeita.
 -- Parte B: módulo LIGADO → os 13 cenários do §2.6 e os pedidos pelo Lucas em 24/11. Termina com RAISE.
@@ -166,6 +167,9 @@ begin
     when 'chamado_aberto'    then g := pg_temp.neg(ct, 3, 'ganho', 200, true); rot := jsonb_build_object('G', g); v_ch := pg_temp.chamado(g, 'aguardando_cliente');
     when 'chamado_resolvido' then g := pg_temp.neg(ct, 3, 'ganho', 200, true); rot := jsonb_build_object('G', g); v_ch := pg_temp.chamado(g, 'resolvido');
     when 'aberto_e_chamado'  then g := pg_temp.neg(ct, 3, 'ganho', 200, true); rot := jsonb_build_object('G', g, 'A', pg_temp.neg(ct, 3, 'aberto', null, true)); v_ch := pg_temp.chamado(g, 'andamento');
+    -- 0800: negócio aberto + chamado aberto, duas mensagens seguidas (um evento só) / mensagem da loja (nenhum)
+    when 'aberto_chamado_duas' then g := pg_temp.neg(ct, 3, 'ganho', 200, true); rot := jsonb_build_object('G', g, 'A', pg_temp.neg(ct, 3, 'aberto', null, true)); v_ch := pg_temp.chamado(g, 'andamento');
+    when 'aberto_chamado_loja' then g := pg_temp.neg(ct, 3, 'ganho', 200, true); rot := jsonb_build_object('G', g, 'A', pg_temp.neg(ct, 3, 'aberto', null, true)); v_ch := pg_temp.chamado(g, 'andamento'); v_so := true;
     when 'acomp_outra_loja'  then rot := jsonb_build_object('G', pg_temp.neg(ct, 3, 'ganho', 100, true)); g := pg_temp.neg(ct, 6, 'ganho', 100, true); rot := rot || jsonb_build_object('G6', g); v_ac := pg_temp.acomp(g, 0);
     when 'loja_envia'        then g := pg_temp.neg(ct, 3, 'ganho', 100, true); rot := jsonb_build_object('G', g); v_ac := pg_temp.acomp(g, 0); v_so := true;
     when 'chamado_duas_msgs' then g := pg_temp.neg(ct, 3, 'ganho', 200, true); rot := jsonb_build_object('G', g); v_ch := pg_temp.chamado(g, 'aberto');
@@ -174,7 +178,7 @@ begin
   select count(*) into antes from negocios where contato_id = ct;
   if p_nova then ret := core_negocio_do_canal(1, ct, v_loja, 'quero comprar o 18', v_so, 'whatsapp', null);
             else ret := pg_temp.canal_antigo(1, ct, v_loja, 'quero comprar o 18', v_so, 'whatsapp', null); end if;
-  if p_cen = 'chamado_duas_msgs' then ret := core_negocio_do_canal(1, ct, v_loja, 'alô?', v_so, 'whatsapp', null); end if;
+  if p_cen in ('chamado_duas_msgs', 'aberto_chamado_duas') then ret := core_negocio_do_canal(1, ct, v_loja, 'alô?', v_so, 'whatsapp', null); end if;
 
   r := jsonb_build_object(
     'ret', coalesce((select k from jsonb_each_text(rot) e(k, v) where v::bigint = ret limit 1), case when ret is null then 'nulo' else 'novo' end),
@@ -208,7 +212,7 @@ begin
   -- ── Parte B: módulo ligado ──
   insert into empresa_modulos (empresa_id, modulo, ativo) values (1, 'posvenda', true);
   foreach cen in array array['d330_futuro', 'd7_amanha', 'd330_amanha', 'acomp_hoje', 'vencido_2', 'vencido_5', 'janela0_hoje', 'janela0_ontem',
-                             'chamado_aberto', 'chamado_resolvido', 'aberto_e_chamado', 'acomp_outra_loja', 'loja_envia', 'chamado_duas_msgs',
+                             'chamado_aberto', 'chamado_resolvido', 'aberto_e_chamado', 'aberto_chamado_duas', 'aberto_chamado_loja', 'acomp_outra_loja', 'loja_envia', 'chamado_duas_msgs',
                              'perdido', 'arquivado', 'sem_negocio', 'ganho_recente'] loop
     begin nova := pg_temp.rodar(cen, true); raise exception 'desfaz'; exception when others then if sqlerrm <> 'desfaz' then nova := to_jsonb('ERRO: ' || sqlerrm); end if; end;
     res := res || jsonb_build_object('B_' || cen, nova);

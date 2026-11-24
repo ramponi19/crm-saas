@@ -134,7 +134,10 @@ async function voltar(svc: Db, f: FotoDaJuncao) {
   const patch = fech
     ? { dados: f.dadosAntes, status: fech.status, ganho_em: fech.ganho_em, perdido_em: fech.perdido_em, motivo_perda_id: fech.motivo_perda_id }
     : { dados: f.dadosAntes }
+  // Marca explícita de exceção (gatilho negocios_venda_exigida, 24/11/2026): o ganho que volta pode ser um
+  // dos antigos, sem `dados.venda`. Só vale com a chave de serviço.
   const { data: volta, error: eV } = await svc.from('negocios').update(patch).eq('id', f.sai).select('id')
+    .setHeader('x-nexus-venda-excecao', 'juncao')
   if (eV || !volta?.length) throw new Error(`negócio #${f.sai}: ${eV?.message ?? 'não existe mais'}`)
   // O fechamento volta a ser do negócio: o registro no histórico do outro sai (senão contaria duas vezes).
   if (fech?.historico) {

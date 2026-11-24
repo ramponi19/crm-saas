@@ -23,6 +23,9 @@ PORTA_DB=56322; PORTA_API=56321
 L="host=127.0.0.1 port=$PORTA_DB dbname=postgres user=postgres password=postgres"
 case "$L" in *127.0.0.1*) ;; *) echo "RECUSADO: não é o banco local"; exit 1;; esac
 export PGCLIENTENCODING=UTF8
+# Marca explícita de exceção do gatilho negocios_venda_exigida (20261124000900): a semente, a demonstração e
+# os testes gravam ganho direto, como script. O teste-venda-exigida.sql a desliga para provar a recusa.
+export PGOPTIONS="-c nexus.venda_excecao=teste-local"
 
 docker info >/dev/null 2>&1 || { echo "Docker parado: abra o Docker Desktop (com o IDE fechado) e rode de novo."; exit 1; }
 

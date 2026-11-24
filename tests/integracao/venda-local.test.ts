@@ -131,3 +131,47 @@ describe('o banco confere a forma de dados.venda (core_validar_dados)', () => {
     assert.match(String(error?.message), /campo personalizado desconhecido/)
   })
 })
+
+/**
+ * A EXIGÊNCIA NO BANCO (20261124000900_venda_exigida), pelo PostgREST de verdade: a sessão não marca ganho
+ * sem venda nem mexe na venda gravada; a chave de serviço só passa sem venda com o cabeçalho de exceção
+ * (é o que o desfazer da junção manda) — e o mesmo cabeçalho vindo de uma sessão não vale.
+ */
+describe('o banco exige a venda (gatilho negocios_venda_exigida)', () => {
+  const ganhoSemVenda = { status: 'ganho', etapa_id: CONVERTIDO }
+  test('sessão do vendedor direto na API: ganho sem venda é recusado', async () => {
+    const id = await negocioAberto('Teste local sessão sem venda')
+    const { error } = await sessoes.vendedor.from('negocios').update(ganhoSemVenda).eq('id', id)
+    assert.match(String(error?.message), /VENDA_OBRIGATORIA/)
+    assert.equal((await ler(id)).status, 'aberto')
+  })
+  test('sessão com o cabeçalho de exceção continua recusada', async () => {
+    const id = await negocioAberto('Teste local sessão forja cabeçalho')
+    const { error } = await sessoes.admin.from('negocios').update(ganhoSemVenda).eq('id', id).setHeader('x-nexus-venda-excecao', 'juncao')
+    assert.match(String(error?.message), /VENDA_OBRIGATORIA/)
+  })
+  test('chave de serviço sem marca: recusada; com o cabeçalho: grava', async () => {
+    const id = await negocioAberto('Teste local serviço com marca')
+    const { error: e1 } = await svc.from('negocios').update(ganhoSemVenda).eq('id', id)
+    assert.match(String(e1?.message), /VENDA_OBRIGATORIA/)
+    const { data, error: e2 } = await svc.from('negocios').update(ganhoSemVenda).eq('id', id).select('id').setHeader('x-nexus-venda-excecao', 'juncao')
+    assert.equal(e2, null); assert.equal(data?.length, 1)
+    assert.equal((await ler(id)).status, 'ganho')
+  })
+  test('venda gravada: a sessão não muda nem apaga direto; a correção pela rota continua valendo', async () => {
+    const id = await negocioAberto('Teste local venda imutável'); como('vendedor')
+    assert.equal((await chamar(mover, { leadId: id, kanban_status: 'convertido', venda })).status, 200)
+    const n = await ler(id)
+    const dados = n.dados as Record<string, unknown> & { venda: Record<string, unknown> }
+    const { error: e1 } = await sessoes.vendedor.from('negocios').update({ dados: { ...dados, venda: { ...dados.venda, valor: 1 } } }).eq('id', id)
+    assert.match(String(e1?.message), /VENDA_SO_POR_RPC/)
+    const { venda: _fora, ...semVenda } = dados
+    const { error: e2 } = await sessoes.admin.from('negocios').update({ dados: semVenda }).eq('id', id)
+    assert.match(String(e2?.message), /VENDA_SO_POR_RPC/)
+    assert.equal(((await ler(id)).dados as { venda: { valor: number } }).venda.valor, 4590)
+    como('admin')
+    const r = await chamar(corrigir, { leadId: id, data: '2026-01-12', motivo: 'teste local: venda foi antes' })
+    assert.equal(r.status, 200, JSON.stringify(r.corpo))
+    assert.equal(((await ler(id)).dados as { venda: { data: string } }).venda.data, '2026-01-12')
+  })
+})
