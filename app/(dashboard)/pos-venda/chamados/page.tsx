@@ -9,7 +9,8 @@ import { ChamadosView, type ChamadoLinha } from './chamados-view'
 export const metadata = { title: 'Chamados' }
 
 /**
- * CHAMADOS DO PÓS-VENDA (C7 bloco 4, 24/11/2026). O responsável vê os dele; dono e administrador, todos (RLS da C1).
+ * CHAMADOS DO PÓS-VENDA (C7 bloco 4, 24/11/2026). O responsável vê os dele; dono e administrador, todos; o vendedor
+ * do cliente vê, em leitura, os chamados dos clientes dele (RLS, migração 2400).
  * Abertos (do prazo mais apertado ao mais folgado) e resolvidos; o NPS dos últimos 90 dias no topo.
  */
 export default async function ChamadosPage() {
@@ -25,7 +26,7 @@ export default async function ChamadosPage() {
 
   const [{ data: ch }, { data: st }, { data: vinc }, { data: eu }, { data: equipe }, { data: notas }] = await Promise.all([
     s.from('posvenda_chamados').select(`id, numero, titulo, descricao, prioridade, origem, aberto_em, primeira_resposta_em, resolvido_em,
-        sla_resposta_vence, sla_resolucao_vence, responsavel_id, negocio_id,
+        sla_resposta_vence, sla_resolucao_vence, sla_pausado_desde, responsavel_id, negocio_id,
         contato:contatos!contato_id(nome, telefone), categoria:posvenda_chamado_categorias!categoria_id(nome),
         status:posvenda_chamado_status!status_id(id, nome, tipo)`)
       .eq('empresa_id', empresaId).order('aberto_em', { ascending: false }).limit(300),

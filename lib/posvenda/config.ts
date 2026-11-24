@@ -33,7 +33,7 @@ export function passoPrecisaDeModelo(p: { tipo_acao: string; dia_offset: number;
 
 // ── Parâmetros (config da M2/D6: {empresa, lojas}) ──────────────────────────────────────────────
 export type Parametro = 'teto_diario' | 'sla_horas' | 'nps_limite_chamado' | 'categorias_modelo' | 'responsavel_padrao' | 'janela_acompanhamento_dias'
-  | 'link_avaliacao' | 'mensagem_promotor' | 'mensagem_neutro' | 'categorias_fonte'
+  | 'link_avaliacao' | 'mensagem_promotor' | 'mensagem_neutro' | 'categorias_fonte' | 'sla_pausa_terceiro'
 export interface DefParametro { porLoja: boolean; padrao: unknown; validar: (v: unknown) => unknown | undefined }
 
 const inteiro = (min: number, max: number) => (v: unknown) => {
@@ -65,6 +65,8 @@ export const PARAMETROS: Record<Parametro, DefParametro> = {
   mensagem_neutro: { porLoja: false, padrao: null, validar: textoLivre(600) },
   // De onde vêm as categorias da venda: as do Estoque (padrão) ou as próprias do Pós-venda (quem não usa o Estoque).
   categorias_fonte: { porLoja: false, padrao: 'estoque', validar: (v) => (v === 'estoque' || v === 'proprias' ? v : undefined) },
+  // "Aguardando terceiro" (assistência, fornecedor) também pausa o prazo do chamado? "Aguardando cliente" sempre pausa.
+  sla_pausa_terceiro: { porLoja: false, padrao: false, validar: (v) => (typeof v === 'boolean' ? v : undefined) },
 }
 export const ehParametro = (k: unknown): k is Parametro => typeof k === 'string' && k in PARAMETROS
 

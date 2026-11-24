@@ -56,3 +56,9 @@ test('ordem: abertos pelo prazo mais apertado; resolvidos depois, do mais recent
   const lista = [c(1, '2026-11-26T10:00:00Z', null), c(2, null, '2026-11-22T10:00:00Z'), c(3, '2026-11-25T10:00:00Z', null), c(4, null, '2026-11-23T10:00:00Z')]
   assert.deepEqual(ordenarChamados(lista).map((x) => x.id), [3, 1, 4, 2])
 })
+
+test('prazo pausado (aguardando cliente, migração 2400): a tela diz desde quando, sem cor de atraso', () => {
+  const s = situacaoDoPrazo({ resolvido_em: null, primeira_resposta_em: '2026-11-20T10:00:00Z', sla_resposta_vence: null,
+    sla_resolucao_vence: '2026-11-21T10:00:00Z', sla_pausado_desde: '2026-11-20T15:00:00Z' }, new Date('2026-11-25T10:00:00Z'), (iso) => iso.slice(0, 10))
+  assert.deepEqual(s, { tone: 'neutro', texto: 'prazo pausado desde 2026-11-20' })
+})
