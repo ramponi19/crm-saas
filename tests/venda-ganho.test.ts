@@ -152,7 +152,14 @@ describe('/api/leads/mover: entrar no ganho exige a venda', () => {
     { id: 76, slug: 'vendido_loja', tipo: 'ganho' },
   ]
   const hoje = new Date().toISOString().slice(0, 10)
-  const banco = (negocio: Record<string, unknown>, categorias: number[] = [1, 7]): Responder => (c) => {
+  // Categorias e campos da venda vêm de RPCs (core_venda_categorias / core_venda_campos, 24/11/2026).
+  let camposDaEmpresa: unknown[] = []
+  const banco = (negocio: Record<string, unknown>, categorias: number[] = [1, 7]): Responder => {
+    estado.rpc = (nome) => nome === 'core_venda_categorias' ? { data: categorias.map((id) => ({ id, nome: `c${id}` })), error: null }
+      : nome === 'core_venda_campos' ? { data: camposDaEmpresa, error: null } : { data: null, error: null }
+    return responder(negocio)
+  }
+  const responder = (negocio: Record<string, unknown>): Responder => (c) => {
     if (c.tabela === 'negocios' && c.op === 'select') {
       return ok({
         id: 1, empresa_id: 1, funil_id: 7, responsavel_id: 'u-1', status: 'aberto', ganho_em: null, perdido_em: null,
@@ -161,7 +168,6 @@ describe('/api/leads/mover: entrar no ganho exige a venda', () => {
       })
     }
     if (c.tabela === 'negocios' && c.op === 'update') return ok([{ id: 1 }])
-    if (c.tabela === 'estoque_categorias') return ok(categorias.map((id) => ({ id })))
     if (c.tabela === 'funil_etapas') {
       const slug = c.filtros.find((f) => f[0] === 'eq' && f[1] === 'slug')?.[2]
       const e = etapas.find((x) => x.slug === slug)
@@ -212,10 +218,27 @@ describe('/api/leads/mover: entrar no ganho exige a venda', () => {
     assert.equal(dados.venda.condicao, 'usado')  // 'seminovo' (valor antigo) entra como 'usado' (24/11/2026)
     assert.equal(dados.venda.data, '2026-11-20')
     assert.equal(dados.venda.registrada_por, 'u-1')
-    // a lista de categorias é a da empresa do negócio, só as ativas
-    const cat = todas().find((c) => c.tabela === 'estoque_categorias')!
-    assert.ok(cat.filtros.some((f) => f[0] === 'eq' && f[1] === 'empresa_id' && f[2] === 1))
-    assert.ok(cat.filtros.some((f) => f[0] === 'eq' && f[1] === 'ativo' && f[2] === true))
+    // a lista de categorias é a da empresa (Estoque ou próprias do Pós-venda), pela RPC da sessão
+    assert.ok(estado.rpcs.some((x) => x.nome === 'core_venda_categorias'))
+  })
+
+  test('campos da venda (Pós-venda ligado): obrigatório faltando é 422 no campo; informado vai para dados', async () => {
+    camposDaEmpresa = [{ chave: 'placa', rotulo: 'Placa', tipo: 'texto', opcoes: [], obrigatorio: true },
+      { chave: 'km', rotulo: 'Quilometragem', tipo: 'numero', opcoes: [], obrigatorio: false }]
+    try {
+      estado.responder = banco({ created_at: '2026-11-10T12:00:00Z' })
+      const r1 = await mover(json({ leadId: 1, kanban_status: 'convertido', venda }))
+      assert.equal(r1.status, 422)
+      assert.equal(((await r1.json()) as { campo: string }).campo, 'placa')
+      assert.equal(update(), undefined)
+      estado.bancos = []
+      const r2 = await mover(json({ leadId: 1, kanban_status: 'convertido', venda: { ...venda, campos: { placa: 'ABC1D23', km: '12.500' } } }))
+      assert.equal(r2.status, 200)
+      const dados = (update()!.dados as Record<string, unknown>).dados as Record<string, unknown>
+      assert.equal(dados.placa, 'ABC1D23')
+      assert.equal(dados.km, 12500)
+      assert.equal(dados.produto_interessado, 'iPhone 17')
+    } finally { camposDaEmpresa = [] }
   })
 
   test('venda de hoje: ganho_em é o instante atual', async () => {

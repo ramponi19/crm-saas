@@ -9,6 +9,7 @@ import { formatarData } from '@/lib/datas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { diaNoFuso } from '@/lib/datas'
 import { ganhoEmDaData, validarVendaGanho, type VendaInformada, modoCondicao } from '@/lib/venda-ganho'
+import { camposDaVenda, validarCamposDaVenda } from '@/lib/venda-campos'
 
 /** `string`, não literal: o parser de tipos do supabase-js estoura com relação embutida. */
 const SELECT_NEGOCIO: string = 'id, empresa_id, funil_id, responsavel_id, status, ganho_em, perdido_em, created_at, dados, etapa:funil_etapas!negocios_etapa_id_fkey(slug), contato:contatos!negocios_contato_id_fkey(id, nome, observacoes)'
@@ -149,12 +150,16 @@ export async function POST(req: Request) {
   let ganhoEmNovo: string | null = null
   let dadosVenda: Record<string, unknown> | null = null
   let valorVenda: number | null = null
+  let camposVenda: Record<string, string | number> = {}
   if (entrandoNoGanho) {
     const fuso = await fusoDaEmpresa(supabase, empresaId)
-    const [{ data: cats }, { data: modo }] = await Promise.all([
-      supabase.from('estoque_categorias').select('id').eq('empresa_id', n.empresa_id).eq('ativo', true),
+    const [{ data: cats }, { data: modo }, { data: camposCfg }] = await Promise.all([
+      // as categorias da venda da empresa: as do Estoque ou as próprias do Pós-venda (core_venda_categorias, 24/11/2026)
+      supabase.rpc('core_venda_categorias' as never),
       // condição exigida | opcional | não usa, por empresa (core.condicao_venda; 24/11/2026)
       supabase.rpc('config_valor' as never, { p_modulo: 'core', p_chave: 'condicao_venda' } as never),
+      // campos da venda que a empresa pede (os do Pós-venda, só com o módulo ligado; senão lista vazia)
+      supabase.rpc('core_venda_campos' as never),
     ])
     const v = validarVendaGanho(body.venda, {
       hoje: diaNoFuso(new Date(), fuso),
@@ -163,6 +168,9 @@ export async function POST(req: Request) {
       condicao: modoCondicao(modo),
     })
     if (!v.ok) return NextResponse.json({ error: v.erro, codigo: 'GANHO_DADOS', campo: v.campo }, { status: 422 })
+    const cs = validarCamposDaVenda(camposDaVenda(camposCfg), (body.venda as { campos?: unknown } | undefined)?.campos)
+    if (!cs.ok) return NextResponse.json({ error: cs.erro, codigo: 'GANHO_DADOS', campo: cs.campo }, { status: 422 })
+    camposVenda = cs.valores
     ganhoEmNovo = ganhoEmDaData(v.venda.data, fuso)
     valorVenda = v.venda.valor
     dadosVenda = {
@@ -196,7 +204,7 @@ export async function POST(req: Request) {
   // A venda informada: valor do negócio e `dados.venda` (data, categoria, condição, valor, quem e quando).
   if (dadosVenda) {
     patch.valor_estimado = valorVenda
-    patch.dados = { ...((patch.dados as Record<string, unknown> | undefined) ?? n.dados ?? {}), venda: dadosVenda }
+    patch.dados = { ...((patch.dados as Record<string, unknown> | undefined) ?? n.dados ?? {}), ...camposVenda, venda: dadosVenda }
   }
 
   /**
