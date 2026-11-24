@@ -19,6 +19,10 @@ interface Usuario {
   modulos_acesso: string[] | null; ultimo_acesso: string | null; created_at: string | null
   /** Loja da pessoa. Só o /admin carrega — no CRM vem indefinido. */
   filial_id?: number | null
+  /** Conta que não é uma pessoa: fora de todas as roletas. Só o /admin carrega. */
+  conta_servico?: boolean
+  /** false = pessoa fora da distribuição automática. Só o /admin carrega. */
+  participa_roleta?: boolean
 }
 /** Loja para escolher no cadastro. Lista vazia = empresa de uma loja só. */
 export interface LojaOpcao { id: number; nome: string; cidade: string | null }
@@ -132,6 +136,15 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
     nome: usuario?.nome ?? '', email: usuario?.email ?? '', senha: '', role: usuario?.role ?? 'vendedor',
     filialId: usuario?.filial_id != null ? String(usuario.filial_id) : '',
   })
+  /**
+   * Distribuição automática (24/11/2026). Só aparece quando a tela recebeu as marcas (/admin) e na edição.
+   * Grava por /api/equipe/roleta, separada do resto: o dono pode tirar a si mesmo da roleta, e lá não.
+   */
+  const temRoleta = !isNew && typeof usuario?.conta_servico === 'boolean'
+  const [roleta, setRoleta] = useState({ contaServico: !!usuario?.conta_servico, participaRoleta: usuario?.participa_roleta !== false })
+  const mudouRoleta = temRoleta && (roleta.contaServico !== !!usuario?.conta_servico || roleta.participaRoleta !== (usuario?.participa_roleta !== false))
+  const mudouCadastro = !isNew && (form.nome !== (usuario?.nome ?? '') || form.role !== (usuario?.role ?? 'vendedor')
+    || form.filialId !== (usuario?.filial_id != null ? String(usuario.filial_id) : ''))
   const [saving, setSaving] = useState(false)
   // Convite por e-mail (17/11/2026): a pessoa cria a própria senha pelo link. Sem provedor de e-mail
   // configurado, o link aparece aqui para o dono repassar.
@@ -168,6 +181,15 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
         }
         notify.ok(json.readmitido ? 'Usuário readmitido na equipe!' : json.convite ? 'Convite enviado por e-mail!' : 'Usuário criado!')
       } else {
+        if (mudouRoleta) {
+          const r = await apiFetch<{ error?: string }>('/api/equipe/roleta', {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: usuario!.id, contaServico: roleta.contaServico, participaRoleta: roleta.participaRoleta }),
+          })
+          if (r.sessaoExpirada) return
+          if (!r.ok) { notify.bad(r.json.error ?? 'Erro ao salvar a distribuição'); return }
+          if (!mudouCadastro) { notify.ok('Salvo!'); onSaved(); return }
+        }
         const { ok, json, sessaoExpirada } = await apiFetch<{ error?: string }>('/api/equipe/atualizar-usuario', {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -241,6 +263,23 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
               <option key={f.id} value={f.id}>{f.cidade ? f.nome + ' · ' + f.cidade : f.nome}</option>
             ))}
           </Select>
+        )}
+        {temRoleta && (
+          <fieldset className="grid gap-2 rounded-control border border-line px-3 py-2.5">
+            <legend className="px-1 text-[12px] font-medium text-ink-2">Distribuição automática</legend>
+            <label className="flex items-start gap-2 text-[13px] text-ink-2">
+              <input type="checkbox" className="mt-0.5" checked={roleta.participaRoleta} disabled={roleta.contaServico}
+                onChange={e => setRoleta(r => ({ ...r, participaRoleta: e.target.checked }))} />
+              <span>Recebe leads e acompanhamentos pela roleta
+                <span className="block text-[11.5px] text-ink-3">Desligado, continua com os próprios clientes e pega leads da esteira à mão.</span></span>
+            </label>
+            <label className="flex items-start gap-2 text-[13px] text-ink-2">
+              <input type="checkbox" className="mt-0.5" checked={roleta.contaServico}
+                onChange={e => setRoleta(r => ({ ...r, contaServico: e.target.checked }))} />
+              <span>Conta de serviço (não é uma pessoa)
+                <span className="block text-[11.5px] text-ink-3">Ex.: conta de revisão ou de integração. Fica fora de todas as roletas e continua ativa.</span></span>
+            </label>
+          </fieldset>
         )}
         {!isNew && (
           <div className="rounded-control border border-line bg-raised px-3 py-2 text-[12px] text-ink-3">
@@ -735,7 +774,16 @@ export default function EquipeView({ usuarios, uso, filiais = [], sinaisIniciais
     { key: 'modulos', header: 'Módulos de acesso', hideOnMobile: true, render: (u) => <span className="text-ink-2">{(u.modulos_acesso ?? []).join(' · ') || 'Acesso total'}</span> },
     {
       key: 'perfil', header: 'Perfil',
-      render: (u) => { const rb = ROLES.find(r => r.value === u.role); return <Badge tone={rb?.tone ?? 'neutro'}>{rb?.label ?? u.role ?? '—'}</Badge> },
+      render: (u) => {
+        const rb = ROLES.find(r => r.value === u.role)
+        return (
+          <div className="flex flex-wrap items-center gap-1">
+            <Badge tone={rb?.tone ?? 'neutro'}>{rb?.label ?? u.role ?? '—'}</Badge>
+            {u.conta_servico && <Badge tone="neutro">Conta de serviço</Badge>}
+            {!u.conta_servico && u.participa_roleta === false && <Badge tone="neutro">Fora da roleta</Badge>}
+          </div>
+        )
+      },
     },
     ...(filiais.length >= 2 ? [{
       key: 'loja', header: 'Loja', hideOnMobile: true,

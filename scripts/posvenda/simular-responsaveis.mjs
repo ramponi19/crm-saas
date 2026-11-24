@@ -31,12 +31,12 @@ const REGUA_APARELHOS = [
   { p: 'D+1', d: 1, tipo: 'whatsapp', grupo: 'relacionamento' },
   { p: 'D+7 NPS', d: 7, tipo: 'nps', grupo: 'relacionamento' },
   { p: 'D+30', d: 30, tipo: 'whatsapp', grupo: 'relacionamento' },
-  { p: 'D+90 bateria', d: 90, tipo: 'whatsapp', grupo: 'aparelho', so: 'seminovo' },
-  { p: 'D+330 troca', d: 330, tipo: 'ligacao', grupo: 'aparelho' },
+  { p: 'D+90 bateria', d: 90, tipo: 'whatsapp', grupo: 'produto', so: 'seminovo' },
+  { p: 'D+330 troca', d: 330, tipo: 'ligacao', grupo: 'produto' },
 ]
 const REGUA_GERAL = [
   { p: 'D+7 NPS', d: 7, tipo: 'nps', grupo: 'relacionamento' },
-  { p: 'D+330 troca', d: 330, tipo: 'ligacao', grupo: 'aparelho' },
+  { p: 'D+330 troca', d: 330, tipo: 'ligacao', grupo: 'produto' },
 ]
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL, chave = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -154,7 +154,7 @@ function materializar(g, d0, fonte, hoje) {
     if (s.so && s.so !== condDe(g)) continue
     const dp = somar(d0, s.d)
     if (dp < hoje || dp > FIM) continue
-    if (fonte === 'base' && s.grupo === 'aparelho' && recompraAntes(g, d0, dp)) { resumo.cancelados_recompra++; continue }
+    if (fonte === 'base' && s.grupo === 'produto' && recompraAntes(g, d0, dp)) { resumo.cancelados_recompra++; continue }
     if (fonte === 'base' && g.contato_id) {
       const kj = `${g.contato_id}|${dp}|${s.tipo}`
       if (juntados.has(kj)) { resumo.juntados++; continue }

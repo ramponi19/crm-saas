@@ -39,13 +39,13 @@ begin
   insert into posvenda_cadencias (empresa_id, nome, prioridade, filtros) values (1, 'Aparelhos', 100, '{"categorias":[1,2,3,4]}') returning id into c_ap;
   insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo, filtros, grupo) values
     (1, c_ap, 1, 1, 'whatsapp', 'D+1 chegou bem?', '{}', 'relacionamento'), (1, c_ap, 2, 7, 'pesquisa', 'D+7 NPS', '{}', 'relacionamento'),
-    (1, c_ap, 3, 90, 'whatsapp', 'D+90 bateria', '{"condicao":"seminovo"}', 'aparelho'), (1, c_ap, 4, 330, 'ligacao', 'D+330 troca', '{}', 'aparelho');
+    (1, c_ap, 3, 90, 'whatsapp', 'D+90 bateria', '{"condicao":"seminovo"}', 'produto'), (1, c_ap, 4, 330, 'ligacao', 'D+330 troca', '{}', 'produto');
   insert into posvenda_cadencias (empresa_id, nome, prioridade, filtros) values (1, 'Acessórios', 50, '{"categorias":[6]}') returning id into c_ac;
   insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo) values
     (1, c_ac, 1, 1, 'whatsapp', 'D+1 acessório'), (1, c_ac, 2, 30, 'whatsapp', 'D+30 acessório');
   insert into posvenda_cadencias (empresa_id, nome, prioridade, filtros) values (1, 'Geral', 0, '{}') returning id into c_ge;
   insert into posvenda_cadencia_passos (empresa_id, cadencia_id, ordem, dia_offset, tipo_acao, titulo, grupo) values
-    (1, c_ge, 1, 7, 'pesquisa', 'D+7 NPS geral', 'relacionamento'), (1, c_ge, 2, 330, 'ligacao', 'D+330 geral', 'aparelho');
+    (1, c_ge, 1, 7, 'pesquisa', 'D+7 NPS geral', 'relacionamento'), (1, c_ge, 2, 330, 'ligacao', 'D+330 geral', 'produto');
 
   -- 1. módulo desligado: nada acontece
   delete from empresa_modulos where empresa_id = 1 and modulo = 'posvenda';

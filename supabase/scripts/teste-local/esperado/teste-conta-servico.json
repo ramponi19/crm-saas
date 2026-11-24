@@ -1,0 +1,14 @@
+{
+  "1_sem_marca_igual_a_hoje": { "diferentes": [], "conferidos_maior_que_zero": true },
+  "2a_matriz_antes": ["M1", "M2", "SL"],
+  "2b_matriz_depois": ["M1", "M2"],
+  "2c_roleta_matriz_4_vezes": ["M1", "M2", "M1", "M2"],
+  "3_negocio_da_conta_servico": { "resp": "M1", "origem": "roleta" },
+  "4a_matriz_sem_M1": ["M2"],
+  "4b_cliente_do_M1": { "resp": "M1", "origem": "vendedor" },
+  "5a_admins_sem_A": ["B"],
+  "5b_sem_admin_cai_no_dono": { "ids": ["DONO"], "eh_dono": true },
+  "6_reavaliacao": { "resp": "VJ", "origem": "roleta" },
+  "7_marcar_redistribui": { "resp": "M2", "origem": "roleta", "observacao": true },
+  "7b_desmarcar_nao_volta": "M2"
+}

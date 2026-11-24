@@ -35,7 +35,7 @@ export default async function AdminEquipePage({ searchParams }: { searchParams: 
   const [{ data: usuarios }, { data: metas }, { data: vendasMes }, { data: comissoesMes }, { data: filiais }] = await Promise.all([
     supabase
       .from('empresa_usuarios')
-      .select('role, ativo, filial_id, usuarios!empresa_usuarios_usuario_public_fkey(*)')
+      .select('role, ativo, filial_id, conta_servico, participa_roleta, usuarios!empresa_usuarios_usuario_public_fkey(*)')
       .eq('empresa_id', empresaId)
       .eq('ativo', true)
       .order('usuario_id'),
@@ -64,11 +64,11 @@ export default async function AdminEquipePage({ searchParams }: { searchParams: 
       .order('matriz', { ascending: false }).order('nome'),
   ])
 
-  type VinculoRow = { role: string | null; ativo: boolean | null; filial_id: number | null; usuarios: Embed<Tables<'usuarios'>> }
+  type VinculoRow = { role: string | null; ativo: boolean | null; filial_id: number | null; conta_servico: boolean; participa_roleta: boolean; usuarios: Embed<Tables<'usuarios'>> }
   const usuariosMapped = ((usuarios ?? []) as unknown as VinculoRow[])
     .map(eu => {
       const u = one(eu.usuarios)
-      return u ? { ...u, role: eu.role, filial_id: eu.filial_id } : null
+      return u ? { ...u, role: eu.role, filial_id: eu.filial_id, conta_servico: eu.conta_servico, participa_roleta: eu.participa_roleta } : null
     })
     .filter((u): u is NonNullable<typeof u> => u !== null)
 
