@@ -143,11 +143,12 @@ begin
         on conflict do nothing;
       end if;
     end loop;
-    -- as novas: Administrador tem tudo menos editar cargos (é do Dono); Consulta vê a rede
+    -- as novas: o Administrador tem todas (inclusive editar cargos, que ele já fazia na tela de Permissões; as
+    -- travas de cargo_salvar e usuario_cargo_trocar guardam o Dono e a hierarquia); Consulta vê a rede
     if c.papel_base = 'admin' and not c.somente_leitura then
       insert into public.empresa_cargo_permissoes (cargo_id, empresa_id, permissao)
       select c.id, p_empresa, chave from public.permissoes_catalogo
-       where chave in ('lojas.ver_rede', 'config.editar', 'auditoria.ver', 'estoque.ver_custo', 'estoque.preco_variante', 'estoque.preco_proprio')
+       where chave in ('lojas.ver_rede', 'config.editar', 'equipe.cargos', 'auditoria.ver', 'estoque.ver_custo', 'estoque.preco_variante', 'estoque.preco_proprio')
       on conflict do nothing;
     elsif c.somente_leitura then
       insert into public.empresa_cargo_permissoes (cargo_id, empresa_id, permissao) values (c.id, p_empresa, 'lojas.ver_rede')
@@ -554,6 +555,24 @@ revoke all on function public.sessao_contexto() from public, anon;
 grant execute on function public.sessao_contexto() to authenticated, service_role;
 
 -- ── RPCs de cargos (só com equipe.cargos; tudo auditado) ───────────────────────────────────────────────
+-- Travas para quem não é Dono (o Administrador, de fábrica), as mesmas da hierarquia da Equipe de hoje:
+--   * não concede permissão que ele mesmo não tem (nem num cargo, nem trocando alguém para um cargo maior);
+--   * não põe nem tira ninguém do Dono, e não mexe em quem também edita cargos (outro Administrador);
+--   * ninguém troca o próprio cargo (nem o Dono: a troca de Dono é feita pelo outro Dono).
+create or replace function public.sessao_e_dono()
+returns boolean
+language sql
+stable security definer
+set search_path to 'public', 'pg_temp'
+as $$
+  select public.get_empresa_id() is not null and (
+    coalesce(public.is_super_admin(), false)
+    or exists (select 1 from public.empresa_usuarios eu join public.empresa_cargos c on c.id = eu.cargo_id
+                where eu.usuario_id = auth.uid() and eu.empresa_id = public.get_empresa_id() and eu.ativo and c.sistema))
+$$;
+revoke all on function public.sessao_e_dono() from public, anon;
+grant execute on function public.sessao_e_dono() to authenticated, service_role;
+
 create or replace function public.cargo_salvar(p_id bigint, p_nome text, p_descricao text, p_permissoes text[], p_somente_leitura boolean default false)
 returns bigint
 language plpgsql
@@ -571,6 +590,12 @@ begin
   if not public.tem_permissao('equipe.cargos') then raise exception 'SEM_PERMISSAO: editar cargos' using errcode = 'P0001'; end if;
   select array_agg(x) into v_ruins from unnest(coalesce(p_permissoes, '{}')) x where x not in (select chave from public.permissoes_catalogo);
   if v_ruins is not null then raise exception 'PERMISSAO_INVALIDA: %', array_to_string(v_ruins, ', ') using errcode = 'P0001'; end if;
+  if not public.sessao_e_dono() then
+    select array_agg(x) into v_ruins from unnest(coalesce(p_permissoes, '{}')) x where not public.tem_permissao(x);
+    if v_ruins is not null then
+      raise exception 'SEM_PERMISSAO: conceder o que você não tem (%)', array_to_string(v_ruins, ', ') using errcode = 'P0001';
+    end if;
+  end if;
 
   if v_id is null then
     insert into public.empresa_cargos (empresa_id, nome, descricao, papel_base, somente_leitura, criado_por)
@@ -622,16 +647,31 @@ language plpgsql
 security definer
 set search_path to 'public', 'pg_temp'
 as $$
-declare v_emp bigint := public.get_empresa_id(); v_antes bigint;
+declare v_emp bigint := public.get_empresa_id(); v_antes bigint; v_novo record; v_ruins text[];
 begin
   if v_emp is null then raise exception 'SEM_EMPRESA' using errcode = 'P0001'; end if;
   if not public.sessao_pode_escrever() then raise exception 'SOMENTE_LEITURA' using errcode = 'P0001'; end if;
   if not public.tem_permissao('equipe.cargos') then raise exception 'SEM_PERMISSAO: trocar cargo' using errcode = 'P0001'; end if;
-  if not exists (select 1 from public.empresa_cargos where id = p_cargo and empresa_id = v_emp) then
-    raise exception 'CARGO_INVALIDO' using errcode = 'P0001';
+  select id, sistema into v_novo from public.empresa_cargos where id = p_cargo and empresa_id = v_emp;
+  if v_novo.id is null then raise exception 'CARGO_INVALIDO' using errcode = 'P0001'; end if;
+  if p_usuario = auth.uid() then
+    raise exception 'PROPRIO_CARGO: ninguém troca o próprio cargo' using errcode = 'P0001';
   end if;
   select cargo_id into v_antes from public.empresa_usuarios where usuario_id = p_usuario and empresa_id = v_emp;
   if not found then raise exception 'SEM_VINCULO' using errcode = 'P0001'; end if;
+  if not public.sessao_e_dono() then
+    if v_novo.sistema or exists (select 1 from public.empresa_cargos where id = v_antes and sistema) then
+      raise exception 'SO_DONO: só o Dono põe ou tira alguém do cargo Dono' using errcode = 'P0001';
+    end if;
+    if exists (select 1 from public.empresa_cargo_permissoes where cargo_id in (v_antes, p_cargo) and permissao = 'equipe.cargos') then
+      raise exception 'SO_DONO: só o Dono muda o cargo de quem edita cargos' using errcode = 'P0001';
+    end if;
+    select array_agg(permissao) into v_ruins from public.empresa_cargo_permissoes
+     where cargo_id = p_cargo and not public.tem_permissao(permissao);
+    if v_ruins is not null then
+      raise exception 'SEM_PERMISSAO: o cargo tem o que você não tem (%)', array_to_string(v_ruins, ', ') using errcode = 'P0001';
+    end if;
+  end if;
   update public.empresa_usuarios set cargo_id = p_cargo where usuario_id = p_usuario and empresa_id = v_emp;
   perform public.auditar_emp(v_emp, 'usuario', p_usuario::text, 'trocar_cargo',
     jsonb_build_object('cargo', v_antes), jsonb_build_object('cargo', p_cargo), null, 'usuario_cargo_trocar');

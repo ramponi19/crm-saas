@@ -44,6 +44,13 @@ trap desmontar EXIT
 
 mkdir -p "$TMP/supabase"
 cp -r supabase/migrations "$TMP/supabase/"
+# O banco local nunca chama a produção (pendência registrada em 25/11/2026). As rotinas do pg_cron
+# (lgpd-limpar, entrada-parada, resgatar-midias...) chamam https://crm-saas-beta.vercel.app/api/cron/*: na CÓPIA
+# das migrações, o endereço vira o app local (o next dev da sessão; fora do ar, a chamada só falha aqui dentro).
+# O arquivo da branch não muda. Depois do start, a trava abaixo recusa o banco se sobrar qualquer endereço de produção.
+APP_LOCAL=${TESTE_LOCAL_APP:-http://host.docker.internal:3011}
+case "$APP_LOCAL" in http://host.docker.internal:*|http://127.0.0.1:*|http://localhost:*) ;; *) echo "RECUSADO: TESTE_LOCAL_APP tem de ser local"; exit 1;; esac
+sed -i "s#https://crm-saas-beta\.vercel\.app#$APP_LOCAL#g" "$TMP"/supabase/migrations/*.sql
 cat > "$TMP/supabase/config.toml" <<EOF
 project_id = "$PROJETO"
 [api]
@@ -66,6 +73,14 @@ if ! npx supabase start --workdir "$TMP" -x studio,imgproxy,logflare,vector,edge
 fi
 SERVICE=$(grep -oE '"SERVICE_ROLE_KEY":"[^"]+"' "$TMP/start.log" | cut -d'"' -f4)
 ANON=$(grep -oE '"ANON_KEY":"[^"]+"' "$TMP/start.log" | cut -d'"' -f4)
+
+# Trava: nenhuma rotina (cron.job) nem função do banco local pode apontar para um endereço de produção.
+PROD=$("$B/psql" "$L" -At -c "select string_agg(x, ', ') from (
+  select 'cron:' || jobname as x from cron.job where command ~* '(vercel\.app|supabase\.co)'
+  union all select 'funcao:' || p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.prosrc ~* '(vercel\.app|supabase\.co)') t" 2>&1 | tr -d '\r')
+if [ -n "$PROD" ]; then echo "RECUSADO: o banco local ainda aponta para a produção: $PROD"; exit 1; fi
+echo "    rotinas locais apontam para $APP_LOCAL ($("$B/psql" "$L" -At -c "select count(*) from cron.job where command like '%/api/cron/%'" | tr -d '\r') com /api/cron)"
 
 echo ">>> 2. Semente fictícia"
 "$B/psql" "$L" -q -v ON_ERROR_STOP=1 -f supabase/scripts/teste-local/semente.sql >/dev/null || { echo "FALHOU a semente"; exit 1; }

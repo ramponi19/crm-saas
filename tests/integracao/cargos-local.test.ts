@@ -1,7 +1,7 @@
 /**
  * CARGOS E PERMISSÕES COM SESSÃO REAL (etapa 1.1b; npm run test:local; scripts/teste-local.sh).
  * JM de teste (empresa 1): dono, administrador A, vendedor M1 e M2. O banco decide: cargo_salvar só com
- * equipe.cargos; a Consulta não grava nem pela API direta; o contexto da sessão traz cargo e permissões; a
+ * equipe.cargos (Dono e Administrador), e o Administrador não mexe no Dono nem no próprio cargo; a Consulta não grava nem pela API direta; o contexto da sessão traz cargo e permissões; a
  * exportação recusa quem não tem core.exportar.
  */
 import { test, describe, before, after, mock } from 'node:test'
@@ -15,14 +15,16 @@ process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = process.env.TESTE_LOCAL_ANON
 process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.TESTE_LOCAL_SERVICE
 
 const EMPRESA = 1
+const M1 = '0e5e0000-0000-4000-8000-000000000101'
 const M2 = '0e5e0000-0000-4000-8000-000000000102'
+const ADMIN_A = '0e5e0000-0000-4000-8000-000000000201'
 const svc = createClient(URL_LOCAL, process.env.TESTE_LOCAL_SERVICE!, { auth: { persistSession: false } })
 const s: Record<string, SupabaseClient> = {}
 let atual: SupabaseClient
 mock.module('@/lib/supabase/server', { namedExports: { createClient: async () => atual, getEmpresaId: async () => EMPRESA } })
 const { GET: exportar } = await import('@/app/api/exportar/route')
 
-let cargoVendedor = 0, cargoConsulta = 0
+let cargoVendedor = 0, cargoConsulta = 0, cargoDono = 0
 before(async () => {
   for (const [quem, email] of Object.entries({ dono: 'dono.jm@teste.invalid', admin: 'admin.a@teste.invalid', m1: 'vendedor.matriz1@teste.invalid', m2: 'vendedor.matriz2@teste.invalid' })) {
     const c = createClient(URL_LOCAL, process.env.TESTE_LOCAL_ANON!, { auth: { persistSession: false } })
@@ -34,12 +36,13 @@ before(async () => {
   const cargos = (data ?? []) as { id: number; nome: string }[]
   cargoVendedor = cargos.find((c) => c.nome === 'Vendedor')!.id
   cargoConsulta = cargos.find((c) => c.nome === 'Consulta')!.id
+  cargoDono = cargos.find((c) => c.nome === 'Dono')!.id
   const { error } = await svc.from('empresa_usuarios').update({ cargo_id: cargoConsulta }).eq('empresa_id', EMPRESA).eq('usuario_id', M2)
   if (error) throw error
 })
 after(async () => {
   await svc.from('empresa_usuarios').update({ cargo_id: cargoVendedor, participa_roleta: true }).eq('empresa_id', EMPRESA).eq('usuario_id', M2)
-  await svc.from('empresa_cargos').delete().eq('empresa_id', EMPRESA).eq('nome', 'Gerente do teste local')
+  await svc.from('empresa_cargos').delete().eq('empresa_id', EMPRESA).in('nome', ['Gerente do teste local', 'Do admin local'])
 })
 
 describe('cargos e permissões com sessão real', () => {
@@ -54,11 +57,15 @@ describe('cargos e permissões com sessão real', () => {
     assert.equal(m2.somente_leitura, true)
   })
 
-  test('cargo_salvar: o dono cria; o administrador e o vendedor são recusados pelo banco', async () => {
+  test('cargo_salvar: o dono e o administrador criam; o administrador não mexe no Dono nem no próprio cargo; o vendedor é recusado', async () => {
     const dono = await s.dono.rpc('cargo_salvar', { p_id: null, p_nome: 'Gerente do teste local', p_descricao: null, p_permissoes: ['core.ver_relatorios'], p_somente_leitura: false })
     assert.equal(dono.error, null)
-    const adm = await s.admin.rpc('cargo_salvar', { p_id: null, p_nome: 'Do admin', p_descricao: null, p_permissoes: [], p_somente_leitura: false })
-    assert.match(adm.error?.message ?? '', /SEM_PERMISSAO/)
+    const adm = await s.admin.rpc('cargo_salvar', { p_id: null, p_nome: 'Do admin local', p_descricao: null, p_permissoes: [], p_somente_leitura: false })
+    assert.equal(adm.error, null)
+    const admDono = await s.admin.rpc('usuario_cargo_trocar', { p_usuario: M1, p_cargo: cargoDono })
+    assert.match(admDono.error?.message ?? '', /SO_DONO/)
+    const admProprio = await s.admin.rpc('usuario_cargo_trocar', { p_usuario: ADMIN_A, p_cargo: cargoVendedor })
+    assert.match(admProprio.error?.message ?? '', /PROPRIO_CARGO/)
     const vend = await s.m1.rpc('usuario_cargo_trocar', { p_usuario: M2, p_cargo: cargoVendedor })
     assert.match(vend.error?.message ?? '', /SEM_PERMISSAO/)
   })

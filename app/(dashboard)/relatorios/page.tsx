@@ -1,5 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { exigirPermissao } from '@/lib/sessao'
+import { exigirPermissao, temPermissao } from '@/lib/sessao'
 import { Topbar } from '@/components/layout/topbar'
 import { RelatoriosView } from '@/components/modules/relatorios/relatorios-view'
 import { RelatoriosImobView } from '@/components/modules/imoveis/relatorios-imob-view'
@@ -22,7 +22,15 @@ export default async function RelatoriosPage({ searchParams }: {
   searchParams: Promise<{ de?: string; ate?: string; corretor?: string }>
 }) {
   // Etapa 1.1b: a permissão do cargo decide (Dono, Administrador e Consulta, de fábrica).
-  await exigirPermissao('core.ver_relatorios')
+  const ctx = await exigirPermissao('core.ver_relatorios')
+  /**
+   * Custo, lucro e margem só para quem tem estoque.ver_custo; o livro-caixa só para quem tem core.ver_financeiro
+   * (o cargo Consulta abre Relatórios e não vê nenhum dos dois). As colunas nem são pedidas ao banco: o dado não
+   * chega ao navegador. A 1.1e reforça isso no próprio banco.
+   */
+  const verCusto = temPermissao(ctx, 'estoque.ver_custo')
+  const verFinanceiro = temPermissao(ctx, 'core.ver_financeiro')
+  const podeExportar = temPermissao(ctx, 'core.exportar')
   const [supabase, empresaId, sp] = await Promise.all([createClient(), getEmpresaId(), searchParams])
   // Mesma capacidade do dashboard: o módulo ligado traz as próprias telas de leitura.
   const cfg = await carregarConfigEmpresa(supabase, empresaId ?? 0)
@@ -53,12 +61,14 @@ export default async function RelatoriosPage({ searchParams }: {
 
   const [vendasRaw, { data: lancamentos }, { data: vendedoresRaw }, { data: trocasPendentes }, { data: abertasRaw }] = await Promise.all([
     vendasDoPeriodo(supabase, empresaId!,
-      'id, data_venda, concluida_em, valor_venda, valor_custo, desconto_valor, lucro, forma_pagamento, canal_venda, status, grupo_pdv, observacoes, clientes:contatos!cliente_id(nome), produtos:estoque_produtos!produto_id(nome), usuarios!vendedor_id(nome)',
+      `id, data_venda, concluida_em, valor_venda, ${verCusto ? 'valor_custo, lucro, ' : ''}desconto_valor, forma_pagamento, canal_venda, status, grupo_pdv, observacoes, clientes:contatos!cliente_id(nome), produtos:estoque_produtos!produto_id(nome), usuarios!vendedor_id(nome)`,
       busca, fuso),
-    supabase
-      .from('financeiro_lancamentos')
-      .select('id, data_venc, descricao, categoria, tipo, valor, status')
-      .eq('empresa_id', empresaId).order('data_venc', { ascending: false }).limit(200),
+    verFinanceiro
+      ? supabase
+        .from('financeiro_lancamentos')
+        .select('id, data_venc, descricao, categoria, tipo, valor, status')
+        .eq('empresa_id', empresaId).order('data_venc', { ascending: false }).limit(200)
+      : Promise.resolve({ data: [] as never[] }),
     supabase
       .from('empresa_usuarios')
       .select('usuarios!empresa_usuarios_usuario_public_fkey(nome)')
@@ -84,6 +94,9 @@ export default async function RelatoriosPage({ searchParams }: {
   )
   const vendas = ((vendasRaw ?? []) as unknown as VendaRow[]).map((v) => ({
     ...v,
+    // sem a permissão as colunas nem vieram; null explícito para a tela não inventar margem
+    valor_custo: verCusto ? v.valor_custo : null,
+    lucro: verCusto ? v.lucro : null,
     cliente_nome: one(v.clientes)?.nome ?? null,
     produto_nome: one(v.produtos)?.nome ?? null,
     vendedor_nome: one(v.usuarios)?.nome ?? null,
@@ -99,6 +112,7 @@ export default async function RelatoriosPage({ searchParams }: {
     <>
       <Topbar title="Relatórios" />
       <RelatoriosView vendas={vendas} lancamentos={lancamentos ?? []} vendedores={vendedores} de={de} ate={ate}
+        verCusto={verCusto} verFinanceiro={verFinanceiro} podeExportar={podeExportar}
         emAberto={resumoEmAberto((abertasRaw ?? []) as unknown as LinhaEmAberto[])} />
     </>
   )

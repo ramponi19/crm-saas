@@ -18,7 +18,9 @@ interface Rascunho { id: number | null; nome: string; descricao: string; somente
 function mensagem(erro: string): string {
   const [codigo, resto] = erro.split(':')
   const textos: Record<string, string> = {
-    SEM_PERMISSAO: 'Só quem pode editar cargos (o Dono) faz isso.',
+    SEM_PERMISSAO: 'Você não pode conceder uma permissão que não tem.',
+    SO_DONO: 'Só o Dono põe ou tira alguém do cargo Dono, ou muda o cargo de quem edita cargos.',
+    PROPRIO_CARGO: 'Ninguém troca o próprio cargo.',
     SOMENTE_LEITURA: 'Conta de consulta: não grava.',
     CARGO_SISTEMA: 'O cargo Dono não pode ser editado nem apagado.',
     CARGO_EM_USO: 'Troque o cargo das pessoas antes de apagar este.',
@@ -32,10 +34,22 @@ function mensagem(erro: string): string {
  * CARGOS (etapa 1.1b). Lista de cargos com quantas pessoas há em cada um; editor com as permissões agrupadas
  * (só as dos módulos ligados); duplicar; e as pessoas com o cargo de cada uma. O Dono é travado. Sem a permissão
  * equipe.cargos, a tela só mostra (o banco recusa de qualquer jeito).
+ *
+ * Quem edita sem ser Dono (o Administrador, de fábrica) tem as travas do banco (cargo_salvar e usuario_cargo_trocar),
+ * que a tela espelha para não oferecer o que vai falhar: não concede permissão que não tem, não mexe no cargo Dono
+ * nem em quem também edita cargos, e ninguém troca o próprio cargo.
  */
-export function CargosView({ cargos, catalogo, pessoas, podeEditar, euId }: {
+export function CargosView({ cargos, catalogo, pessoas, podeEditar, euId, souDono, minhas }: {
   cargos: CargoTela[]; catalogo: PermissaoCatalogo[]; pessoas: PessoaTela[]; podeEditar: boolean; euId: string
+  souDono: boolean; minhas: string[]
 }) {
+  const tenho = (p: string) => souDono || minhas.includes(p)
+  const editaCargos = (c: CargoTela | undefined) => !!c && (c.sistema || c.permissoes.includes('equipe.cargos'))
+  /** O cargo desta pessoa pode ser trocado por quem está aqui? (mesma regra de usuario_cargo_trocar) */
+  const podeTrocar = (p: PessoaTela) => podeEditar && p.ativo && p.id !== euId
+    && (souDono || !editaCargos(cargos.find((c) => c.id === p.cargoId)))
+  /** Os cargos que quem está aqui pode dar a alguém. */
+  const cargosOferecidos = cargos.filter((c) => souDono || (!editaCargos(c) && c.permissoes.every(tenho)))
   const router = useRouter()
   const [editando, setEditando] = useState<Rascunho | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
@@ -117,11 +131,11 @@ export function CargosView({ cargos, catalogo, pessoas, podeEditar, euId }: {
                 <span className={p.ativo ? 'flex-1 text-ink' : 'flex-1 text-ink-3 line-through'}>
                   {p.nome}{p.id === euId ? ' (você)' : ''}{p.contaServico ? ' · conta de serviço' : ''}
                 </span>
-                {podeEditar && p.ativo ? (
+                {podeTrocar(p) ? (
                   <select aria-label={`Cargo de ${p.nome}`} value={p.cargoId ?? ''} disabled={ocupado === `pessoa-${p.id}`}
                     onChange={(e) => rpc('usuario_cargo_trocar', { p_usuario: p.id, p_cargo: Number(e.target.value) }, `pessoa-${p.id}`)}
                     className="h-8 rounded-control border border-line bg-card px-2 text-[13px] text-ink">
-                    {cargos.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                    {cargosOferecidos.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                   </select>
                 ) : (
                   <Badge tone="neutro">{cargos.find((c) => c.id === p.cargoId)?.nome ?? 'sem cargo'}</Badge>
@@ -148,6 +162,7 @@ export function CargosView({ cargos, catalogo, pessoas, podeEditar, euId }: {
                 {lista.map((p) => (
                   <label key={p.chave} className="flex items-center gap-2 text-[13px] text-ink">
                     <input type="checkbox" checked={editando.permissoes.has(p.chave)}
+                      disabled={!tenho(p.chave) && !editando.permissoes.has(p.chave)}
                       onChange={(e) => {
                         const s = new Set(editando.permissoes)
                         if (e.target.checked) s.add(p.chave); else s.delete(p.chave)

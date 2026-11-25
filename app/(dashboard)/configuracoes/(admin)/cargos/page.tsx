@@ -10,8 +10,9 @@ export const metadata = { title: 'Cargos' }
 
 /**
  * CONFIGURAÇÕES › CARGOS (etapa 1.1b, 25/11/2026). Substitui a tela de Permissões: a empresa monta os cargos
- * marcando permissões, e cada pessoa tem um cargo. Quem edita é quem tem equipe.cargos (o Dono, de fábrica); o
- * Administrador vê. Toda gravação é uma RPC do banco, que confere a permissão e audita.
+ * marcando permissões, e cada pessoa tem um cargo. Quem edita é quem tem equipe.cargos (Dono e Administrador, de
+ * fábrica — o Administrador já editava as permissões na tela antiga), com as travas do banco para quem não é Dono.
+ * Toda gravação é uma RPC do banco, que confere a permissão e audita.
  */
 export default async function Page() {
   const ctx = await contextoDaSessao()
@@ -51,6 +52,8 @@ export default async function Page() {
         pessoas={listaPessoas}
         podeEditar={temPermissao(ctx, 'equipe.cargos')}
         euId={ctx.usuario_id}
+        souDono={ctx.plataforma || !!ctx.cargo?.sistema}
+        minhas={ctx.permissoes}
       />
     </>
   )

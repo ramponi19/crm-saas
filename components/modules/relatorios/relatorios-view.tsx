@@ -61,6 +61,14 @@ interface Props {
   /** Período que o servidor buscou (YYYY-MM-DD, calendário da loja). Mudar as datas busca de novo. */
   de?: string
   ate?: string
+  /**
+   * Etapa 1.1b: o cargo decide. Sem estoque.ver_custo, nada de custo, lucro ou margem (KPI, coluna, CSVs); sem
+   * core.ver_financeiro, nada de livro-caixa; sem core.exportar, nada de exportação. O servidor já não manda o
+   * dado; estas flags só tiram da tela o que ficaria vazio.
+   */
+  verCusto?: boolean
+  verFinanceiro?: boolean
+  podeExportar?: boolean
 }
 
 const CANAL_LABEL: Record<string, string> = {
@@ -98,21 +106,22 @@ function downloadCSV(filename: string, header: string[], rows: (string | number 
   URL.revokeObjectURL(a.href)
 }
 
-function exportCSV(rows: Venda[], fuso: string) {
+function exportCSV(rows: Venda[], fuso: string, verCusto: boolean) {
   if (rows.length === 0) { toast.info('Nenhuma venda para exportar'); return }
   downloadCSV(
     'vendas',
     // Coluna de troca também no CSV: quem fecha o mês na planilha precisa poder
     // separar lá o que a tela separa aqui.
     // "Data" é a da conclusão (a que põe a venda no período); "Lançada em" é a data_venda — só difere na encomenda.
-    ['Data', 'Lançada em', 'Cliente', 'Produto', 'Vendedor', 'Canal', 'Valor', 'Desconto', 'Lucro', 'Troca pendente'],
+    ['Data', 'Lançada em', 'Cliente', 'Produto', 'Vendedor', 'Canal', 'Valor', 'Desconto', ...(verCusto ? ['Lucro'] : []), 'Troca pendente'],
     rows.map(v => [
       formatarData(dataDaConclusao(v), undefined, '', fuso),
       formatarData(v.data_venda, undefined, '', fuso),
       v.cliente_nome ?? '', v.produto_nome ?? '', v.vendedor_nome ?? '',
       CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '',
       // Sem custo lançado o lucro fica em branco: a coluna gerada daria o preço cheio.
-      v.valor_venda, v.desconto_valor ?? 0, temCusto({ valor_custo: v.valor_custo ?? null }) ? (v.lucro ?? 0) : '',
+      v.valor_venda, v.desconto_valor ?? 0,
+      ...(verCusto ? [temCusto({ valor_custo: v.valor_custo ?? null }) ? (v.lucro ?? 0) : ''] : []),
       v.troca_pendente ? 'sim' : 'nao',
     ]),
     fuso,
@@ -153,23 +162,24 @@ async function exportClientes(fuso: string) {
 }
 
 /** O IMEI entra no arquivo só com o módulo Celulares ligado. */
-async function exportEstoque(fuso: string, celulares: boolean) {
+async function exportEstoque(fuso: string, celulares: boolean, verCusto: boolean) {
   const supabase = createClient()
+  // Sem estoque.ver_custo o custo nem é pedido (nem vai para a planilha).
   const { data, error } = await supabase
     .from('estoque_unidades')
-    .select('imei, numero_serie, estado, status, preco_custo, preco_venda, produtos:estoque_produtos!produto_id(nome)')
+    .select(`imei, numero_serie, estado, status, ${verCusto ? 'preco_custo, ' : ''}preco_venda, produtos:estoque_produtos!produto_id(nome)`)
     .eq('ativo', true)
     .order('id', { ascending: false })
   if (error || !data) { toast.error('Erro ao exportar estoque'); return }
   if (data.length === 0) { toast.info('Nenhuma unidade para exportar'); return }
   downloadCSV(
     'estoque',
-    ['Produto', ...(celulares ? [RELATORIOS_CELULAR.colunaImei] : []), 'Nº Série', 'Estado', 'Status', 'Custo', 'Venda'],
-    (data as Array<{ imei: string | null; numero_serie: string | null; estado: string | null; status: string | null; preco_custo: number | null; preco_venda: number | null; produtos: { nome: string | null } | { nome: string | null }[] | null }>).map(u => {
+    ['Produto', ...(celulares ? [RELATORIOS_CELULAR.colunaImei] : []), 'Nº Série', 'Estado', 'Status', ...(verCusto ? ['Custo'] : []), 'Venda'],
+    (data as unknown as Array<{ imei: string | null; numero_serie: string | null; estado: string | null; status: string | null; preco_custo?: number | null; preco_venda: number | null; produtos: { nome: string | null } | { nome: string | null }[] | null }>).map(u => {
       const prod = Array.isArray(u.produtos) ? u.produtos[0] : u.produtos
       return [
         prod?.nome ?? '', ...(celulares ? [u.imei ?? ''] : []), u.numero_serie ?? '', u.estado ?? '',
-        u.status ?? '', u.preco_custo ?? 0, u.preco_venda ?? 0,
+        u.status ?? '', ...(verCusto ? [u.preco_custo ?? 0] : []), u.preco_venda ?? 0,
       ]
     }),
     fuso,
@@ -207,7 +217,7 @@ function BarChart({ vendas }: { vendas: Venda[] }) {
   )
 }
 
-export function RelatoriosView({ vendas, lancamentos, vendedores, emAberto, de, ate }: Props) {
+export function RelatoriosView({ vendas, lancamentos, vendedores, emAberto, de, ate, verCusto = false, verFinanceiro = false, podeExportar = false }: Props) {
   const fuso = useFuso()
   const celulares = useCelulares()
   const [aba, setAba]           = useState('vendas')
@@ -254,16 +264,16 @@ export function RelatoriosView({ vendas, lancamentos, vendedores, emAberto, de, 
     const { lucro, semCusto } = resultadoDasVendas(conc.map(v => ({ valor_venda: v.valor_venda, valor_custo: v.valor_custo ?? null })))
     return [
       { label: 'Total vendas', value: formatCurrency(receita) },
-      {
+      ...(verCusto ? [{
         label: 'Lucro total',
         value: lucro === null ? '—' : formatCurrency(lucro),
         aviso: semCusto > 0 ? `${semCusto} de ${qtd} sem custo lançado` : undefined,
-      },
+      }] : []),
       { label: 'Ticket médio', value: formatCurrency(ticket) },
       { label: 'Descontos',    value: formatCurrency(descontos) },
       { label: 'Qtd. vendas',  value: String(qtd) },
     ]
-  }, [vendasFiltradas])
+  }, [vendasFiltradas, verCusto])
 
   // Separação, não subtração: o "Total vendas" acima continua sendo o número real
   // do mês — esconder o pendente faria o faturamento mentir para menos. O que
@@ -308,9 +318,9 @@ export function RelatoriosView({ vendas, lancamentos, vendedores, emAberto, de, 
       ),
     },
     { key: 'desc', header: 'Desc.', align: 'right', className: 'num', hideOnMobile: true, render: v => <span className="text-bad">{v.desconto_valor ? formatCurrency(v.desconto_valor) : '—'}</span> },
-    { key: 'lucro', header: 'Lucro', align: 'right', className: 'num', render: v => !temCusto({ valor_custo: v.valor_custo ?? null })
+    ...(verCusto ? [{ key: 'lucro', header: 'Lucro', align: 'right', className: 'num', render: (v: Venda) => !temCusto({ valor_custo: v.valor_custo ?? null })
       ? <span className="text-ink-3" title="Sem custo lançado">—</span>
-      : <span className={cn('font-bold', (v.lucro ?? 0) > 0 ? 'text-ok' : 'text-bad')}>{v.lucro != null ? formatCurrency(v.lucro) : '—'}</span> },
+      : <span className={cn('font-bold', (v.lucro ?? 0) > 0 ? 'text-ok' : 'text-bad')}>{v.lucro != null ? formatCurrency(v.lucro) : '—'}</span> } satisfies Column<Venda>] : []),
   ]
 
   const lancCols: Column<Lancamento>[] = [
@@ -322,7 +332,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores, emAberto, de, 
     { key: 'status', header: 'Status', align: 'right', render: l => { const p = l.status === 'pago'; return <Badge tone={p ? 'ok' : 'warn'}>{p ? 'Pago' : 'Pendente'}</Badge> } },
   ]
 
-  const tabItems = TABS.map(({ id, label, Icon }) => ({
+  const tabItems = TABS.filter(t => (t.id !== 'caixa' || verFinanceiro) && (t.id !== 'exportar' || podeExportar)).map(({ id, label, Icon }) => ({
     value: id,
     label: <span className="flex items-center gap-1.5"><Icon size={15} strokeWidth={1.7} /> {label}</span>,
   }))
@@ -353,12 +363,12 @@ export function RelatoriosView({ vendas, lancamentos, vendedores, emAberto, de, 
               >
                 Gerar
               </Button>
-              <Button variant="outline" icon={<Download size={15} strokeWidth={1.7} />} onClick={() => exportCSV(vendasFiltradas, fuso)}>CSV</Button>
+              {podeExportar && <Button variant="outline" icon={<Download size={15} strokeWidth={1.7} />} onClick={() => exportCSV(vendasFiltradas, fuso, verCusto)}>CSV</Button>}
             </div>
           </Card>
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-5 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+          <div className={cn('grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card [&>*]:border-line-soft [&>*:not(:last-child)]:border-r', verCusto ? 'md:grid-cols-5' : 'md:grid-cols-4')}>
             {kpis.map(k => (
               <StatCard
                 key={k.label}
@@ -412,7 +422,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores, emAberto, de, 
         </>)}
 
         {/* ── ABA LIVRO-CAIXA ── */}
-        {aba === 'caixa' && (
+        {aba === 'caixa' && verFinanceiro && (
           <Card
             flush
             title={<>Livro-caixa · {rotuloDoMes(mesAtual)}</>}
@@ -444,14 +454,14 @@ export function RelatoriosView({ vendas, lancamentos, vendedores, emAberto, de, 
         )}
 
         {/* ── ABA EXPORTAR ── */}
-        {aba === 'exportar' && (
+        {aba === 'exportar' && podeExportar && (
           <Card title="Exportar dados">
             <div className="grid gap-3 sm:grid-cols-2">
               {[
-                { label: 'Exportar Vendas',      sub: 'Todas as vendas do período filtrado',  action: () => exportCSV(vendasFiltradas, fuso) },
+                { label: 'Exportar Vendas',      sub: 'Todas as vendas do período filtrado',  action: () => exportCSV(vendasFiltradas, fuso, verCusto) },
                 { label: 'Exportar Clientes',    sub: 'Lista completa de clientes', action: () => exportClientes(fuso) },
-                { label: 'Exportar Estoque',     sub: 'Inventário atual',           action: () => exportEstoque(fuso, celulares) },
-                { label: 'Exportar Financeiro',  sub: 'Lançamentos financeiros',    action: () => exportFinanceiro(lancamentos, fuso) },
+                { label: 'Exportar Estoque',     sub: 'Inventário atual',           action: () => exportEstoque(fuso, celulares, verCusto) },
+                ...(verFinanceiro ? [{ label: 'Exportar Financeiro',  sub: 'Lançamentos financeiros',    action: () => exportFinanceiro(lancamentos, fuso) }] : []),
               ].map(e => (
                 <button key={e.label} onClick={e.action}
                   className="flex items-start gap-3 rounded-card border border-line bg-card p-4 text-left transition-colors hover:bg-raised">

@@ -15,9 +15,10 @@ declare
   v_adm2  constant uuid := '0e5e0000-0000-4000-8000-000000000202';
   v_m1    constant uuid := '0e5e0000-0000-4000-8000-000000000101';
   v_m2    constant uuid := '0e5e0000-0000-4000-8000-000000000102';
+  v_j2    constant uuid := '0e5e0000-0000-4000-8000-000000000104';
   v_dono5 constant uuid := 'f47a8e4f-a428-4bf6-8a82-d43088751d2c';
   v_vd5   constant uuid := '0e5e0000-0000-4000-8000-000000000001';
-  c_dono1 bigint; c_adm1 bigint; c_vend1 bigint; c_cons1 bigint; c_tec1 bigint;
+  c_dono1 bigint; c_adm1 bigint; c_vend1 bigint; c_cons1 bigint; c_tec1 bigint; c_coord bigint;
   sess text;
 begin
   execute 'set constraints all immediate';   -- a guarda do Dono é adiada: aqui ela dispara na hora
@@ -139,9 +140,38 @@ begin
   perform usuario_cargo_trocar(v_m1, v_id);
   r := r || jsonb_build_object('t8_trocar_cargo', (select role from empresa_usuarios where usuario_id = v_m1 and empresa_id = 1),
     't8_troca_auditada', (select count(*) from auditoria_eventos where entidade = 'usuario' and entidade_id = v_m1::text and acao = 'trocar_cargo'));
+  begin perform usuario_cargo_trocar(v_dono1, c_adm1); e := 'trocou'; exception when others then e := split_part(sqlerrm, ':', 1); end;
+  r := r || jsonb_build_object('t8_dono_troca_o_proprio', e);
+
+  -- 8b. Administrador edita cargos (já editava na tela de Permissões), com as travas de quem não é Dono
   perform set_config('request.jwt.claims', jsonb_build_object('sub', v_adm1::text, 'role', 'authenticated')::text, true);
-  begin perform cargo_salvar(null, 'Do admin', null, array[]::text[]); e := 'criou'; exception when others then e := split_part(sqlerrm, ':', 1); end;
+  begin perform cargo_salvar(null, 'Do admin', null, array['core.ver_relatorios']); e := 'criou'; exception when others then e := split_part(sqlerrm, ':', 1); end;
   r := r || jsonb_build_object('t8_admin_cria_cargo', e);
+  begin perform usuario_cargo_trocar(v_j2, c_dono1); e := 'trocou'; exception when others then e := split_part(sqlerrm, ':', 1); end;
+  r := r || jsonb_build_object('t8_admin_poe_dono', e);
+  begin perform usuario_cargo_trocar(v_dono1, c_vend1); e := 'trocou'; exception when others then e := split_part(sqlerrm, ':', 1); end;
+  r := r || jsonb_build_object('t8_admin_tira_dono', e);
+  begin perform usuario_cargo_trocar(v_adm2, c_vend1); e := 'trocou'; exception when others then e := split_part(sqlerrm, ':', 1); end;
+  r := r || jsonb_build_object('t8_admin_troca_outro_admin', e);
+  begin perform usuario_cargo_trocar(v_j2, c_adm1); e := 'trocou'; exception when others then e := split_part(sqlerrm, ':', 1); end;
+  r := r || jsonb_build_object('t8_admin_promove_a_admin', e);
+  begin perform usuario_cargo_trocar(v_adm1, c_vend1); e := 'trocou'; exception when others then e := split_part(sqlerrm, ':', 1); end;
+  r := r || jsonb_build_object('t8_admin_troca_o_proprio', e);
+  perform usuario_cargo_trocar(v_j2, c_tec1);
+  r := r || jsonb_build_object('t8_admin_troca_vendedor', (select role from empresa_usuarios where usuario_id = v_j2 and empresa_id = 1));
+  perform usuario_cargo_trocar(v_j2, c_vend1);
+
+  -- 8c. quem edita cargos sem ter tudo (um "Coordenador") não concede o que não tem
+  perform set_config('request.jwt.claims', jsonb_build_object('sub', v_dono1::text, 'role', 'authenticated')::text, true);
+  c_coord := cargo_salvar(null, 'Coordenador teste', null, array['equipe.cargos', 'core.ver_relatorios']);
+  perform usuario_cargo_trocar(v_m1, c_coord);
+  perform set_config('request.jwt.claims', jsonb_build_object('sub', v_m1::text, 'role', 'authenticated')::text, true);
+  begin perform cargo_salvar(null, 'Com custo', null, array['estoque.ver_custo']); e := 'criou'; exception when others then e := split_part(sqlerrm, ':', 1); end;
+  r := r || jsonb_build_object('t8_coord_concede_o_que_nao_tem', e);
+  begin perform usuario_cargo_trocar(v_j2, v_id); e := 'trocou'; exception when others then e := split_part(sqlerrm, ':', 1); end;
+  r := r || jsonb_build_object('t8_coord_da_cargo_maior', e);
+  perform set_config('request.jwt.claims', jsonb_build_object('sub', v_dono1::text, 'role', 'authenticated')::text, true);
+  perform usuario_cargo_trocar(v_m1, c_vend1);
 
   -- 9. ponte da tela antiga de Permissões: salvar empresas.permissoes muda o cargo Vendedor
   update empresas set permissoes = coalesce(permissoes, '{}'::jsonb) || '{"vendedor": {"verRelatorios": true}}'::jsonb where id = 1;
