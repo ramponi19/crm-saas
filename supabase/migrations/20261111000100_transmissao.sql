@@ -330,7 +330,6 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  -- 'enviando' esquecido (rodada que caiu no meio) volta para a fila depois de 15 min.
   update transmissao_envios set status = 'pendente', reservada_em = null
    where transmissao_id = p_transmissao and status = 'enviando' and reservada_em < now() - interval '15 minutes';
 

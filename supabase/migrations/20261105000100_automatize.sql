@@ -76,7 +76,6 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  -- 'executando' esquecido (rodada que caiu no meio) volta para a fila depois de 15 min.
   update automacao_execucoes set status = 'agendada', reservada_em = null
    where status = 'executando' and reservada_em < now() - interval '15 minutes';
 

@@ -1,27 +1,12 @@
--- ETAPA 1.1b — CARGOS E PERMISSÕES NO SERVIDOR, EMPRESA ATIVA, SUPERADMIN COMO PLATAFORMA (25/11/2026;
--- docs/etapa-1.1-plano.md §2).
---
--- Compatível com o app no ar:
---   - o CARGO passa a ser a fonte; empresa_usuarios.role vira DERIVADO do cargo (papel_base) por gatilho, nos
---     dois sentidos enquanto o app antigo gravar role: quem grava role recebe o cargo correspondente; quem grava
---     cargo_id recebe o role do cargo. As 264 checagens de papel do app continuam certas (remoção: etapa E1.6);
---   - get_empresa_id, filiais_visiveis, sessao_pode_escrever, prevent_privilege_escalation: MESMA assinatura.
---     Para todo usuário de hoje o resultado é idêntico (conferido na produção em 25/11: 0 usuários com dois
---     vínculos ativos; superadmin sem vínculo; 1 dono por empresa);
---   - empresas.permissoes continua sendo gravada pela tela antiga; um gatilho leva o que for salvo para os
---     cargos (ponte, sai na 1.1h);
---   - nenhum dado da JM muda de cargo aqui: a semente só reproduz o papel de hoje (a 1.1c faz o mapeamento).
--- Decisão D-A1 (LGPD): a auditoria da escrita da plataforma guarda só tabela, id e NOMES dos campos alterados,
--- nunca valores.
---
--- Volta: supabase/scripts/volta/volta-cargos-permissoes.sql (devolve os corpos das funções; tabelas ficam).
+-- ETAPA 1.1b, parte 1 de 2 (repo: supabase/migrations/20261125000700_cargos_permissoes.sql, tudo menos o laço final dos
+-- gatilhos zz_plataforma_auditar, que vai na parte 2: a 1a tentativa num bloco só deu deadlock com o app).
+set local lock_timeout = '5s';
 
--- ── Catálogo de permissões ─────────────────────────────────────────────────────────────────────────────
 create table if not exists public.permissoes_catalogo (
   chave   text primary key check (chave ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$'),
   rotulo  text not null,
   grupo   text not null,
-  modulo  text,                     -- nulo = núcleo; senão, só aparece com o módulo ligado
+  modulo  text,
   tipo    text not null default 'sim_nao' check (tipo in ('sim_nao', 'limite')),
   ordem   int not null default 0
 );
@@ -46,15 +31,14 @@ grant select on table public.permissoes_catalogo to authenticated, service_role;
 drop policy if exists permissoes_catalogo_select on public.permissoes_catalogo;
 create policy permissoes_catalogo_select on public.permissoes_catalogo for select to authenticated using (true);
 
--- ── Cargos ─────────────────────────────────────────────────────────────────────────────────────────────
 create table if not exists public.empresa_cargos (
   id              bigint generated always as identity primary key,
   empresa_id      bigint not null references public.empresas(id) on delete cascade,
   nome            text not null check (length(btrim(nome)) between 2 and 60),
   descricao       text,
-  sistema         boolean not null default false,     -- Dono: não edita, não apaga, tem tudo
+  sistema         boolean not null default false,
   papel_base      text not null check (papel_base in ('owner', 'admin', 'vendedor', 'tecnico')),
-  somente_leitura boolean not null default false,     -- Consulta: nenhuma escrita em lugar nenhum
+  somente_leitura boolean not null default false,
   criado_por      uuid,
   criado_em       timestamptz not null default now(),
   unique (empresa_id, nome),
@@ -97,9 +81,6 @@ create index if not exists empresa_usuarios_cargo_idx on public.empresa_usuarios
 
 alter table public.usuarios add column if not exists empresa_ativa_id bigint references public.empresas(id) on delete set null;
 
--- ── Semente: os cargos de fábrica de uma empresa, com as permissões que ela já salvou ──────────────────
--- Reproduz o papel de hoje: Dono (owner), Administrador (admin), Vendedor, Técnico e Consulta (só leitura).
--- As 6 permissões antigas vêm de empresas.permissoes (o que o dono salvou) ou do padrão de lib/permissoes.ts.
 create or replace function public.cargos_semear(p_empresa bigint)
 returns void
 language plpgsql
@@ -122,15 +103,14 @@ begin
   on conflict (empresa_id, nome) do nothing;
 
   for c in select id, nome, papel_base, sistema, somente_leitura from public.empresa_cargos where empresa_id = p_empresa loop
-    if c.sistema then continue; end if;       -- o Dono tem tudo por definição (tem_permissao), sem linhas
+    if c.sistema then continue; end if;
     if exists (select 1 from public.empresa_cargo_permissoes where cargo_id = c.id) then continue; end if;
-    -- as 6 permissões antigas, pelo papel de base (Consulta: as de leitura fixas abaixo)
     for k in select * from (values
         ('core.ver_financeiro', 'verFinanceiro'), ('core.ver_relatorios', 'verRelatorios'),
         ('core.ver_leads_outros', 'verLeadsOutros'), ('core.ver_vendas_outros', 'verVendasOutros'),
         ('core.excluir', 'excluir'), ('core.exportar', 'exportar')) t(chave, antiga) loop
       if c.somente_leitura then
-        v_val := k.chave in ('core.ver_leads_outros', 'core.ver_vendas_outros', 'core.ver_relatorios');   -- sem Financeiro (Q2)
+        v_val := k.chave in ('core.ver_leads_outros', 'core.ver_vendas_outros', 'core.ver_relatorios');
       else
         v_val := coalesce((v_perm -> c.papel_base ->> k.antiga)::boolean,
           case c.papel_base
@@ -143,8 +123,6 @@ begin
         on conflict do nothing;
       end if;
     end loop;
-    -- as novas: o Administrador tem todas (inclusive editar cargos, que ele já fazia na tela de Permissões; as
-    -- travas de cargo_salvar e usuario_cargo_trocar guardam o Dono e a hierarquia); Consulta vê a rede
     if c.papel_base = 'admin' and not c.somente_leitura then
       insert into public.empresa_cargo_permissoes (cargo_id, empresa_id, permissao)
       select c.id, p_empresa, chave from public.permissoes_catalogo
@@ -159,7 +137,6 @@ end $$;
 revoke all on function public.cargos_semear(bigint) from public, anon, authenticated;
 grant execute on function public.cargos_semear(bigint) to service_role;
 
--- ── Cargo ⇄ papel (compatibilidade até a E1.6) ─────────────────────────────────────────────────────────
 create or replace function public.empresa_usuarios_cargo_papel()
 returns trigger
 language plpgsql
@@ -170,7 +147,6 @@ declare
   v_cargo record;
 begin
   if tg_op = 'INSERT' then
-    -- superadmin é plataforma: nunca tem vínculo com empresa (fecha o "resíduo aceito" de 03/09)
     if exists (select 1 from public.usuarios u where u.id = new.usuario_id and u.is_super_admin) then
       raise exception 'PLATAFORMA_SEM_VINCULO: conta da plataforma não entra na equipe de uma empresa' using errcode = 'P0001';
     end if;
@@ -182,7 +158,6 @@ begin
 
   if tg_op = 'INSERT' and new.cargo_id is null
      or tg_op = 'UPDATE' and new.cargo_id is not distinct from old.cargo_id and new.role is distinct from old.role then
-    -- quem gravou só o papel (app antigo): o cargo de fábrica desse papel
     select id into new.cargo_id from public.empresa_cargos
      where empresa_id = new.empresa_id and papel_base = coalesce(new.role, 'vendedor') and not somente_leitura
      order by sistema desc, id limit 1;
@@ -193,7 +168,6 @@ begin
     raise exception 'CARGO_INVALIDO: o cargo não é desta empresa' using errcode = 'P0001';
   end if;
   new.role := v_cargo.papel_base;
-  -- Consulta não entra na roleta, na esteira nem no pós-venda
   if v_cargo.somente_leitura then
     new.participa_roleta := false;
   end if;
@@ -206,7 +180,6 @@ create trigger empresa_usuarios_cargo_papel
   before insert or update of cargo_id, role, empresa_id on public.empresa_usuarios
   for each row execute function public.empresa_usuarios_cargo_papel();
 
--- A empresa nunca fica sem Dono: conferido no fim da transação (trocar de Dono numa transação só funciona).
 create or replace function public.empresa_usuarios_dono_guarda()
 returns trigger
 language plpgsql
@@ -216,12 +189,11 @@ as $$
 declare
   v_emp bigint := old.empresa_id;
 begin
-  -- só quando ESTA mudança tirou um Dono ativo
   if not (old.ativo and exists (select 1 from public.empresa_cargos c where c.id = old.cargo_id and c.sistema)) then
     return null;
   end if;
   if not exists (select 1 from public.empresas where id = v_emp) then
-    return null;   -- a empresa está sendo excluída
+    return null;
   end if;
   if not exists (select 1 from public.empresa_usuarios eu join public.empresa_cargos c on c.id = eu.cargo_id
                   where eu.empresa_id = v_emp and eu.ativo and c.sistema) then
@@ -237,7 +209,6 @@ create constraint trigger empresa_usuarios_dono_guarda
   deferrable initially deferred
   for each row execute function public.empresa_usuarios_dono_guarda();
 
--- Semente de todas as empresas e cargo de cada vínculo (o papel de hoje; nada muda de papel)
 do $$
 declare e bigint;
 begin
@@ -254,7 +225,6 @@ begin
   end if;
 end $$;
 
--- Empresa nova já nasce com os cargos
 create or replace function public.empresas_semear_cargos()
 returns trigger language plpgsql security definer set search_path to 'public', 'pg_temp' as $$
 begin
@@ -266,7 +236,6 @@ drop trigger if exists empresas_semear_cargos on public.empresas;
 create trigger empresas_semear_cargos after insert on public.empresas
   for each row execute function public.empresas_semear_cargos();
 
--- Ponte: a tela antiga de Permissões grava empresas.permissoes → as 6 permissões dos cargos de fábrica
 create or replace function public.empresas_permissoes_ponte()
 returns trigger language plpgsql security definer set search_path to 'public', 'pg_temp' as $$
 declare c record; k record; v_val boolean;
@@ -294,9 +263,6 @@ create trigger empresas_permissoes_ponte after update of permissoes on public.em
   for each row when (new.permissoes is distinct from old.permissoes)
   execute function public.empresas_permissoes_ponte();
 
--- ── Empresa ativa ──────────────────────────────────────────────────────────────────────────────────────
--- Ordem: (1) impersonação válida; (2) empresa ativa escolhida, com vínculo ativo; (3) o único vínculo ativo;
--- (4) nulo (com dois vínculos e nenhuma escolha, a RLS nega e o app pede "Escolha a empresa").
 create or replace function public.get_empresa_id()
 returns bigint
 language plpgsql
@@ -358,7 +324,6 @@ end $$;
 revoke all on function public.trocar_empresa_ativa(bigint) from public, anon;
 grant execute on function public.trocar_empresa_ativa(bigint) to authenticated;
 
--- Colunas de plataforma e de sessão só mudam pelo caminho certo
 create or replace function public.prevent_privilege_escalation()
 returns trigger
 language plpgsql
@@ -390,7 +355,6 @@ begin
       raise exception 'Permission denied: cannot modify permissoes';
     end if;
   end if;
-  -- empresa ativa: só pela RPC trocar_empresa_ativa (inclusive para o superadmin e a chave de serviço)
   if old.empresa_ativa_id is distinct from new.empresa_ativa_id
      and coalesce(current_setting('nexus.empresa_ativa_rpc', true), '') <> '1' then
     raise exception 'Permission denied: empresa ativa muda só por trocar_empresa_ativa';
@@ -400,9 +364,6 @@ end $$;
 revoke execute on function public.prevent_privilege_escalation() from public, anon, authenticated;
 grant execute on function public.prevent_privilege_escalation() to service_role;
 
--- ── Permissão ──────────────────────────────────────────────────────────────────────────────────────────
--- Cargo do vínculo ativo na empresa da sessão. Dono (sistema) = tudo. Superadmin impersonando = tudo
--- (auditado pela plataforma). Sem empresa = nada.
 create or replace function public.tem_permissao(p text)
 returns boolean
 language sql
@@ -446,8 +407,6 @@ $$;
 revoke all on function public.limite_permissao(text) from public, anon;
 grant execute on function public.limite_permissao(text) to authenticated, service_role;
 
--- Somente leitura: empresa suspensa (como hoje) OU cargo Consulta. As políticas restritivas
--- somente_leitura_* de todas as tabelas da empresa já chamam esta função.
 create or replace function public.sessao_pode_escrever()
 returns boolean
 language sql
@@ -462,7 +421,6 @@ $$;
 revoke all on function public.sessao_pode_escrever() from public, anon;
 grant execute on function public.sessao_pode_escrever() to authenticated;
 
--- Rede de lojas: dono/admin como hoje, ou quem tem lojas.ver_rede (o cargo Consulta)
 create or replace function public.filiais_visiveis()
 returns bigint[]
 language plpgsql
@@ -509,7 +467,6 @@ end $$;
 revoke execute on function public.filiais_visiveis() from public, anon;
 grant execute on function public.filiais_visiveis() to authenticated, service_role;
 
--- ── Contexto da sessão (uma chamada; corrige o 406 dos .single() em empresa_usuarios) ──────────────────
 create or replace function public.sessao_contexto()
 returns jsonb
 language plpgsql
@@ -554,11 +511,6 @@ end $$;
 revoke all on function public.sessao_contexto() from public, anon;
 grant execute on function public.sessao_contexto() to authenticated, service_role;
 
--- ── RPCs de cargos (só com equipe.cargos; tudo auditado) ───────────────────────────────────────────────
--- Travas para quem não é Dono (o Administrador, de fábrica), as mesmas da hierarquia da Equipe de hoje:
---   * não concede permissão que ele mesmo não tem (nem num cargo, nem trocando alguém para um cargo maior);
---   * não põe nem tira ninguém do Dono, e não mexe em quem também edita cargos (outro Administrador);
---   * ninguém troca o próprio cargo (nem o Dono: a troca de Dono é feita pelo outro Dono).
 create or replace function public.sessao_e_dono()
 returns boolean
 language sql
@@ -684,13 +636,11 @@ grant execute on function public.cargo_salvar(bigint, text, text, text[], boolea
 grant execute on function public.cargo_apagar(bigint) to authenticated;
 grant execute on function public.usuario_cargo_trocar(uuid, bigint) to authenticated;
 
--- ── Auditoria: permissão nova e acessos da plataforma ──────────────────────────────────────────────────
 drop policy if exists auditoria_eventos_select on public.auditoria_eventos;
 create policy auditoria_eventos_select on public.auditoria_eventos
   for select to authenticated
   using (empresa_id = (select public.get_empresa_id()) and (select public.tem_permissao('auditoria.ver')));
 
--- config_salvar: a permissão da configuração passa a ser config.editar (Dono e Administrador, como antes)
 do $$
 declare v_src text;
 begin
@@ -702,7 +652,6 @@ begin
                   'só dono ou administrador altera a configuração', 'sem permissão para alterar a configuração');
 end $$;
 
--- Entrada e saída da plataforma na auditoria da empresa (o dono vê); superadmin_logs continua como está
 create or replace function public.set_impersonation(p_empresa_id bigint, p_ttl_seconds integer default 14400)
 returns void
 language plpgsql
@@ -767,7 +716,6 @@ end $$;
 revoke execute on function public.encerrar_impersonacao() from public, anon;
 grant execute on function public.encerrar_impersonacao() to authenticated, service_role;
 
--- Página aberta pela plataforma dentro da empresa: no máximo uma linha por rota por minuto
 create or replace function public.plataforma_registrar_acesso(p_rota text)
 returns void
 language plpgsql
@@ -789,8 +737,6 @@ end $$;
 revoke all on function public.plataforma_registrar_acesso(text) from public, anon;
 grant execute on function public.plataforma_registrar_acesso(text) to authenticated;
 
--- Toda escrita da plataforma numa tabela da empresa: tabela, id e os NOMES dos campos alterados (D-A1:
--- nenhum valor, nenhum dado pessoal). Para quem não é superadmin impersonando, sai na primeira linha.
 create or replace function public.plataforma_auditar_escrita()
 returns trigger
 language plpgsql
@@ -821,21 +767,3 @@ begin
   return null;
 end $$;
 revoke all on function public.plataforma_auditar_escrita() from public, anon, authenticated;
-
-do $$
-declare t text;
-begin
-  for t in
-    select c.table_name
-      from information_schema.columns c
-      join information_schema.tables x on x.table_schema = c.table_schema and x.table_name = c.table_name and x.table_type = 'BASE TABLE'
-     where c.table_schema = 'public' and c.column_name = 'empresa_id'
-       and c.table_name not in ('auditoria_eventos', 'acessos', 'superadmin_logs', 'rate_limit', 'historico_bruto',
-                                'zapintel_conversa_cache', 'diagnostico_canais', 'rotinas_execucoes_empresas')
-       and c.table_name not like '\_backup%'
-     order by 1
-  loop
-    execute format('drop trigger if exists zz_plataforma_auditar on public.%I', t);
-    execute format('create trigger zz_plataforma_auditar after insert or update or delete on public.%I for each row execute function public.plataforma_auditar_escrita()', t);
-  end loop;
-end $$;
