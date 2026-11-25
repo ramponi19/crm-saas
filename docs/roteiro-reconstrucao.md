@@ -83,6 +83,8 @@ flowchart TD
 
 **Gerador de valores padrão para empresa nova** (registrado em 25/11, a pedido do Lucas): na 1.1a, os padrões de configuração ficaram parte no catálogo (`lib/config.ts`) e parte no chamador (horário, dias úteis, liberação diária, sem ofertas). O gerador leva **todos** os padrões para o catálogo, gera deles os padrões usados pelas funções do banco e **materializa** as chaves marcadas na criação da empresa e na instalação de cada módulo (PDV v2 §A, "Padrões na criação"). Etapa de destino: **entrega 1.1i**, dentro da E1.1, depois da 1.1a (só depende do motor de configuração; pode correr em paralelo com 1.1b–1.1h). **Trava:** nenhuma empresa nova é cadastrada e a **Aletrini** não liga nenhum módulo com configuração (Pós-venda, distribuição, PDV, Estoque) antes de a 1.1i estar em produção.
 
+**Pré-requisito da 1.1h** (registrado em 25/11, achado no deploy da 1.1a): antes de a 1.1h apagar o envelope provisório de `configuracoes_sistema`, as funções `core_horario` (lê `chave = 'core.horario'`) e `core_liberar_lotes_do_dia` (descobre as empresas por `chave = 'distribuicao.liberacao_diaria'`) passam a ler `empresa_config`. A busca de leitores antigos antes da 1.1h inclui o corpo das funções do banco (`pg_proc.prosrc`), não só o código do app.
+
 ### 2.1 Critérios de aceite resumidos
 
 | Etapa | Pronto quando |
@@ -292,6 +294,10 @@ Na E1.4, isso vira a releitura de preço dentro de `venda_fechar` (PDV v2 §C).
 - Limite de **valor de troca** com aprovação, configurável por empresa (PDV v2 §B.1).
 
 ### Ainda abertas
+
+**Para a etapa 1.1b (antes do código da auditoria da plataforma):**
+
+- **D-A1 — Auditoria sem dado pessoal de cliente em texto** (registrado em 25/11, a pedido do Lucas). A `auditoria_eventos` é imutável; um pedido de exclusão pela LGPD não conseguiria apagar nome, telefone ou CPF de cliente gravados em `antes`/`depois`. Proposta a decidir: a auditoria guarda só **identificadores** (tabela, id da linha, empresa, quem) e **os nomes dos campos alterados**; valores só de campos que não são dado pessoal (configuração, preço, custo, status, ids). Lista de campos pessoais por tabela (nome, telefone, e-mail, CPF/CNPJ, endereço, observação livre) mantida no código e conferida por teste. A gravação genérica da plataforma (1.1b) já nasce assim. Vale também para o que a 1.1a já grava: hoje só `config` (sem dado de cliente).
 
 **Para a etapa 1.4 (pode esperar):**
 

@@ -179,6 +179,8 @@ Nenhuma permissão sem ponto de aplicação entra no catálogo, **exceto** as du
 
 **Volta da B1:** devolve os corpos de `get_empresa_id`, `filiais_visiveis`, `sessao_pode_escrever`, `prevent_privilege_escalation`; remove gatilhos; tabelas e colunas novas ficam (ninguém mais grava pelo app velho). Arquivo `volta-cargos-permissoes.sql` com os corpos atuais copiados.
 
+**Decisão pendente D-A1 (LGPD), antes do código da auditoria da plataforma:** a auditoria não guarda dado pessoal de cliente em texto (nome, telefone, CPF, e-mail, endereço, observação livre), só identificadores e os nomes dos campos alterados, porque a tabela é imutável e um pedido de exclusão não conseguiria apagá-los. O gatilho genérico de "escrita da plataforma" (acima) grava `{tabela, id, campos_alterados}` e só os valores de campos não pessoais; lista de campos pessoais por tabela no código, com teste. Registrada no roteiro §7.
+
 ### 2.4 App
 
 | Área | Arquivos | Mudança |

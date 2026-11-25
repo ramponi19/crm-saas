@@ -1,0 +1,17 @@
+{
+  "t1_devolve_igual": true,
+  "t1_execucao": { "erro": "1 empresa(s) com erro", "total": 2, "status": "com_erro", "tem_fim": true, "com_erro": 1 },
+  "t1_empresas": [{ "erro": null, "status": "ok", "empresa": 1 }, { "erro": "deu ruim na 5", "status": "erro", "empresa": 5 }],
+  "t2_ok": "ok",
+  "t3_texto_igual": true, "t3_resumo": { "resultado": "texto solto" }, "t3_rotina_nula": "devolveu", "t3_nada_gravado": true,
+  "t4_aberta": "rodando", "t4_fechada": { "total": 2, "status": "com_erro", "com_erro": 1 }, "t4_falhou": "falhou:Erro no cron", "t4_fecha_uma_vez": "falhou",
+  "t5_vencida": "falhou", "t5_segunda_vez": 0,
+  "t6_posvenda_envolvido": true, "t6_posvenda_agenda": "10 * * * *", "t6_liberacao_envolvido": true, "t6_liberacao_agenda": "5 * * * *", "t6_conferidor": "*/5 * * * *",
+  "t7_insert_authenticated": false, "t7_registrar_authenticated": false, "t7_abrir_authenticated": false, "t7_conferir_authenticated": false, "t7_situacao_anon": false,
+  "t8_dono_le_execucoes": 0, "t8_dono_situacao": "SEM_PERMISSAO",
+  "t9_rotinas_no_catalogo": 15,
+  "t9_problemas": ["automacoes-hora:falhou", "lgpd-exportacoes-limpar:falhou", "ponte-vendas:com_erro", "posvenda-rotina-diaria:com_erro"],
+  "t9_empresa_com_erro": "deu ruim na 5", "t9_le_execucoes": true,
+  "t9_depois_de_visto": ["automacoes-hora", "lgpd-exportacoes-limpar", "ponte-vendas"],
+  "t10_sync_stripe": { "motivo": "sem execução registrada no intervalo", "atrasada": true }, "t10_reter_audio_recente": false
+}

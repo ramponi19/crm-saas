@@ -4,6 +4,7 @@ import { MobileTopbar } from '@/components/layout/mobile-topbar'
 import { NotificationProvider } from '@/components/layout/notification-provider'
 import { TempoRealEmpresa } from '@/components/layout/tempo-real-empresa'
 import { ImpersonationBanner } from '@/components/superadmin/impersonation-banner'
+import { AvisoRotinas } from '@/components/superadmin/aviso-rotinas'
 import { AvisosBanner, type AvisoBanner } from '@/components/layout/avisos-banner'
 import { LimiteBanner } from '@/components/layout/limite-banner'
 import { SituacaoBanner } from '@/components/layout/situacao-banner'
@@ -202,6 +203,7 @@ export default async function DashboardLayout({
           />
           <Suspense fallback={null}><AvisoModuloIndisponivel /></Suspense>
           {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
+          {usuario?.is_super_admin && <Suspense fallback={null}><AvisoRotinas /></Suspense>}
           {avisos.length > 0 && <AvisosBanner avisos={avisos} />}
           <SituacaoBanner situacao={situacao} podePagar={role === 'owner' || role === 'admin'} />
           <LimiteBanner />

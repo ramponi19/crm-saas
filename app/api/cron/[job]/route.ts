@@ -14,6 +14,7 @@ import { processarPublicos } from '@/lib/publicos/rodada'
 import { limparExportacoes } from '@/lib/lgpd/exportacao'
 import { verificarEntradaParada } from '@/lib/alertas-entrada'
 import { resgatarMidiasPendentes } from '@/lib/midia/resgate'
+import { ROTINA_DO_JOB, abrirExecucao, fecharExecucao } from '@/lib/rotinas'
 
 // ============================================================
 // Cron jobs de manutenção. Protegidos por CRON_SECRET.
@@ -43,6 +44,19 @@ export async function GET(
   const { job } = await params
   const supabase = createServiceClient()
 
+  // Entrega 1.1r: toda execução fica registrada em rotinas_execucoes (lib/rotinas.ts). O registro nunca muda a
+  // resposta nem derruba o job; job desconhecido não abre execução.
+  const rotina = ROTINA_DO_JOB[job]
+  const execucao = rotina ? await abrirExecucao(supabase, rotina) : null
+  const resposta = await rodarJob(job, supabase)
+  if (rotina) {
+    const corpo = await resposta.clone().json().catch(() => null)
+    await fecharExecucao(supabase, execucao, resposta.status, corpo)
+  }
+  return resposta
+}
+
+async function rodarJob(job: string, supabase: ReturnType<typeof createServiceClient>): Promise<NextResponse> {
   try {
     switch (job) {
       case 'expirar-trials': {
@@ -220,6 +234,6 @@ export async function GET(
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Erro no cron'
     console.error(`[cron/${job}]`, msg)
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return NextResponse.json({ error: msg, job }, { status: 500 })
   }
 }

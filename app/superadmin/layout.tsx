@@ -2,6 +2,8 @@ import { SuperAdminShell } from '@/components/superadmin/superadmin-shell'
 import { SessionGuard } from '@/components/layout/session-guard'
 import { requireSuperAdmin } from '@/lib/superadmin'
 import { createClient } from '@/lib/supabase/server'
+import { Suspense } from 'react'
+import { AvisoRotinas } from '@/components/superadmin/aviso-rotinas'
 
 export default async function SuperAdminLayout({
   children,
@@ -19,6 +21,7 @@ export default async function SuperAdminLayout({
 
   return (
     <SuperAdminShell userName={usuario?.nome ?? 'Super Admin'}>
+      <Suspense fallback={null}><AvisoRotinas /></Suspense>
       {children}
       <SessionGuard />
     </SuperAdminShell>
