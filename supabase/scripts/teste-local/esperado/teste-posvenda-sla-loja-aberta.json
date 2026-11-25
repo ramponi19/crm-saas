@@ -1,0 +1,11 @@
+{
+  "1_loja_aberta_padrao": { "resposta": "Wed 02/12 10:00", "resolucao": "Tue 08/12 18:00" },
+  "2_corridas": { "resposta": "Sat 28/11 17:00", "resolucao": "Mon 30/11 17:00" },
+  "3_loja_6_loja_aberta": "Wed 02/12 10:00",
+  "3_loja_3_corridas": "Sat 28/11 17:00",
+  "4_loja_3_sabado_fechado": "Wed 02/12 14:00",
+  "4_sem_loja_empresa": "Wed 02/12 10:00",
+  "5_domingo": "Wed 02/12 15:00",
+  "5_zero_horas": true,
+  "6_chamado": { "loja_do_negocio": true, "resposta_loja_aberta": true, "resolucao_loja_aberta": true }
+}

@@ -1,0 +1,44 @@
+{
+  "1_modulo_desligado_jornadas": 0,
+  "2a_iphone_usado": {
+    "regua": "Aparelhos",
+    "passos": { "1": "pendente", "7": "pendente", "90": "pendente", "330": "pendente" },
+    "responsaveis": ["M1"], "origens": ["vendedor"], "datas_do_ganho": true
+  },
+  "2b_iphone_novo": { "1": "pendente", "7": "pendente", "330": "pendente" },
+  "2c_sem_dados_venda": { "regua": "Geral", "passos": { "7": "pendente", "330": "pendente" }, "origens": ["roleta"] },
+  "2d_categoria_sem_regua": "Geral",
+  "3_reabrir": {
+    "passos": { "1": "feito", "7": "cancelado:venda_reaberta", "330": "cancelado:venda_reaberta" },
+    "jornada": "cancelada:venda_reaberta"
+  },
+  "7_ganho_de_novo": {
+    "jornadas": ["cancelada", "ativa"],
+    "pendentes_novos": { "1": "pendente", "7": "pendente", "330": "pendente" },
+    "total_de_passos": 6
+  },
+  "4_corrigir_data": {
+    "passos": { "1": "pulado:data_no_passado_apos_correcao", "7": "pulado:data_no_passado_apos_correcao", "90": "pendente", "330": "pendente" },
+    "pendentes_na_data_nova": true,
+    "atrasados": 0
+  },
+  "5a_outra_categoria_aparelho": { "anterior": { "90": "pendente", "330": "pendente" } },
+  "5b_mesma_categoria": {
+    "anterior": { "90": "cancelado:recompra", "330": "cancelado:recompra" },
+    "ipad_intacto": { "1": "pendente", "7": "pendente", "330": "pendente" }
+  },
+  "5c_acessorio_nao_cancela": {
+    "iphone_novo": { "1": "juntado", "7": "juntado", "330": "juntado" },
+    "cancelados_por_recompra": 2
+  },
+  "6_mesmo_dia": {
+    "jornadas": 2,
+    "d1_pendentes_do_cliente": 1,
+    "capa": { "1": "juntado", "30": "pendente" },
+    "capa_d1_aponta_para_o_do_iphone": true
+  },
+  "6b_reabrir_o_iphone_promove_a_capa": {
+    "capa": { "1": "pendente", "30": "pendente" },
+    "d1_pendentes_do_cliente": 1
+  }
+}

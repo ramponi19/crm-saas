@@ -1,0 +1,11 @@
+{
+  "1_padrao_esteira": { "modo": "esteira", "aplicar": null, "continua_sem_dono": true },
+  "2_roleta_matriz": ["M1", "M2", "SL", "M2"],
+  "2_historico_distribuir": 4,
+  "2_jaguariuna": "J2",
+  "3_por_loja": { "matriz": "esteira", "jaguariuna": "J2" },
+  "4_so_M1": ["M1", "M1"],
+  "5_canal": { "esteira": true, "roleta": "M1" },
+  "6a_esteira": { "sem_dono": 2, "historico": 2 },
+  "6b_roleta": ["M1", "SL"]
+}

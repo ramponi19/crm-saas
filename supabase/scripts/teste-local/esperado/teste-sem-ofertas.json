@@ -1,0 +1,22 @@
+{
+  "1a_outro_texto": false,
+  "1b_instagram": false,
+  "2_botao": {
+    "marcado": true,
+    "confirmacao": "Pronto, Carla: você não vai mais receber ofertas da nossa loja. Os avisos sobre a sua compra continuam chegando.",
+    "telefone": "+5519900001111",
+    "negocio": true,
+    "dois_contatos": 2,
+    "passo_marketing": "pulado/cliente não quer ofertas",
+    "passo_utilidade": "pendente"
+  },
+  "3_de_novo": { "ja_estava": true, "confirmacao": null },
+  "4a_nasce_pulado": "pulado",
+  "4b_utilidade_pendente": "pendente",
+  "5a_vendedor_desfaz": "SEM_PERMISSAO",
+  "5b_admin_desfaz": 2,
+  "5c_vendedor_marca": 2,
+  "5d_origem": true,
+  "6_da_empresa": "Feito, Carla! Sem promoções daqui para a frente.",
+  "7_privilegios": { "sessao_marca": true, "sessao_pelo_botao": false, "sessao_aplicar": false }
+}

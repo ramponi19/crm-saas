@@ -1,0 +1,12 @@
+{
+  "1_contato_outra_chave_com_campo_desligado": "ok",
+  "2_marcar_venda_com_produto_desligado": "ok",
+  "3_mudar_campo_desligado": "recusou: campo personalizado desconhecido: contato.profissao",
+  "4a_produto_texto_com_campo_desligado": "ok",
+  "4b_produto_numero": "recusou: valor inválido para negocio.produto_interessado (texto)",
+  "5a_chave_nova_desconhecida": "recusou: campo personalizado desconhecido: negocio.qualquer_coisa",
+  "5b_inclusao_com_campo_desligado": "recusou: campo personalizado desconhecido: contato.profissao",
+  "6a_trocar_para_empresa_com_os_campos": "ok",
+  "6b_trocar_para_empresa_sem_o_campo": "recusou: campo personalizado desconhecido: contato.estado_civil",
+  "7_venda_errada": "recusou: valor inválido para negocio.venda"
+}

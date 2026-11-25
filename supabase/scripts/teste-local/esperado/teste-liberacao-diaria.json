@@ -1,0 +1,12 @@
+{
+  "1_desligado": "desligado",
+  "2_lote": { "liberados": 6, "por_pessoa": { "M1": 2, "M2": 2, "SL": 2 }, "os_mais_recentes": true, "motivo": 6, "manual": 6, "pulados_continuam": 3 },
+  "3_mesmo_dia": "já liberado hoje",
+  "4_antes_da_abertura": "antes da abertura",
+  "5a_segunda_pulada": "primeiro dia de abertura da semana",
+  "6_sabado_fechado": "loja fechada hoje",
+  "5b_terca_libera": 6,
+  "5c_terca_e_o_primeiro_dia": "primeiro dia de abertura da semana",
+  "7_so_M1": { "liberados": 2, "pessoas": ["M1"] },
+  "8_agendamento": "5 * * * *"
+}

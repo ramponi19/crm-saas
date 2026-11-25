@@ -1,0 +1,32 @@
+{
+  "passa": {
+    "p1_sessao_admin_entra_com_venda": "ok",
+    "p2_sessao_vendedor_entra_com_venda": "ok",
+    "p3_servidor_com_cabecalho_juncao": "ok",
+    "p4_script_com_marca": "ok",
+    "p5_servidor_com_marca_sql": "ok",
+    "p6_rpc_corrigir_data_muda_venda": "ok",
+    "p7_rpc_reabrir_tira_venda": "ok",
+    "p8_sessao_edita_outra_chave": "ok",
+    "p9_sessao_regrava_ganho_igual": "ok",
+    "p10_ganho_antigo_sessao_edita_lead": "ok",
+    "p11_servidor_classifica_ganho_antigo": "ok",
+    "p12_sessao_aberto_sem_venda_outra_etapa": "ok"
+  },
+  "barrado": {
+    "b1_sessao_entra_sem_venda": "VENDA_OBRIGATORIA",
+    "b2_sessao_vendedor_entra_sem_venda": "VENDA_OBRIGATORIA",
+    "b3_sessao_insere_ganho_sem_venda": "VENDA_OBRIGATORIA",
+    "b4_servidor_sem_marca": "VENDA_OBRIGATORIA",
+    "b5_script_sem_marca": "VENDA_OBRIGATORIA",
+    "b6_sessao_forja_cabecalho": "VENDA_OBRIGATORIA",
+    "b7_sessao_forja_marca_sql": "VENDA_OBRIGATORIA",
+    "b8_servidor_cabecalho_vazio": "VENDA_OBRIGATORIA",
+    "b9_sessao_muda_valor_da_venda": "VENDA_SO_POR_RPC",
+    "b10_vendedor_muda_categoria": "VENDA_SO_POR_RPC",
+    "b11_sessao_apaga_a_venda": "VENDA_SO_POR_RPC",
+    "b12_sessao_cria_venda_em_ganho_antigo": "VENDA_SO_POR_RPC",
+    "b13_sessao_poe_venda_em_aberto": "VENDA_SO_POR_RPC"
+  },
+  "estado_final": { "nA": "aberto", "nV_valor": "4590", "nG_tem_venda": false }
+}

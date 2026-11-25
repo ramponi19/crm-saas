@@ -1,0 +1,23 @@
+{
+  "A_modulo_desligado": { "cenarios_iguais": 12, "diferentes": [] },
+  "B_d330_futuro":       { "ret": "novo", "novos": 1, "historico": ["novo_apos_ganho"], "status": ["aberto", "ganho"], "acomp": { "status": "pendente", "respondeu": false } },
+  "B_d7_amanha":         { "ret": "G", "novos": 0, "historico": [], "status": ["ganho"], "acomp": { "status": "pendente", "respondeu": false } },
+  "B_d330_amanha":       { "ret": "novo", "novos": 1, "historico": ["novo_apos_ganho"], "acomp": { "status": "pendente", "respondeu": false } },
+  "B_acomp_hoje":        { "ret": "G", "novos": 0, "historico": [], "status": ["ganho"], "acomp": { "status": "pendente", "respondeu": true } },
+  "B_vencido_2":         { "ret": "G", "novos": 0, "acomp": { "status": "pendente", "respondeu": true } },
+  "B_vencido_5":         { "ret": "novo", "novos": 1, "historico": ["novo_apos_ganho"], "acomp": { "status": "pendente", "respondeu": false } },
+  "B_janela0_hoje":      { "ret": "G", "novos": 0, "acomp": { "status": "pendente", "respondeu": true } },
+  "B_janela0_ontem":     { "ret": "novo", "novos": 1, "acomp": { "status": "pendente", "respondeu": false } },
+  "B_chamado_aberto":    { "ret": "G", "novos": 0, "status": ["ganho"], "eventos": 1 },
+  "B_chamado_resolvido": { "ret": "novo", "novos": 1, "historico": ["novo_apos_ganho"], "eventos": 0 },
+  "B_aberto_e_chamado":  { "ret": "A", "novos": 0, "status": ["aberto", "ganho"], "eventos": 1 },
+  "B_aberto_chamado_duas": { "ret": "A", "novos": 0, "status": ["aberto", "ganho"], "eventos": 1 },
+  "B_aberto_chamado_loja": { "ret": "A", "novos": 0, "status": ["aberto", "ganho"], "eventos": 0 },
+  "B_acomp_outra_loja":  { "ret": "novo", "novos": 1, "historico": ["novo_apos_ganho"], "acomp": { "status": "pendente", "respondeu": false } },
+  "B_loja_envia":        { "ret": "G", "novos": 0, "historico": [], "acomp": { "status": "pendente", "respondeu": false } },
+  "B_chamado_duas_msgs": { "ret": "G", "novos": 0, "eventos": 1 },
+  "B_perdido":           { "ret": "P", "novos": 0, "historico": ["reaberto_por_mensagem"], "status": ["aberto"] },
+  "B_arquivado":         { "ret": "X", "novos": 0, "historico": ["reaberto_por_mensagem"], "status": ["aberto"] },
+  "B_sem_negocio":       { "ret": "novo", "novos": 1, "historico": [], "status": ["aberto"] },
+  "B_ganho_recente":     { "ret": "G", "novos": 0, "historico": [], "status": ["ganho"] }
+}

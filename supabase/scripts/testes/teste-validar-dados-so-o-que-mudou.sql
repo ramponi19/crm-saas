@@ -53,7 +53,7 @@ begin
   res := res || jsonb_build_object('6b_trocar_para_empresa_sem_o_campo', v_msg);
 
   -- 7. dados.venda continua conferida quando muda
-  begin update negocios set dados = dados || '{"venda":{"condicao":"usado"}}' where id = v_neg; v_msg := 'FALHOU: aceitou';
+  begin update negocios set dados = dados || '{"venda":{"condicao":"meio-usado"}}' where id = v_neg; v_msg := 'FALHOU: aceitou';
   exception when others then v_msg := 'recusou: ' || sqlerrm; end;
   res := res || jsonb_build_object('7_venda_errada', v_msg);
 

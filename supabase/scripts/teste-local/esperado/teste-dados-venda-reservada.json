@@ -1,0 +1,10 @@
+{ "casos": {
+  "1_venda_valida": "ok",
+  "2_venda_conciliacao": "ok",
+  "3_condicao_invalida": "recusou: valor inválido para negocio.venda",
+  "4_data_invalida": "recusou: valor inválido para negocio.venda",
+  "5_venda_nao_objeto": "recusou: valor inválido para negocio.venda",
+  "6_valor_texto": "recusou: valor inválido para negocio.venda",
+  "7_chave_desconhecida": "recusou: campo personalizado desconhecido: negocio.qualquer_coisa",
+  "8_venda_em_contato": "recusou: campo personalizado desconhecido: contato.venda"
+} }
