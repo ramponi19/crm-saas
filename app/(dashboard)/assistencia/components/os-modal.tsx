@@ -12,6 +12,7 @@ import { comNome } from '@/lib/sem-nome'
 import { consultaClientes } from '@/lib/clientes'
 import { useFuso } from '@/components/fuso-provider'
 import { agora, diaNoFuso, formatarData, paraData } from '@/lib/datas'
+import { dataDeEntrega, diasDeGarantiaRestantes, maisRecentePorEntrega } from '@/lib/data-entrega'
 import { useModuloLigado } from '@/components/layout/ferramentas-context'
 import { rotulosOS } from '../rotulos'
 
@@ -137,17 +138,19 @@ export default function OSModal({ os, isNew, onClose }: Props) {
          * Então: tenta pela série da venda e, se não achar, pela UNIDADE ligada à
          * venda (`vendas.unidade_id`), que é onde o IMEI real acaba morando.
          */
-        let venda: { data_venda: string | null; created_at: string | null } | null = null
+        // A garantia conta da ENTREGA (lib/data-entrega): desde o hotfix de 24/11 a encomenda guarda o
+        // lançamento em data_venda e a entrega em concluida_em. Busca algumas e fica com a entregue por último.
+        type VendaDatas = { data_venda: string | null; concluida_em: string | null; created_at: string | null }
+        let venda: VendaDatas | null = null
 
         const { data: porSerie } = await supabase
           .from('vendas_vendas')
-          .select('data_venda, created_at')
+          .select('data_venda, concluida_em, created_at')
           .eq('numero_serie', serie)
           .eq('status', 'concluida')
           .order('data_venda', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-        venda = porSerie ?? null
+          .limit(5)
+        venda = maisRecentePorEntrega((porSerie ?? []) as VendaDatas[])
 
         if (!venda) {
           const { data: unidades } = await supabase
@@ -159,13 +162,12 @@ export default function OSModal({ os, isNew, onClose }: Props) {
           if (ids.length) {
             const { data: porUnidade } = await supabase
               .from('vendas_vendas')
-              .select('data_venda, created_at')
+              .select('data_venda, concluida_em, created_at')
               .in('unidade_id', ids)
               .eq('status', 'concluida')
               .order('data_venda', { ascending: false })
-              .limit(1)
-              .maybeSingle()
-            venda = porUnidade ?? null
+              .limit(5)
+            venda = maisRecentePorEntrega((porUnidade ?? []) as VendaDatas[])
           }
         }
 
@@ -178,9 +180,8 @@ export default function OSModal({ os, isNew, onClose }: Props) {
           .select('valor').eq('chave', 'contrato').maybeSingle()
         const diasTotal = Number((cfg?.valor as { garantia_dias?: unknown } | null)?.garantia_dias) || 90
 
-        const base = paraData(venda.data_venda ?? venda.created_at) ?? agora()
-        const passados = Math.floor((Date.now() - base.getTime()) / 86_400_000)
-        const restantes = diasTotal - passados
+        const base = paraData(dataDeEntrega(venda)) ?? agora()
+        const restantes = diasDeGarantiaRestantes(base, diasTotal, agora())
 
         if (!cancelado) {
           setGarantiaDaVenda({ vendaEm: formatarData(base, undefined, '', fuso), diasTotal, restantes })

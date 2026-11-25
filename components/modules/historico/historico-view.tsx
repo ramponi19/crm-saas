@@ -13,10 +13,13 @@ import { EncomendaFechar, type EncomendaParaFechar } from '@/components/modules/
 import { Card, StatCard, Table, Tabs, Badge, Button, EmptyState, Modal, Select, notify, type Column } from '@/components/ui'
 import { useFuso } from '@/components/fuso-provider'
 import { agora, diaNoFuso, formatarData } from '@/lib/datas'
+import { dataDeEntrega } from '@/lib/data-entrega'
 
 interface Venda {
   id: number
   data_venda: string | null
+  /** Quando foi concluída/entregue (hotfix de 24/11); nula nas anteriores. */
+  concluida_em?: string | null
   cliente_nome: string | null
   produto_nome: string | null
   vendedor_nome: string | null
@@ -142,7 +145,8 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
         itens: [{ descricao: v.produto_nome ?? 'Produto', imei: v.numero_serie, valor: v.valor_venda, garantia_dias: garantiaProduto }],
         total: v.valor_venda, desconto: v.desconto_valor ?? 0,
         forma_pagamento: v.forma_pagamento, parcelas: v.parcelas,
-        vendedor: v.vendedor_nome, data: v.data_venda ?? undefined,
+        // A 2ª via sai com a data da ENTREGA (lib/data-entrega), a mesma do documento original.
+        vendedor: v.vendedor_nome, data: dataDeEntrega(v) ?? undefined,
       })
       setEmitindo(null)
       // Recusado por falta de identificação da loja: diz o MOTIVO. O teste mostrou

@@ -21,6 +21,8 @@ export interface VendaTermo {
   /** Itens recebidos em troca — preenchem o termo de entrega do usado. */
   trocas: TrocaDoTermo[]
   data_venda: string | null
+  /** Data da entrega (lib/data-entrega): é ela que vai no termo e na coluna Data. */
+  data_entrega: string | null
   valor_venda: number
   cliente_id: number | null
   cliente_nome: string | null
@@ -81,7 +83,7 @@ export function TermosView({ vendas, documentos, empresaId }: Props) {
         itens: [{ descricao: v.produto_nome ?? 'Produto', imei: v.numero_serie, valor: v.valor_venda, garantia_dias: null }],
         total: v.valor_venda, desconto: v.desconto_valor ?? 0,
         forma_pagamento: v.forma_pagamento, parcelas: v.parcelas,
-        vendedor: v.vendedor_nome, data: v.data_venda ?? undefined,
+        vendedor: v.vendedor_nome, data: v.data_entrega ?? v.data_venda ?? undefined,
         // Os aparelhos da troca alimentam {{trocas}} e companhia — é o que faz o
         // termo de entrega do usado ter conteúdo em vez de espaço em branco.
         trocas: v.trocas,
@@ -142,7 +144,7 @@ export function TermosView({ vendas, documentos, empresaId }: Props) {
   const colunas = (assinado: boolean): Column<VendaTermo>[] => [
     {
       key: 'data', header: 'Data', className: 'num w-[110px]',
-      render: (v) => <span className="text-ink-2">{formatarData(v.data_venda, undefined, '—', fuso)}</span>,
+      render: (v) => <span className="text-ink-2">{formatarData(v.data_entrega ?? v.data_venda, undefined, '—', fuso)}</span>,
     },
     {
       // O tipo precisa estar visível: a mesma venda pode ter dois termos, e sem

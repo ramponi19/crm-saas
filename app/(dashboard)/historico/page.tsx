@@ -37,7 +37,7 @@ export default async function HistoricoPage() {
   const baseVendas = supabase
     .from('vendas_vendas')
     .select(`
-      id, data_venda, valor_venda, lucro, forma_pagamento,
+      id, data_venda, concluida_em, valor_venda, lucro, forma_pagamento,
       canal_venda, status, parcelas, cliente_id, produto_id, numero_serie, desconto_valor, observacoes, quantidade, grupo_pdv,
       clientes:contatos!cliente_id(nome),
       produtos:estoque_produtos!produto_id(nome),
@@ -58,7 +58,7 @@ export default async function HistoricoPage() {
   const { data: vendasRaw } = soMinhas ? await baseVendas.eq('vendedor_id', user!.id) : await baseVendas
 
   type VendaRow = {
-    id: number; data_venda: string | null; valor_venda: number; lucro: number | null
+    id: number; data_venda: string | null; concluida_em: string | null; valor_venda: number; lucro: number | null
     forma_pagamento: string | null; canal_venda: string | null; status: string | null; parcelas: number | null
     cliente_id: number | null; produto_id: number | null; numero_serie: string | null; desconto_valor: number | null; observacoes: string | null
     quantidade: number | null; grupo_pdv: string | null
@@ -92,6 +92,7 @@ export default async function HistoricoPage() {
   const vendas = linhasVenda.map(v => ({
     id:            v.id,
     data_venda:    v.data_venda,
+    concluida_em:  v.concluida_em,
     valor_venda:   Number(v.valor_venda),
     lucro:         v.lucro != null ? Number(v.lucro) : null,
     forma_pagamento: v.forma_pagamento,

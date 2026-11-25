@@ -5,6 +5,7 @@ import type { VendaTermo } from './components/termos-view'
 import { comNomeDoCliente } from '@/lib/sem-nome'
 import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { rotulosGarantia } from './rotulos'
+import { dataDeEntrega } from '@/lib/data-entrega'
 
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
@@ -31,7 +32,7 @@ export default async function GarantiaPage() {
         id, venda_id, tipo, status, assinado_em,
         anexou:usuarios!assinado_por(nome),
         venda:vendas_vendas!venda_id(
-          id, data_venda, valor_venda, cliente_id, numero_serie, forma_pagamento,
+          id, data_venda, concluida_em, valor_venda, cliente_id, numero_serie, forma_pagamento,
           parcelas, desconto_valor, quantidade, observacoes, grupo_pdv,
           clientes:contatos!cliente_id(nome, telefone),
           produtos:estoque_produtos!produto_id(nome),
@@ -49,7 +50,7 @@ export default async function GarantiaPage() {
   const documentos = await documentosDisponiveis(supabase, empresaId!)
 
   type VendaEmbed = {
-    id: number; data_venda: string | null; valor_venda: number; cliente_id: number | null
+    id: number; data_venda: string | null; concluida_em: string | null; valor_venda: number; cliente_id: number | null
     numero_serie: string | null; forma_pagamento: string | null; parcelas: number | null
     desconto_valor: number | null; quantidade: number | null; observacoes: string | null
     grupo_pdv: string | null
@@ -101,6 +102,8 @@ export default async function GarantiaPage() {
       anexado_por: one(t.anexou)?.nome ?? null,
       trocas: (v.grupo_pdv ? trocasPorGrupo.get(v.grupo_pdv) : undefined) ?? [],
       data_venda: v.data_venda,
+      // O termo de garantia é da ENTREGA (lib/data-entrega): encomenda guarda o lançamento em data_venda.
+      data_entrega: dataDeEntrega(v),
       valor_venda: Number(v.valor_venda),
       cliente_id: v.cliente_id,
       cliente_nome: cli?.nome ?? null,
