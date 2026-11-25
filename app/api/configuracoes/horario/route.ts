@@ -4,6 +4,7 @@ import {
   CHAVE_HORARIO, CHAVE_HORARIO_ANTIGA, horarioDaLoja, horarioValido, paraFormatoAntigo, temHorarioProprio, type Horario,
 } from '@/lib/horario'
 import { nadaGravado } from '@/lib/linhas-afetadas'
+import { envelopesDaConfig } from '@/lib/config'
 import type { Json } from '@/types/database'
 
 /**
@@ -22,12 +23,13 @@ export async function GET() {
   const supabase = await createClient()
   const empresaId = await getEmpresaId()
   if (!empresaId) return NextResponse.json({ error: 'Sem empresa' }, { status: 400 })
-  const [{ data: cfg }, { data: lojas }] = await Promise.all([
-    supabase.from('configuracoes_sistema').select('chave, valor').eq('empresa_id', empresaId).in('chave', [CHAVE_HORARIO, CHAVE_HORARIO_ANTIGA]),
+  const [envs, { data: cfgAntiga }, { data: lojas }] = await Promise.all([
+    envelopesDaConfig(supabase, empresaId, { chaves: [CHAVE_HORARIO] }),
+    supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', CHAVE_HORARIO_ANTIGA).maybeSingle(),
     supabase.from('filiais').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('matriz', { ascending: false }).order('nome'),
   ])
-  const novo = cfg?.find((c) => c.chave === CHAVE_HORARIO)?.valor ?? null
-  const antigo = cfg?.find((c) => c.chave === CHAVE_HORARIO_ANTIGA)?.valor ?? null
+  const novo = envs[CHAVE_HORARIO] ?? null
+  const antigo = cfgAntiga?.valor ?? null
   return NextResponse.json({
     empresa: horarioDaLoja(novo, antigo, null),
     lojas: ((lojas ?? []) as { id: number; nome: string }[]).map((l) => ({

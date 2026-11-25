@@ -18,6 +18,7 @@ import * as Sentry from '@sentry/nextjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { HORARIO_PADRAO, abertoAgora, doFormatoAntigo, horarioDaLoja, horarioValido } from '@/lib/horario'
 import { fusoDoValor } from '@/lib/fuso-empresa'
+import { montarEnvelopes } from '@/lib/config'
 import { enviarEmail } from '@/lib/email'
 import { formatarDataHora, FUSO_PADRAO } from '@/lib/datas'
 
@@ -67,12 +68,21 @@ export async function verificarEntradaParada(svc: SupabaseClient<any>, agora = n
   const lista = (canais ?? []) as Canal[]
   if (lista.length) {
     const empresas = [...new Set(lista.map((c) => c.empresa_id))]
-    const { data: cfg } = await svc.from('configuracoes_sistema').select('empresa_id, chave, valor')
-      .in('empresa_id', empresas).in('chave', ['core.horario', 'horario_comercial', 'fuso'])
+    const [{ data: cfg }, { data: cfgNova }] = await Promise.all([
+      svc.from('configuracoes_sistema').select('empresa_id, chave, valor')
+        .in('empresa_id', empresas).in('chave', ['horario_comercial', 'fuso']),
+      // core.horario mora no motor de configuração (empresa_config, etapa 1.1a)
+      (svc as unknown as SupabaseClient).from('empresa_config').select('empresa_id, modulo, chave, filial_id, valor')
+        .in('empresa_id', empresas).eq('modulo', 'core').eq('chave', 'horario'),
+    ])
     const novo = new Map<number, unknown>(); const antigo = new Map<number, unknown>(); const fuso = new Map<number, string>()
+    for (const e of empresas) {
+      const linhas = ((cfgNova ?? []) as { empresa_id: number; modulo: string; chave: string; filial_id: number | null; valor: unknown }[])
+        .filter((l) => l.empresa_id === e)
+      if (linhas.length) novo.set(e, montarEnvelopes(linhas)['core.horario'])
+    }
     for (const c of cfg ?? []) {
-      if (c.chave === 'core.horario') novo.set(c.empresa_id as number, c.valor)
-      else if (c.chave === 'horario_comercial') antigo.set(c.empresa_id as number, c.valor)
+      if (c.chave === 'horario_comercial') antigo.set(c.empresa_id as number, c.valor)
       else fuso.set(c.empresa_id as number, fusoDoValor(c.valor))
     }
     const horario = new Map<number, unknown>(empresas.map((e) => [e, horarioDaLoja(novo.get(e) ?? null, antigo.get(e) ?? null, null)]))

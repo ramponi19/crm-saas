@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { envelopesDaConfig } from '@/lib/config'
 import { posvendaLigado, semTipo } from '@/lib/posvenda/ligado'
 import { ConfigPosVenda, type DadosConfigPosVenda } from '@/components/modules/configuracoes/config-pos-venda'
 
@@ -24,7 +25,7 @@ export default async function Page() {
       .eq('empresa_id', empresaId).order('ordem'),
     s.from('modelos_mensagem').select('id, nome, categoria, corpo, status').eq('empresa_id', empresaId).order('nome'),
     s.from('estoque_categorias').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
-    semTipo(service).from('configuracoes_sistema').select('chave, valor').eq('empresa_id', empresaId).or('chave.like.posvenda.%,chave.eq.core.sem_ofertas,chave.eq.core.condicao_venda'),
+    envelopesDaConfig(service, empresaId, { modulos: ['posvenda'], chaves: ['core.sem_ofertas', 'core.condicao_venda'] }),
     service.from('filiais').select('id, nome').eq('empresa_id', empresaId).eq('ativo', true).order('id'),
     service.from('empresa_usuarios').select('usuario_id, usuarios(nome)').eq('empresa_id', empresaId).eq('ativo', true).eq('conta_servico', false),
     s.from('posvenda_chamado_categorias').select('id, nome, ativo').eq('empresa_id', empresaId).order('id'),
@@ -35,8 +36,8 @@ export default async function Page() {
   ])
 
   const parametros: DadosConfigPosVenda['parametros'] = {}
-  for (const c of (config.data ?? []) as { chave: string; valor: { empresa?: unknown; lojas?: Record<string, unknown> } | null }[]) {
-    parametros[c.chave.replace(/^posvenda\./, '')] = { empresa: c.valor?.empresa ?? null, lojas: c.valor?.lojas ?? {} }
+  for (const [chave, env] of Object.entries(config)) {
+    parametros[chave.replace(/^posvenda\./, '')] = { empresa: env.empresa ?? null, lojas: env.lojas }
   }
   type Membro = { usuario_id: string; usuarios: { nome: string | null } | { nome: string | null }[] | null }
   const categoriasProprias = (proprias.data ?? []) as DadosConfigPosVenda['categoriasProprias']

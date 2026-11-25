@@ -1,0 +1,14 @@
+{
+  "t1_linha": { "acao": "alterar", "antes": { "valor": 1 }, "depois": { "valor": 2 }, "origem": "teste-auditoria", "empresa": 1, "usuario": "a632db2c-c42b-4973-8008-2d5ca2dbf479", "entidade": "config", "impersonado": null },
+  "t2_empresa_explicita": 5,
+  "t3_sem_sessao_auditar": "SEM_EMPRESA", "t3_job_usuario_nulo": true,
+  "t4_update": "AUDITORIA_IMUTAVEL", "t4_delete": "AUDITORIA_IMUTAVEL", "t4_truncate": "AUDITORIA_IMUTAVEL",
+  "t5_authenticated_insert": false, "t5_authenticated_update": false, "t5_authenticated_delete": false,
+  "t5_service_insert": false, "t5_service_delete": false, "t5_anon_select": false,
+  "t5_auditar_authenticated": false, "t5_auditar_emp_authenticated": false, "t5_auditar_emp_service": true,
+  "t6_dono1_ve_jm": true, "t6_dono1_ve_demo": 0, "t6_vendedora_ve": 0, "t6_vendedora_insere_direto": "42501",
+  "t6_dono5_ve_jm": 0, "t6_dono5_ve_demo": true,
+  "t7_impersonando": { "empresa": 1, "usuario_e_ele": true, "impersonado_por_e_ele": true },
+  "t7_vencida_sem_marca": true,
+  "t8_expurgo_so_da_empresa": true, "t8_gatilho_em_empresas": true, "t8_marca_de_outra_empresa": "AUDITORIA_IMUTAVEL"
+}

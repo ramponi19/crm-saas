@@ -73,6 +73,7 @@ export function secoesDeConfiguracoes({ isAdmin, abasDosModulos, zapintel }: {
       { label: 'Usuários', itens: [
         { href: '/configuracoes/usuarios', label: 'Usuários' },
         { href: '/configuracoes/permissoes', label: 'Permissões' },
+        { href: '/configuracoes/auditoria', label: 'Auditoria' },
       ] },
       { label: 'Vendas e atendimento', itens: [
         { href: '/configuracoes/funil', label: 'Etapas do funil' },

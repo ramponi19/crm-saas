@@ -19,9 +19,21 @@ const SABADO_REDUZIDO = { semana: { '0': [], '1': dia('09:00', '18:00'), '2': di
 const ANTIGO = { inicio: '09:00', fim: '18:00', dias: [1, 2, 3, 4, 5] }
 
 /** Banco falso: só a leitura de configuracoes_sistema que o carregador faz. */
-const bancoCom = (linhas: { chave: string; valor: unknown }[]) => ({
-  from: () => ({ select: () => ({ eq: () => ({ in: async () => ({ data: linhas, error: null }) }) }) }),
-}) as never
+// Desde a etapa 1.1a, core.horario mora em empresa_config (uma linha por empresa/loja) e o formato antigo
+// (horario_comercial) segue em configuracoes_sistema. O banco falso aceita o envelope de antes e o reparte.
+const bancoCom = (linhas: { chave: string; valor: unknown }[]) => {
+  const env = linhas.find((l) => l.chave === 'core.horario')?.valor as { empresa?: unknown; lojas?: Record<string, unknown> } | undefined
+  const novas = env ? [
+    ...(env.empresa != null ? [{ modulo: 'core', chave: 'horario', filial_id: null, valor: env.empresa }] : []),
+    ...Object.entries(env.lojas ?? {}).map(([f, v]) => ({ modulo: 'core', chave: 'horario', filial_id: Number(f), valor: v })),
+  ] : []
+  const antiga = linhas.find((l) => l.chave === 'horario_comercial') ?? null
+  return {
+    from: (t: string) => t === 'empresa_config'
+      ? { select: () => ({ eq: () => ({ or: async () => ({ data: novas, error: null }) }) }) }
+      : { select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: antiga, error: null }) }) }) }) },
+  } as never
+}
 
 describe('agenda pública com sábado reduzido', () => {
   const h = horarioDaAgenda(SABADO_REDUZIDO)

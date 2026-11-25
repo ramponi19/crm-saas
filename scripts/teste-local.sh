@@ -19,7 +19,11 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 RAIZ=$(pwd)
 B=${PG_BIN:-/c/Ferramentas/pgsql-18.4/bin}
-PORTA_DB=56322; PORTA_API=56321
+# Projeto e portas: o padrão é o de sempre (teste-local, 561xx/5632x). Sessões paralelas usam os seus
+# (regra de isolamento, .claude/sessoes-locais.json): TESTE_LOCAL_PROJETO=etapa-1-1 TESTE_LOCAL_PREFIXO=573
+PROJETO=${TESTE_LOCAL_PROJETO:-teste-local}
+PREFIXO=${TESTE_LOCAL_PREFIXO:-563}
+PORTA_DB=${PREFIXO}22; PORTA_API=${PREFIXO}21; PORTA_SHADOW=${PREFIXO}20
 L="host=127.0.0.1 port=$PORTA_DB dbname=postgres user=postgres password=postgres"
 case "$L" in *127.0.0.1*) ;; *) echo "RECUSADO: não é o banco local"; exit 1;; esac
 export PGCLIENTENCODING=UTF8
@@ -41,12 +45,12 @@ trap desmontar EXIT
 mkdir -p "$TMP/supabase"
 cp -r supabase/migrations "$TMP/supabase/"
 cat > "$TMP/supabase/config.toml" <<EOF
-project_id = "teste-local"
+project_id = "$PROJETO"
 [api]
 port = $PORTA_API
 [db]
 port = $PORTA_DB
-shadow_port = 56320
+shadow_port = $PORTA_SHADOW
 major_version = 17
 [studio]
 enabled = false
