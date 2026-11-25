@@ -29,6 +29,7 @@ import { bancoIndisponivel, chaveMid, contaDoEvento, ErroDeBanco, ErroDeGravacao
 import { conferirCanalDeResposta, destinoNaConta, type TipoCanal } from "./canal-resposta.ts";
 import { direcaoNoHistorico, numeroDoCanalNoEvento } from "./historico.ts";
 import { negocioArquivadoDoEco, negocioAtivoDoEco } from "./eco.ts";
+import { comNovasTentativas, erroDeStorageTransitorio, prazoDaMidia, statusTransitorio } from "./midia.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -39,6 +40,10 @@ const GRAPH = Deno.env.get("META_GRAPH_VERSION") ?? "v25.0";
 const GRAPH_BASE = Deno.env.get("META_GRAPH_BASE") ?? "https://graph.facebook.com";
 /** Prazo da chamada de envio à Meta (ver postarNaMeta). */
 const PRAZO_ENVIO_META_MS = Number(Deno.env.get("META_PRAZO_ENVIO_MS") ?? 20_000);
+// Prazo de CADA tentativa de consulta/download de mídia na Meta (25/11/2026). Estourar conta como falha
+// passageira e repete (midia.ts). Curto de propósito: a Meta reenvia o webhook quando o 200 demora; o que
+// não couber vira mídia pendente e a rotina resgatar-midias busca depois, sem pressa.
+const PRAZO_MIDIA_MS = Number(Deno.env.get("MIDIA_PRAZO_MS") ?? 15_000);
 const APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
 /**
  * Segredo do app do INSTAGRAM — outro par, nao o do Facebook.
@@ -570,9 +575,12 @@ function descreverSemArquivo(t: string, m: Record<string, unknown>): string {
  * tradutor: foi justamente a lógica duplicada que deixou o eco sem baixar mídia
  * durante todo o primeiro dia de uso.
  */
+/** Mídia que falhou de passagem: a mensagem nasce com o tipo certo e PENDENTE, e a rotina busca de novo. */
+type MidiaPendente = { ref: string; expiraEm: string };
+
 async function traduzirWhatsApp(
   canal: Canal, m: Record<string, unknown>, ehEco = false,
-): Promise<{ tipo: string; conteudo: string; midiaUrl: string | null }> {
+): Promise<{ tipo: string; conteudo: string; midiaUrl: string | null; pendente?: MidiaPendente }> {
   const t = String(m.type ?? "text");
 
   if (t === "text") {
@@ -580,7 +588,17 @@ async function traduzirWhatsApp(
   }
 
   const tipoDb = BAIXAVEIS[t];
-  if (!tipoDb) return { tipo: "texto", conteudo: descreverSemArquivo(t, m), midiaUrl: null };
+  if (!tipoDb) {
+    const conteudo = descreverSemArquivo(t, m);
+    /**
+     * "[midia]" DE TIPO QUE NÃO CONHECEMOS (25/11/2026, só diagnóstico). Em 30 dias foram ~2.560 assim
+     * (Aletrini 2.425, JM 138) e não dá para saber o que eram. O pedido original vai para o cofre
+     * (`midia_desconhecida`), todos (≈85/dia), com a retenção de 7 dias que o cofre já tem
+     * (20261021001000_retencao). A bolha continua igual.
+     */
+    if (conteudo === "[midia]") await guardarBruto(canal, "midia_desconhecida", m);
+    return { tipo: "texto", conteudo, midiaUrl: null };
+  }
 
   const bloco = m[t] as Record<string, unknown> | undefined;
   const legenda = bloco?.caption ? String(bloco.caption) : "";
@@ -592,15 +610,40 @@ async function traduzirWhatsApp(
     return { tipo: "texto", midiaUrl: null, conteudo: legenda || rotuloEco(tipoDb) };
   }
 
-  const url = await salvarMidiaWhatsApp(canal, bloco?.id as string | undefined);
+  const salvo = await salvarMidiaWhatsApp(canal, bloco?.id as string | undefined);
 
-  if (!url) {
-    // O ID da mídia vive 30 dias na Meta: com o bruto guardado o anexo ainda pode
-    // ser resgatado depois. Sem o cofre ele se perde para sempre.
+  if (falhouMidia(salvo)) {
+    // O ID da mídia recebida por webhook vive 7 DIAS na Meta (documentação da Cloud API; o cofre também
+    // guarda 7 dias). Com o bruto guardado o anexo ainda pode ser resgatado depois.
     await guardarBruto(canal, "midia_sem_arquivo", m);
+    /**
+     * FALHA DE PASSAGEM (5xx, 429, tempo esgotado, mesmo depois das novas tentativas): a mensagem nasce com
+     * o TIPO CERTO e pendente; a rotina resgatar-midias busca de novo a cada 15 min até o prazo da Meta.
+     * Falha definitiva (acima do limite, 4xx) continua como sempre: texto, sem arquivo.
+     */
+    if (salvo.falha === "transitoria" && bloco?.id) {
+      return {
+        tipo: tipoDb, conteudo: legenda || nome || `[${tipoDb}]`, midiaUrl: null,
+        pendente: { ref: String(bloco.id), expiraEm: prazoDaMidia(m.timestamp) },
+      };
+    }
     return { tipo: "texto", conteudo: legenda || nome || `[${tipoDb}]`, midiaUrl: null };
   }
-  return { tipo: tipoDb, conteudo: legenda || nome || `[${tipoDb}]`, midiaUrl: url };
+  return { tipo: tipoDb, conteudo: legenda || nome || `[${tipoDb}]`, midiaUrl: salvo.url };
+}
+
+/**
+ * Marca a mensagem recém-gravada como mídia pendente (25/11/2026). Fica FORA da `mensagem_registrar` de
+ * propósito: a função de entrada não muda, e a marca vem logo depois, por id. Se a marca falhar, a mensagem já
+ * está gravada (o recebimento nunca cai por isso) e o chat mostra "indisponível", como antes.
+ */
+async function marcarMidiaPendente(msgId: number | null, p: MidiaPendente | undefined) {
+  if (msgId == null || !p) return;
+  const { error } = await db.from("mensagens")
+    .update({ midia_status: "pendente", midia_ref: p.ref, midia_expira_em: p.expiraEm })
+    .eq("id", msgId);
+  if (error) console.error("ALERTA midia pendente nao marcada:", msgId, error.message);
+  else console.log("midia pendente:", msgId, p.ref);
 }
 const MIDIA_MAX = 20 * 1024 * 1024;
 const EXT: Record<string, string> = {
@@ -748,9 +791,24 @@ type Baixado = {
   reel: { shortcode: string; autor: string | null; legenda: string | null; url: string } | null;
 };
 
+/**
+ * Por que a mídia não foi gravada (25/11/2026). `transitoria` = 5xx, 429 ou tempo esgotado mesmo depois das
+ * novas tentativas: a mensagem nasce PENDENTE e a rotina resgatar-midias busca de novo na Meta (prazo de 7
+ * dias). `definitiva` = não adianta tentar (4xx, acima do limite, página no lugar do arquivo): fica como hoje.
+ */
+type FalhaMidia = { falha: "transitoria" | "definitiva"; motivo: string };
+const falhouMidia = (x: unknown): x is FalhaMidia => !!x && typeof x === "object" && "falha" in x;
+
+/** Um fetch com prazo (tempo esgotado vira falha passageira em `comNovasTentativas`). */
+async function fetchComPrazo(url: string, init: RequestInit | undefined, ms: number): Promise<Response> {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), ms);
+  try { return await fetch(url, { ...(init ?? {}), signal: ctl.signal }); } finally { clearTimeout(t); }
+}
+
 async function baixarParaStorage(
   empresaId: number, url: string, chave?: string | null, bearer?: string,
-): Promise<Baixado | null> {
+): Promise<Baixado | FalhaMidia> {
   try {
     // Antes de gastar banda: esta mídia já veio num reenvio anterior?
     if (chave) {
@@ -758,11 +816,22 @@ async function baixarParaStorage(
       if (existente) { console.log("midia reaproveitada:", chave); return { ...existente, reel: null }; }
     }
 
-    const res = await fetch(url, bearer ? { headers: { Authorization: `Bearer ${bearer}` } } : undefined);
-    if (!res.ok) { console.error("midia download:", res.status); return null; }
-    const ct = (res.headers.get("content-type") ?? "application/octet-stream").split(";")[0].trim();
-    const buf = await res.arrayBuffer();
-    if (buf.byteLength > MIDIA_MAX) { console.log("midia acima do limite:", buf.byteLength); return null; }
+    // DOWNLOAD com novas tentativas (25/11/2026): 5xx, 429 e tempo esgotado repetem até 2 vezes.
+    const baixado = await comNovasTentativas<{ ct: string; buf: ArrayBuffer }>(async () => {
+      const res = await fetchComPrazo(url, bearer ? { headers: { Authorization: `Bearer ${bearer}` } } : undefined, PRAZO_MIDIA_MS);
+      if (!res.ok) return { ok: false, transitorio: statusTransitorio(res.status), motivo: `download HTTP ${res.status}` };
+      const ct = (res.headers.get("content-type") ?? "application/octet-stream").split(";")[0].trim();
+      return { ok: true, valor: { ct, buf: await res.arrayBuffer() } };
+    });
+    if (!baixado.ok) {
+      console.error("midia download:", baixado.motivo, `(${baixado.tentativas} tentativa(s))`);
+      return { falha: baixado.transitorio ? "transitoria" : "definitiva", motivo: baixado.motivo };
+    }
+    const { ct, buf } = baixado.valor;
+    if (buf.byteLength > MIDIA_MAX) {
+      console.log("midia acima do limite:", buf.byteLength);
+      return { falha: "definitiva", motivo: "acima do limite" };
+    }
 
     /**
      * VEIO PÁGINA, NÃO ARQUIVO — e às vezes a página é o conteúdo.
@@ -777,24 +846,31 @@ async function baixarParaStorage(
       const reel = extrairReel(new TextDecoder().decode(buf));
       if (reel) { console.log("reel identificado:", reel.shortcode); return { url: null, mime: ct, reel }; }
       console.error("midia recusada, veio pagina sem post:", ct);
-      return null;
+      return { falha: "definitiva", motivo: "pagina no lugar do arquivo" };
     }
 
     const path = chave
       ? caminhoDaMidia(empresaId, chave, EXT[ct] ?? "bin")
       : `${empresaId}/${crypto.randomUUID()}.${EXT[ct] ?? "bin"}`;
-    const { error } = await db.storage.from("chat-midia")
-      .upload(path, buf, { contentType: ct, upsert: !!chave });
-    if (error) { console.error("midia upload:", error.message); return null; }
+    // UPLOAD com novas tentativas, com o arquivo que JÁ está na memória (não baixa de novo). Com chave o
+    // caminho é determinístico e o upsert torna a repetição inofensiva; sem chave, o caminho aleatório é o
+    // mesmo nas três tentativas (sorteado uma vez acima).
+    const gravado = await comNovasTentativas<true>(async () => {
+      const { error } = await db.storage.from("chat-midia")
+        .upload(path, buf, { contentType: ct, upsert: !!chave });
+      if (error) return { ok: false, transitorio: erroDeStorageTransitorio(error), motivo: `upload: ${error.message}` };
+      return { ok: true, valor: true };
+    });
+    if (!gravado.ok) {
+      console.error("midia upload:", gravado.motivo, `(${gravado.tentativas} tentativa(s))`);
+      return { falha: gravado.transitorio ? "transitoria" : "definitiva", motivo: gravado.motivo };
+    }
+    if (gravado.tentativas > 1) console.log("midia gravada na tentativa", gravado.tentativas, path);
     return { url: db.storage.from("chat-midia").getPublicUrl(path).data.publicUrl, mime: ct, reel: null };
-  } catch (e) { console.error("baixarParaStorage:", e); return null; }
-}
-
-/** Só a URL — para quem já sabe o tipo (WhatsApp diz no payload). */
-async function salvarMidia(
-  empresaId: number, url: string, chave?: string | null, bearer?: string,
-): Promise<string | null> {
-  return (await baixarParaStorage(empresaId, url, chave, bearer))?.url ?? null;
+  } catch (e) {
+    console.error("baixarParaStorage:", e);
+    return { falha: "transitoria", motivo: `erro: ${(e as Error)?.message ?? e}` };
+  }
 }
 
 /** Quem manda é o arquivo: "share" do Instagram pode ser foto, vídeo ou reel. */
@@ -823,20 +899,32 @@ const ROTULO_ANEXO: Record<string, string> = {
   location: "📍 localização",
 };
 
-async function salvarMidiaWhatsApp(canal: Canal, mediaId: string | undefined): Promise<string | null> {
+async function salvarMidiaWhatsApp(canal: Canal, mediaId: string | undefined): Promise<{ url: string } | FalhaMidia> {
   try {
-    if (!mediaId || !canal.token) return null;
-    const info = await fetch(`https://graph.facebook.com/${GRAPH}/${mediaId}`, {
-      headers: { Authorization: `Bearer ${canal.token}` },
+    if (!mediaId || !canal.token) return { falha: "definitiva", motivo: "sem id da mídia ou sem token" };
+    // CONSULTA À META com novas tentativas (25/11/2026): a URL que ela devolve vale 5 minutos.
+    const info = await comNovasTentativas<Record<string, unknown>>(async () => {
+      const r = await fetchComPrazo(`https://graph.facebook.com/${GRAPH}/${mediaId}`, {
+        headers: { Authorization: `Bearer ${canal.token}` },
+      }, PRAZO_MIDIA_MS);
+      if (!r.ok) return { ok: false, transitorio: statusTransitorio(r.status), motivo: `WA media info HTTP ${r.status}: ${(await r.text()).slice(0, 200)}` };
+      return { ok: true, valor: await r.json() };
     });
-    if (!info.ok) { console.error("WA media info:", await info.text()); return null; }
-    const meta = await info.json();
+    if (!info.ok) {
+      console.error("WA media info:", info.motivo, `(${info.tentativas} tentativa(s))`);
+      return { falha: info.transitorio ? "transitoria" : "definitiva", motivo: info.motivo };
+    }
+    const meta = info.valor;
+    if (!meta?.url) return { falha: "definitiva", motivo: "a Meta não devolveu URL" };
     // `mediaId` é o id que a Meta dá ao ARQUIVO: o mesmo em todos os reenvios,
     // e o mesmo quando o histórico é reprocessado. É a chave perfeita.
-    return meta?.url
-      ? await salvarMidia(canal.empresa_id, meta.url as string, `wa-${mediaId}`, canal.token)
-      : null;
-  } catch (e) { console.error("salvarMidiaWhatsApp:", e); return null; }
+    const salvo = await baixarParaStorage(canal.empresa_id, meta.url as string, `wa-${mediaId}`, canal.token);
+    if (falhouMidia(salvo)) return salvo;
+    return salvo.url ? { url: salvo.url } : { falha: "definitiva", motivo: "sem arquivo" };
+  } catch (e) {
+    console.error("salvarMidiaWhatsApp:", e);
+    return { falha: "transitoria", motivo: `erro: ${(e as Error)?.message ?? e}` };
+  }
 }
 
 async function extrairMidiaMeta(
@@ -904,7 +992,9 @@ async function extrairMidiaMeta(
       // (`mid`) — e é ele que o reenvio repete. Um anexo por mensagem aqui
       // (lemos `attachments[0]`), então o `mid` identifica a mídia sem ambiguidade.
       const mid = message?.mid as string | undefined;
-      const salvo = await baixarParaStorage(canal.empresa_id, aUrl, mid ? `ig-${mid}` : null);
+      const tentativa = await baixarParaStorage(canal.empresa_id, aUrl, mid ? `ig-${mid}` : null);
+      // Instagram/Messenger: a URL do anexo é de CDN e expira; sem id para buscar depois, a falha fica como antes.
+      const salvo = falhouMidia(tentativa) ? null : tentativa;
       // Reel: o CONTEÚDO é o cartão. Mesmo desenho do card de anúncio — tipo
       // próprio e JSON no texto —, e o chat sabe renderizar (`ReelChat`).
       if (salvo?.reel) {
@@ -1136,6 +1226,8 @@ async function registrarRecebida(canal: Canal, p: {
   origem: string; origemId: string; texto: string; externalId: string | null;
   tipo?: string; midiaUrl?: string | null; fotoUrl?: string | null;
   anuncio?: AnuncioOrigem | null;
+  /** Mídia que falhou de passagem: marcada pendente logo depois de gravar (25/11/2026). */
+  midiaPendente?: MidiaPendente;
 }) {
   const empresaId = canal.empresa_id;
   const tipo = p.tipo ?? "texto";
@@ -1199,6 +1291,8 @@ async function registrarRecebida(canal: Canal, p: {
   await completarCadastro(canal, p, null);
 
   if (msgId == null) { console.log("msg duplicada ignorada:", p.externalId); return; }
+
+  await marcarMidiaPendente(msgId, p.midiaPendente);
 
   // "NÃO QUERO RECEBER OFERTAS" (24/11/2026; migração 20261124001900). O banco decide (texto do botão da empresa,
   // só WhatsApp) e marca o contato; na primeira vez devolve a confirmação, que sai já, pelo mesmo número — o toque
@@ -1272,6 +1366,7 @@ async function completarCadastro(canal: Canal, p: {
 async function registrarEcho(
   canal: Canal, destinatario: string | undefined, mid: string | undefined,
   texto: string, origem: string, tipo = "texto", midiaUrl: string | null = null,
+  midiaPendente?: MidiaPendente,
 ) {
   try {
     if (!destinatario || !mid) return;
@@ -1313,6 +1408,7 @@ async function registrarEcho(
     if (fora) throw new ErroDeBanco(`gravar echo ${mid}: ${erro}`);
     if (erro) { console.error("gravar echo:", mid, erro); return; }
     if (msgId == null) console.log("echo duplicado ignorado:", mid);
+    else await marcarMidiaPendente(msgId, midiaPendente);
   } catch (e) {
     // Banco fora sobe até o handler (500 + esquecer hash e mids); o resto é log.
     if (e instanceof ErroDeBanco) throw e;
@@ -1571,8 +1667,9 @@ async function enriquecerMidiaDoHistorico(canal: Canal, mensagens: Record<string
       if (!alvo) { semPlaceholder++; continue; }
 
       const midia = m[tipoMsg] as Record<string, unknown> | undefined;
-      const url = await salvarMidiaWhatsApp(canal, midia?.id as string | undefined);
-      if (!url) continue;
+      const salvo = await salvarMidiaWhatsApp(canal, midia?.id as string | undefined);
+      if (falhouMidia(salvo)) continue;
+      const url = salvo.url;
 
       const legenda = midia?.caption as string | undefined;
       const { data } = await db.from("mensagens")
@@ -2299,12 +2396,12 @@ serve(async (req: Request) => {
                 }
                 continue;
               }
-              const { tipo, conteudo: texto, midiaUrl } = await traduzirWhatsApp(canal, m);
+              const { tipo, conteudo: texto, midiaUrl, pendente } = await traduzirWhatsApp(canal, m);
               await registrarRecebida(canal, {
                 nome: ((contatos?.[0]?.profile as Record<string, unknown> | undefined)?.name as string) ?? null,
                 telefone: fone, instagramUser: null, origem: "whatsapp", origemId: fone,
                 texto, externalId: (m.id as string) ?? null, tipo, midiaUrl,
-                anuncio: extrairAnuncio(m),
+                anuncio: extrairAnuncio(m), midiaPendente: pendente,
               });
             }
           }
@@ -2376,10 +2473,10 @@ serve(async (req: Request) => {
                * WhatsApp vem um ID que precisa ser trocado pelo arquivo com o token.
                */
               // `true`: e eco, a loja que mandou. Foto e video viram registro, nao arquivo.
-              const { tipo, conteudo, midiaUrl } = await traduzirWhatsApp(canal, e, true);
+              const { tipo, conteudo, midiaUrl, pendente } = await traduzirWhatsApp(canal, e, true);
               // No echo o cliente é o "to" — o "from" é o número do negócio.
               await registrarEcho(canal, String(e.to ?? "").replace(/\D/g, ""), e.id as string,
-                conteudo, "whatsapp", tipo, midiaUrl);
+                conteudo, "whatsapp", tipo, midiaUrl, pendente);
             }
           }
 
