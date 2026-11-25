@@ -47,7 +47,8 @@ flowchart TD
     E12[E1.2 · Variante<br/>estoque_variantes, herança, encomenda com variante,<br/>migração com dump novo] --> E13
     E13[E1.3 · Meios de pagamento] --> E14
     E14[E1.4 · Venda única + migração M<br/>evento de conclusão → negócio ganho → Pós-venda] --> E15
-    E15[E1.5 · Caixa] --> F2
+    E15[E1.5 · Caixa] --> E16
+    E16[E1.6 · Fim do papel legado<br/>checagens por permissão, sai empresa_usuarios.role] --> F2
     F2[Fase 2 · calendário, devolução/troca/garantia,<br/>comissão, desconto, impressão, crediário] --> F3[Fase 3 · integrações]
     E12 --> P1[P1 · Precificação por planilha<br/>em paralelo]
     P1 --> P2[P2 · IA, endpoint, saída] --> P3[P3 · agendamento, API do PXT]
@@ -64,6 +65,7 @@ flowchart TD
 | **E1.3 Meios de pagamento** | E1.1 | P1 |
 | **E1.4 Venda única + M** | E1.2 (`vendas_itens.variante_id`), E1.3 | P1. **Pós-venda precisa estar estável**: a 1.4 passa a ganhar o negócio pela conclusão |
 | **E1.5 Caixa** | E1.4 | P1 |
+| **E1.6 Fim do papel legado** | E1.5 (todas as telas da Fase 1 já trocadas) | P1 |
 | **Fase 2** | Fase 1 | P2 |
 | **Pós-venda (terminar e ligar na JM)** | nada técnico das outras frentes; ligar depende da triagem dos 42 e do ok da simulação | tudo. Ele só lê `estoque_categorias` e só grava `negocios`/`posvenda_*` |
 
@@ -77,6 +79,8 @@ flowchart TD
 - a herança de preço precisa das permissões `estoque.preco_variante` e `estoque.preco_proprio` e da auditoria, para o histórico;
 - o custo tem de estar protegido antes de a variante mexer nas telas de estoque.
 
+**E1.6 Fim do papel legado** (registrado em 25/11, a pedido do Lucas): na 1.1 o cargo passa a definir o papel antigo (`empresa_usuarios.role`), para as 264 checagens de papel em ~115 arquivos continuarem certas sem trocar tudo de uma vez ([etapa-1.1-plano.md §2.2](etapa-1.1-plano.md)). Essa camada de compatibilidade **tem data para sair**: a E1.6, última etapa da Fase 1, troca o que sobrar por permissões e remove a coluna. Até lá, cada etapa troca as checagens das telas que mexer, e o contador `scripts/check-papel.mjs` (criado na 1.1b) só deixa o número cair.
+
 ### 2.1 Critérios de aceite resumidos
 
 | Etapa | Pronto quando |
@@ -88,6 +92,7 @@ flowchart TD
 | **E1.3** | Formas, maquininhas e taxas por empresa; Pix estático; taxas migradas de `financeiro_taxas` sem diferença |
 | **E1.4** | Prova de totais do §M (inclusive R$ 596.707,50 das 92 da reconciliação como `pendencia_legado`); 23 leitores trocados no mesmo deploy; preço relido no servidor; **cada conclusão ganha o negócio com `dados.venda` e abre a jornada do Pós-venda uma vez só** (sem duplicar quando o negócio já estava ganho); smoke com empresa sem PDV |
 | **E1.5** | Caixa abrir/sangrar/fechar cego; movimentos imutáveis |
+| **E1.6** | Busca no código e no banco sem nenhum leitor de `empresa_usuarios.role` (nem `requireEmpresaRole*`, `getEmpresaRole`, `useSouAdmin`, `is_empresa_admin`); o gatilho que deriva o papel do cargo e a coluna `role` removidos; matriz de cargos da 1.1b verde |
 | **Fase 2** | Testes T-H1a–k e T-H2 da comissão; prova de cancelamento/devolução; etiqueta impressa na B2 Pro |
 | **Pós-venda ligado na JM** | O que o módulo já definiu: triagem, simulação aprovada, réguas da JM gravadas desativadas, depois ativadas |
 

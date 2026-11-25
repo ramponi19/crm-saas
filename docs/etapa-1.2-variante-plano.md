@@ -25,7 +25,7 @@ Regra de trabalho que vale aqui (memória do projeto, "Excelência sem espera de
 | `empresa_config` definitivo | nada de config nova na 1.2; as chaves de preço (se vierem) usam o motor |
 | RLS de escrita substituída por RPC nas tabelas de estoque | a variante já nasce sem escrita direta: só RPC |
 
-**Atenção para o plano da 1.1** (não é escopo desta etapa, mas afeta a ordem): o §B.1 do PDV v2 diz "remoção das colunas antigas [de custo] no **mesmo deploy** do app". Pela regra nova, a 1.1 tem de seguir o padrão em três tempos: (1) satélite criado e preenchido por gatilho, com as colunas antigas mantidas; (2) app lendo do satélite; (3) colunas antigas removidas num deploy separado. Se a 1.1 não puder seguir esse padrão, a justificativa vai no plano dela e espera a decisão do Matheus.
+**Atenção para o plano da 1.1** (não é escopo desta etapa, mas afeta a ordem): o §B.1 do PDV v2 diz "remoção das colunas antigas [de custo] no **mesmo deploy** do app". Pela regra nova, a 1.1 tem de seguir o padrão em três tempos: (1) satélite criado e preenchido por gatilho, com as colunas antigas mantidas; (2) app lendo do satélite; (3) colunas antigas removidas num deploy separado. Se a 1.1 não puder seguir esse padrão, a justificativa vai no plano dela e espera a decisão do Matheus. **Resolvido em 25/11:** [etapa-1.1-plano.md §4](etapa-1.1-plano.md) usa quatro tempos (entregas 1.1d a 1.1g), com a coluna antiga legível até o app novo estar no ar.
 
 ---
 

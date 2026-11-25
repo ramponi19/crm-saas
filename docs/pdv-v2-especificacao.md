@@ -372,10 +372,13 @@ São usadas nas políticas de **leitura** (ex.: ver venda de outro) e dentro de 
 
 **Item futuro (registrado em 24/11, sem etapa):** limite de **valor de troca** com aprovação, configurável por empresa. Acima do limite (por modelo, percentual da referência ou valor), o vendedor pede aprovação, pelo mesmo fluxo do §F. Hoje existe só o aceite de troca acima da referência, em `vendas_alertas`.
 
-**Migração (1.1):**
-- cópia `preco_custo`/`custo_reparo` → satélite, `valor_custo` → satélite;
-- prova de somas iguais por empresa;
-- remoção das colunas antigas no **mesmo deploy** do app (as 17 linhas da tabela acima). Nenhum valor muda.
+**Migração (1.1), em quatro tempos** (revisto em 25/11 pela regra "migração compatível com o app no ar" e pela resposta do Lucas; detalhe em [etapa-1.1-plano.md §4](etapa-1.1-plano.md)):
+1. **Tempo 1 (banco):** satélites criados, preenchidos (prova de somas iguais por empresa) e protegidos por `estoque.ver_custo`; gatilhos mantêm coluna antiga e satélite iguais nos dois sentidos. A coluna antiga continua legível como hoje: o Dono não perde nada e o vendedor não ganha exposição nova.
+2. **Tempo 2 (app):** o app lê e grava só nos satélites (as 17 linhas da tabela acima), com o custo pendente e a lista.
+3. **Tempo 3 (banco, logo depois do tempo 2, na mesma janela):** a coluna antiga fica vazia para todos; o gatilho continua só como porta de entrada até o tempo 4.
+4. **Tempo 4 (banco, deploy separado):** remoção das colunas antigas, só depois de provar que nada mais as lê (código, banco e logs da API).
+
+Nenhum valor muda.
 
 **Teste de aceite:** um usuário **Vendedor** e um **Consulta** percorrem todas as rotas e telas da tabela, e o teste procura `custo`, `preco_custo`, `valor_custo`, `lucro` e `margem` em toda resposta JSON e em todo prop serializado. Tem de dar zero ocorrências.
 
@@ -1130,6 +1133,13 @@ Implementações em `lib/fiscal/provedores/<nome>.ts`, como `lib/payments/provid
    - Com o volume atual, uma consulta na hora com índice `(cliente_id, status)` basta. Se crescer, vira uma tabela-resumo atualizada pelas RPCs.
 2. **Evento `venda_concluida` e o módulo Pós-venda** (revisto em 24/11).
 
+   **As duas "vendas" do Nexus (registrado em 25/11):**
+   - **Negócio ganho no funil** (`negocios.status = ganho`): é a base do Pós-venda. A JM tem mais de 300, a maioria sem venda no PDV.
+   - **Venda no PDV** (`vendas_vendas`, depois `vendas`): é a base do faturamento e da comissão.
+   - **Daqui em diante**, venda concluída no PDV **ganha o negócio** (é o gatilho do Pós-venda), pelo evento descrito abaixo (etapa 1.4).
+   - Os **negócios ganhos antigos sem venda no PDV** ficam como **legado**: contam para o Pós-venda (as jornadas já existem) e **não** contam para faturamento nem comissão.
+   - Conferido no código em 25/11: painel, relatórios, metas, ranking e comissão já leem o faturamento só da venda; o valor do negócio entra apenas na previsão das Metas, e só com negócios abertos.
+
    **Situação encontrada:**
    - O módulo Pós-venda está **em produção no banco**: todas as migrações `posvenda_*`, inclusive `posvenda_ativar_existentes`. O app está na `main`, com o módulo em preparação e não ligado na JM.
    - O gatilho dele **não é a venda**: é o negócio virar **ganho** (trigger `negocios_posvenda`, que chama `posvenda_iniciar_jornadas`).
@@ -1457,6 +1467,16 @@ gantt
 | Conta "Meta Reviewer" | Desativada na etapa 1.1; os 3 negócios e a conversa vão para o Matheus | §B |
 | Dias úteis | Calendário de feriados configurável (nacionais pré-carregados, estaduais e municipais por empresa e loja) | §N |
 | Impressora da JM | Niimbot **B2 Pro** (300 dpi, 2", preto e vermelho); prova de conceito antes da Fase 2 | §J, [spike-niimbot.md](spike-niimbot.md) |
+
+### Tomadas em 25/11/2026
+
+| Tema | Decisão | Onde ficou |
+|---|---|---|
+| Duas "vendas" | Negócio ganho no funil = base do Pós-venda; venda no PDV = faturamento e comissão. Daqui em diante, venda concluída no PDV ganha o negócio; ganhos antigos sem venda no PDV são legado: contam para o Pós-venda, não para faturamento nem comissão | §L.2 |
+| Custo protegido | Em quatro tempos (satélite sincronizado, coluna antiga ainda legível → app no satélite → coluna antiga vazia na mesma janela → remoção das colunas), cada um com deploy próprio; o Dono nunca fica sem custo | §B.1, [etapa-1.1-plano.md](etapa-1.1-plano.md) |
+| Superadmin | Papel de plataforma, fora dos cargos de qualquer empresa; todo acesso a dados de empresa auditado | §B, [etapa-1.1-plano.md](etapa-1.1-plano.md) |
+| Cargo Consulta | Vê leads, vendas, relatórios sem custo e a rede inteira; sem Financeiro, sem custo, sem escrita | §B |
+| Papel legado | O cargo define `empresa_usuarios.role` até a etapa E1.6 "Fim do papel legado", que remove a camada | [roteiro](roteiro-reconstrucao.md) §2 |
 
 ### Abertas
 
