@@ -1,19 +1,88 @@
 {
-  "t1_linhas": [{ "valor": 10, "filial": null }, { "valor": "loja3", "filial": 3 }],
-  "t1_envelope_tabela_antiga": { "lojas": { "3": "loja3" }, "empresa": 10 },
-  "t1_resposta": { "lojas": { "3": "loja3" }, "empresa": 10 },
+  "t1_linhas": [
+    {
+      "valor": 10,
+      "filial": null
+    },
+    {
+      "valor": "loja3",
+      "filial": 3
+    }
+  ],
+  "t1_envelope_tabela_antiga": {
+    "lojas": {
+      "3": "loja3"
+    },
+    "empresa": 10
+  },
+  "t1_resposta": {
+    "lojas": {
+      "3": "loja3"
+    },
+    "empresa": 10
+  },
   "t1_autor": "a632db2c-c42b-4973-8008-2d5ca2dbf479",
   "t1_auditoria": [
-    { "id": "core.teste_cfg", "antes": { "valor": null }, "depois": { "valor": 10 }, "filial": null },
-    { "id": "core.teste_cfg@3", "antes": { "valor": null }, "depois": { "valor": "loja3" }, "filial": 3 }
+    {
+      "id": "core.teste_cfg",
+      "antes": {
+        "valor": null
+      },
+      "depois": {
+        "valor": 10
+      },
+      "filial": null
+    },
+    {
+      "id": "core.teste_cfg@3",
+      "antes": {
+        "valor": null
+      },
+      "depois": {
+        "valor": "loja3"
+      },
+      "filial": 3
+    }
   ],
   "t2_sem_auditoria_repetida": true,
-  "t3_linha_da_loja": 0, "t3_le_empresa": 10, "t3_auditoria_depois_nulo": { "valor": null },
-  "t4_insert_empresa": 12, "t4_insert_loja": 4, "t4_loja_inexistente_ignorada": 0,
-  "t4_update_empresa": 20, "t4_update_loja_cai_na_empresa": 20,
-  "t4_delete": null, "t4_delete_linhas": 0,
+  "t3_linha_da_loja": 0,
+  "t3_le_empresa": 10,
+  "t3_auditoria_depois_nulo": {
+    "valor": null
+  },
+  "t4_insert_empresa": 12,
+  "t4_insert_loja": 4,
+  "t4_loja_inexistente_ignorada": 0,
+  "t4_update_empresa": 20,
+  "t4_update_loja_cai_na_empresa": 20,
+  "t4_delete": null,
+  "t4_delete_linhas": 0,
   "t5_chaves_antigas_fora": true,
-  "t6_uma_linha_empresa": 1, "t6_autor_mantido": "a632db2c-c42b-4973-8008-2d5ca2dbf479",
-  "t7_vendedora_le_jm": true, "t7_vendedora_le_demo": 0, "t7_insert_direto": "42501", "t7_update_direto": "42501", "t7_dono5_le_jm": 0,
-  "t8_envelope_igual_tabela": true
+  "t6_uma_linha_empresa": 1,
+  "t6_autor_mantido": "a632db2c-c42b-4973-8008-2d5ca2dbf479",
+  "t7_vendedora_le_jm": true,
+  "t7_vendedora_le_demo": 0,
+  "t7_insert_direto": "42501",
+  "t7_update_direto": "42501",
+  "t7_dono5_le_jm": 0,
+  "t8_envelope_igual_tabela": true,
+  "t9_gatilhos_em_empresa_config": 0,
+  "t9_gatilhos_ponte": 1,
+  "t9_ponte_nao_grava_envelope": true,
+  "t9a_envelope_direto_depois_do_salvar": [
+    2,
+    5
+  ],
+  "t9a_marca_limpa_depois_do_salvar": true,
+  "t9a_salvar_de_novo": {
+    "lojas": {
+      "3": 5
+    },
+    "empresa": 3
+  },
+  "t9a_linhas": 2,
+  "t9b_final_tabela": 1100,
+  "t9b_final_envelope": 1100,
+  "t9b_uma_linha": 1,
+  "t9c_sem_envelope": true
 }

@@ -92,5 +92,40 @@ begin
        and nullif(c.valor -> 'empresa', 'null'::jsonb) is distinct from
            config_valor_emp(c.empresa_id, split_part(c.chave, '.', 1), substr(c.chave, length(split_part(c.chave, '.', 1)) + 2))));
 
+  -- 9. LAÇO DA SINCRONIZAÇÃO (pedido do Lucas, 25/11): gravar no formato antigo e na tabela nova não
+  --    dispara cadeia. Por construção há um gatilho só (configuracoes_sistema → empresa_config) e nenhum no
+  --    sentido inverso; o caminho tabela nova → envelope é só o config_salvar, marcado para a ponte não refazer.
+  --    Com teto de tempo e de profundidade: uma cadeia estouraria um dos dois.
+  perform set_config('statement_timeout', '3s', true);
+  perform set_config('request.jwt.claims', jsonb_build_object('sub', v_dono1, 'role', 'authenticated')::text, true);
+  r := r || jsonb_build_object(
+    't9_gatilhos_em_empresa_config', (select count(*) from pg_trigger where tgrelid = 'public.empresa_config'::regclass and not tgisinternal),
+    't9_gatilhos_ponte', (select count(*) from pg_trigger where tgrelid = 'public.configuracoes_sistema'::regclass and not tgisinternal
+                                                         and tgname = 'configuracoes_sistema_ponte'),
+    't9_ponte_nao_grava_envelope', position('configuracoes_sistema' in
+        regexp_replace((select prosrc from pg_proc where proname = 'empresa_config_do_envelope'), 'from public\.configuracoes_sistema', '', 'g')) = 0);
+  -- 9a. sequência mista na mesma transação: salvar (tabela nova + envelope), gravar o envelope direto, salvar de novo
+  perform config_salvar('core', 'teste_laco', '1'::jsonb);
+  update configuracoes_sistema set valor = '{"empresa": 2, "lojas": {"3": 5}}' where empresa_id = 1 and chave = 'core.teste_laco';
+  r := r || jsonb_build_object('t9a_envelope_direto_depois_do_salvar',
+    jsonb_build_array(config_valor_emp(1, 'core', 'teste_laco'), config_valor_emp(1, 'core', 'teste_laco', 3)),
+    't9a_marca_limpa_depois_do_salvar', coalesce(current_setting('nexus.config_salvando', true), '') = '');
+  v := config_salvar('core', 'teste_laco', '3'::jsonb);
+  r := r || jsonb_build_object('t9a_salvar_de_novo', v - 'atualizado_em' - 'atualizado_por',
+    't9a_linhas', (select count(*) from empresa_config where empresa_id = 1 and chave = 'teste_laco'));
+  -- 9b. 200 gravações alternadas: terminam dentro do teto, com uma linha de empresa e o mesmo valor nas duas formas
+  for v_n in 1..100 loop
+    perform config_salvar('core', 'teste_laco', to_jsonb(v_n));
+    update configuracoes_sistema set valor = jsonb_build_object('empresa', v_n + 1000, 'lojas', '{}'::jsonb)
+     where empresa_id = 1 and chave = 'core.teste_laco';
+  end loop;
+  r := r || jsonb_build_object('t9b_final_tabela', config_valor_emp(1, 'core', 'teste_laco'),
+    't9b_final_envelope', (select valor -> 'empresa' from configuracoes_sistema where empresa_id = 1 and chave = 'core.teste_laco'),
+    't9b_uma_linha', (select count(*) from empresa_config where empresa_id = 1 and chave = 'teste_laco'));
+  -- 9c. gravação direta na tabela nova (só o service_role pode; ninguém faz hoje) não volta para o envelope
+  insert into empresa_config (empresa_id, modulo, chave, valor) values (1, 'core', 'teste_so_tabela', '7');
+  r := r || jsonb_build_object('t9c_sem_envelope', not exists (select 1 from configuracoes_sistema where empresa_id = 1 and chave = 'core.teste_so_tabela'));
+  perform set_config('statement_timeout', '0', true);
+
   raise exception 'RESULTADO_TESTE_EMPRESA_CONFIG %', r::text;
 end $teste$;

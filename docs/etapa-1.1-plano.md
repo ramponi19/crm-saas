@@ -31,6 +31,7 @@ Regra que vale aqui ("Excelência sem espera de horário", 25/11):
 | **1.1f** | Custo, **tempo 3**, na mesma janela de trabalho da 1.1e: a coluna antiga fica vazia para todos; o gatilho continua até o tempo 4 | sim | não | nada (o app já não lê a coluna) |
 | **1.1g** | Custo, **tempo 4**: remove as colunas antigas, num deploy separado, depois de provar que nada as lê | sim | não | nada |
 | **1.1h** | Contração do resto: envelope provisório da configuração e `empresas.permissoes` | sim | não | nada |
+| **1.1i** | Gerador de valores padrão: todos os padrões no catálogo, gerados para o banco e materializados na criação da empresa e na instalação do módulo. **Antes de qualquer cliente novo e antes de a Aletrini ligar módulo com configuração** (roteiro §2) | talvez (função de semente) | sim (cadastro) | nada para a JM |
 
 Ordem obrigatória: a → b → c → d → e → f → g; a **h** depois da b e da e (sem leitor antigo). Cada uma vai sozinha para a produção; a f sobe logo depois da e, na mesma janela.
 
@@ -97,7 +98,7 @@ Compatibilidade: o app de hoje lê pelas funções (corpo trocado, mesma respost
 
 **Como ficou no código (25/11, commits `3beb8e04` e `d639ee88`, local):**
 - O catálogo das chaves ficou em `lib/config.ts` (`DEFINICOES_CONFIG`), não no manifesto: o pós-venda já tinha as definições em `lib/posvenda/config.ts` e o catálogo as reaproveita, sem cópia. O teste `tests/config.test.ts` reprova chave usada no código ou nas migrações que não esteja no catálogo.
-- O gerador de padrões para o SQL (`scripts/gerar-config-padroes.mjs`) **não** foi feito: os padrões de horário, liberação diária, sem ofertas e dias úteis continuam no chamador (marcados `padraoNoChamador`) e passam ao catálogo quando o módulo for tocado.
+- O gerador de padrões para o SQL (`scripts/gerar-config-padroes.mjs`) **não** foi feito na 1.1a: os padrões de horário, liberação diária, sem ofertas e dias úteis continuam no chamador (marcados `padraoNoChamador`). Destino: **entrega 1.1i** (registrada no roteiro §2), obrigatória antes de qualquer cliente novo, Aletrini incluída.
 - Além das duas telas do pós-venda, três leitores diretos de `core.horario` passaram ao motor novo: `api/configuracoes/horario` (GET), `lib/horario-empresa.ts` e `lib/alertas-entrada.ts`. Com isso, nenhum código do app lê o envelope provisório (pré-requisito da 1.1h).
 - Tabelas novas lidas com cliente sem tipo: `types/database.gerado.ts` é gerado da produção e só as terá depois da migração aplicada.
 - `scripts/teste-local.sh` aceita projeto e portas próprios (`TESTE_LOCAL_PROJETO`, `TESTE_LOCAL_PREFIXO`) para sessões paralelas. A faixa 553xx é reservada pelo Windows nesta máquina; usar 573xx.
