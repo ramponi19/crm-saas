@@ -50,7 +50,7 @@ describe('resgate das mídias pendentes', () => {
     const db = cenario([{ id: 1, empresa_id: 1, canal_id: 15, tipo: 'audio', midia_url: null, midia_status: 'pendente', midia_ref: '1184151040855213', midia_tentativas: 0, midia_expira_em: EM_3_DIAS }])
     const meta = metaFalsa({ '1184151040855213': {} })
     const r = await resgatarMidiasPendentes(db as unknown as SupabaseClient, dep(meta.f))
-    assert.deepEqual(r, { expiradas: 0, resgatadas: 1, indisponiveis: 0, adiadas: 0 })
+    assert.deepEqual(r, { expiradas: 0, resgatadas: 1, indisponiveis: 0, adiadas: 0, jaResolvidas: 0 })
     assert.ok(db.arquivos.has('chat-midia/1/m/wa-1184151040855213.ogg'), 'mesmo caminho determinístico da Edge')
     const m = (await db.from('mensagens').select('*').eq('id', 1).single()).data as Record<string, unknown>
     assert.equal(m.midia_status, null)
@@ -90,7 +90,7 @@ describe('resgate das mídias pendentes', () => {
       getPublicUrl: (c: string) => ({ data: { publicUrl: c } }),
     }) as unknown as ReturnType<typeof db.storage.from>
     const r = await resgatarMidiasPendentes(db as unknown as SupabaseClient, dep(meta.f))
-    assert.deepEqual(r, { expiradas: 0, resgatadas: 0, indisponiveis: 0, adiadas: 2 })
+    assert.deepEqual(r, { expiradas: 0, resgatadas: 0, indisponiveis: 0, adiadas: 2, jaResolvidas: 0 })
     const linhas = (await db.from('mensagens').select('*').order('id')).data as Record<string, unknown>[]
     assert.deepEqual(linhas.map((l) => [l.id, l.midia_status, l.midia_tentativas]), [[4, 'pendente', 3], [5, 'pendente', 1]])
   })
@@ -106,7 +106,7 @@ describe('resgate das mídias pendentes', () => {
     const db = cenario([{ id: 7, empresa_id: 1, canal_id: 15, tipo: 'audio', midia_url: 'x', midia_status: null, midia_ref: null, midia_tentativas: 0, midia_expira_em: null }])
     const meta = metaFalsa({})
     const r = await resgatarMidiasPendentes(db as unknown as SupabaseClient, dep(meta.f))
-    assert.deepEqual(r, { expiradas: 0, resgatadas: 0, indisponiveis: 0, adiadas: 0 })
+    assert.deepEqual(r, { expiradas: 0, resgatadas: 0, indisponiveis: 0, adiadas: 0, jaResolvidas: 0 })
     assert.equal(meta.chamadas.length, 0)
   })
 

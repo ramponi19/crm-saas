@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { decifrarToken } from '@/lib/canais/crypto'
+import { nadaGravado } from '@/lib/linhas-afetadas'
 
 /**
  * RESGATE DAS MÍDIAS PENDENTES DO WHATSAPP (25/11/2026; plano em docs/midia-resgate-plano.md).
@@ -46,7 +47,7 @@ export interface Pendente {
   midia_tentativas: number | null; midia_expira_em: string | null
 }
 
-export interface ResultadoResgate { expiradas: number; resgatadas: number; indisponiveis: number; adiadas: number }
+export interface ResultadoResgate { expiradas: number; resgatadas: number; indisponiveis: number; adiadas: number; jaResolvidas: number }
 
 export interface Dependencias {
   fetch?: typeof fetch
@@ -89,7 +90,7 @@ export async function resgatarMidiasPendentes(db: SupabaseClient, dep: Dependenc
   const f = dep.fetch ?? fetch
   const decifrar = dep.decifrar ?? decifrarToken
   const graph = dep.graph ?? process.env.META_GRAPH_VERSION ?? 'v25.0'
-  const r: ResultadoResgate = { expiradas: 0, resgatadas: 0, indisponiveis: 0, adiadas: 0 }
+  const r: ResultadoResgate = { expiradas: 0, resgatadas: 0, indisponiveis: 0, adiadas: 0, jaResolvidas: 0 }
 
   // 1. Prazo da Meta vencido: indisponível.
   const { data: vencidas, error: eV } = await db.from('mensagens')
@@ -130,18 +131,23 @@ export async function resgatarMidiasPendentes(db: SupabaseClient, dep: Dependenc
       catch (e) { passo = { ok: false, definitivo: false, motivo: e instanceof Error ? e.message : String(e) } }
     }
 
-    // Só mexe na linha que continua pendente (outra rodada ou a Edge podem ter resolvido antes).
+    // Só mexe na linha que continua pendente. Zero linhas é legítimo: outra rodada (ou a Edge, num reenvio)
+    // resolveu antes — conta como já resolvida, sem somar duas vezes.
+    const gravar = async (patch: Record<string, unknown>): Promise<boolean> => {
+      const { data: tocadas, error: eU } = await db.from('mensagens').update(patch)
+        .eq('id', p.id).eq('midia_status', 'pendente').select('id')
+      if (eU) throw eU
+      if (nadaGravado(tocadas)) { r.jaResolvidas++; return false }
+      return true
+    }
     if (passo.ok) {
-      await db.from('mensagens').update({ midia_url: passo.url, midia_status: null, midia_tentativas: tentativas })
-        .eq('id', p.id).eq('midia_status', 'pendente')
-      r.resgatadas++
+      if (await gravar({ midia_url: passo.url, midia_status: null, midia_tentativas: tentativas })) r.resgatadas++
     } else if (passo.definitivo) {
-      await db.from('mensagens').update({ midia_status: 'indisponivel', midia_tentativas: tentativas })
-        .eq('id', p.id).eq('midia_status', 'pendente')
-      console.error('[resgatar-midias] indisponível:', p.id, passo.motivo)
-      r.indisponiveis++
-    } else {
-      await db.from('mensagens').update({ midia_tentativas: tentativas }).eq('id', p.id).eq('midia_status', 'pendente')
+      if (await gravar({ midia_status: 'indisponivel', midia_tentativas: tentativas })) {
+        console.error('[resgatar-midias] indisponível:', p.id, passo.motivo)
+        r.indisponiveis++
+      }
+    } else if (await gravar({ midia_tentativas: tentativas })) {
       console.error('[resgatar-midias] adiada:', p.id, passo.motivo)
       r.adiadas++
     }
