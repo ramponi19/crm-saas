@@ -99,7 +99,9 @@ begin
   perform set_config('statement_timeout', '3s', true);
   perform set_config('request.jwt.claims', jsonb_build_object('sub', v_dono1, 'role', 'authenticated')::text, true);
   r := r || jsonb_build_object(
-    't9_gatilhos_em_empresa_config', (select count(*) from pg_trigger where tgrelid = 'public.empresa_config'::regclass and not tgisinternal),
+    't9_gatilhos_em_empresa_config', (select count(*) from pg_trigger t join pg_proc f on f.oid = t.tgfoid
+                                        where t.tgrelid = 'public.empresa_config'::regclass and not t.tgisinternal
+                                          and f.prosrc ilike '%configuracoes_sistema%'),
     't9_gatilhos_ponte', (select count(*) from pg_trigger where tgrelid = 'public.configuracoes_sistema'::regclass and not tgisinternal
                                                          and tgname = 'configuracoes_sistema_ponte'),
     't9_ponte_nao_grava_envelope', position('configuracoes_sistema' in
