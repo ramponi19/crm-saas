@@ -103,6 +103,10 @@ Compatibilidade: o app de hoje lê pelas funções (corpo trocado, mesma respost
 - Tabelas novas lidas com cliente sem tipo: `types/database.gerado.ts` é gerado da produção e só as terá depois da migração aplicada.
 - `scripts/teste-local.sh` aceita projeto e portas próprios (`TESTE_LOCAL_PROJETO`, `TESTE_LOCAL_PREFIXO`) para sessões paralelas. A faixa 553xx é reservada pelo Windows nesta máquina; usar 573xx.
 
+**Em produção (25/11/2026):** migrações aplicadas como `20261125172744 auditoria_eventos`, `20261125172836 empresa_config` e `20261125172859 vendas_concluida_idx` (no repositório: `20261125000300`, `0400`, `0500`). App `fd809b97` = `dpl_24gjmRTpSNcMz9n7hKtPo5cb9DzM`; ponto de volta `dpl_5f6DbEzbY6HoZD4JaDX8ejd6C3Mg`. Backup `public._backup_config_1_1a_20261125` (12 linhas, md5 `00456c2c…`). Conferido: 3 valores no envelope = 3 linhas na tabela nova (só a JM), valores lidos pela JM com o mesmo md5 de antes, fila do Pós-venda da JM com as 400 pendentes idênticas, liberação e rotina sem erro, logs de 15 min limpos.
+
+**Achado no deploy (pré-requisito da 1.1h):** duas funções do banco leem o envelope direto, fora das funções de configuração: `core_horario` (`chave = 'core.horario'`) e `core_liberar_lotes_do_dia` (descobre as empresas por `chave = 'distribuicao.liberacao_diaria'`). Funcionam enquanto a ponte existir; têm de passar para `empresa_config` antes de a 1.1h apagar o envelope. As duas também engolem o erro de cada empresa no resultado (o job fica `succeeded`): a conferência pós-deploy tem de ler o resultado (`posvenda_rotina_execucoes.resultado`, histórico `atribuir` com motivo), não só o status do job.
+
 ### 1.4 Testes e scripts
 
 - `supabase/scripts/testes/teste-auditoria.sql` + esperado: só a `auditar()` insere; UPDATE/DELETE recusados para `authenticated` **e** `service_role`; empresa e usuário preenchidos pela função, não pelo chamador; isolamento entre duas empresas.
@@ -422,7 +426,7 @@ Sem migração. O app para de ler e de gravar as colunas antigas.
 
 ## 5. Entrega 1.1h: contração da configuração e das permissões antigas
 
-**Só depois de:** 1.1b e 1.1e em produção, e busca no código sem leitor do envelope provisório nem de `empresas.permissoes`.
+**Só depois de:** 1.1b e 1.1e em produção, e busca no código sem leitor do envelope provisório nem de `empresas.permissoes`. **E** `core_horario` e `core_liberar_lotes_do_dia` lendo `empresa_config` (achado do deploy da 1.1a, §1.3); a busca inclui o corpo das funções do banco (`pg_proc.prosrc`), não só o código do app.
 
 **Migração H1 `<n>_contracao_config_permissoes`:**
 - `config_salvar` para de escrever o envelope; as linhas `'<modulo>.<chave>'` de `configuracoes_sistema` vão para `_backup_config_provisoria_<data>` e saem da tabela (as chaves antigas sem ponto ficam);
