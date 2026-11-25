@@ -1,3 +1,4 @@
+import { contarPosVendaDoDia } from '@/lib/posvenda/contador'
 import { Sidebar } from '@/components/layout/sidebar'
 import { MobileTopbar } from '@/components/layout/mobile-topbar'
 import { NotificationProvider } from '@/components/layout/notification-provider'
@@ -134,6 +135,8 @@ export default async function DashboardLayout({
   // menu, entregues às telas-casa e ao ⌘K.
   // O fuso da empresa: toda tela abaixo mostra e corta datas nele (lib/datas, useFuso).
   const fuso = await fusoDaEmpresa(supabase, empresaId)
+  // Pós-venda instalado: passos atrasados + de hoje (os da pessoa; dono e administrador, os da equipe — RLS).
+  const posvendaCount = empresaId && instalados['/pos-venda'] ? await contarPosVendaDoDia(supabase, empresaId, fuso) : 0
 
   const ferramentas = resolverFerramentas({
     plano, role,
@@ -170,6 +173,7 @@ export default async function DashboardLayout({
           }
           userEmpresa={empresa?.nome}
           leadsCount={leadsCount ?? 0}
+          posvendaCount={posvendaCount}
           empresaLogo={empresa?.wl_logo_url ?? null}
           isSuperAdmin={usuario?.is_super_admin ?? false}
           role={role}
@@ -190,6 +194,7 @@ export default async function DashboardLayout({
             role={role}
             isSuperAdmin={usuario?.is_super_admin ?? false}
             leadsCount={leadsCount ?? 0}
+            posvendaCount={posvendaCount}
             overrides={menuOverrides}
             configDono={menuConfig}
             base={base}

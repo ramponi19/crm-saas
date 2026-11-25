@@ -15,6 +15,7 @@ interface Props {
   empresaLogo?: string | null
   userName?: string
   leadsCount?: number
+  posvendaCount?: number
   garantiasCount?: number
   isSuperAdmin?: boolean
   role?: string
@@ -33,7 +34,7 @@ interface Props {
  * inferior, que não vinha ficando acessível. Mesmo padrão do /admin.
  */
 export function MobileTopbar({
-  empresaNome, empresaLogo = null, userName = 'Usuário', leadsCount = 0, garantiasCount = 0,
+  empresaNome, empresaLogo = null, userName = 'Usuário', leadsCount = 0, garantiasCount = 0, posvendaCount = 0,
   isSuperAdmin = false, role = 'owner', plano, overrides, configDono, base, instalados,
 }: Props) {
   const [open, setOpen] = useState(false)
@@ -86,7 +87,7 @@ export function MobileTopbar({
                 )}
                 {g.itens.map((it) => {
                   const Icon = MENU_ICONS[it.icon] ?? LayoutDashboard
-                  const badge = it.badge === 'leads' ? leadsCount : it.badge === 'garantia' ? garantiasCount : 0
+                  const badge = it.badge === 'leads' ? leadsCount : it.badge === 'garantia' ? garantiasCount : it.badge === 'posvenda' ? posvendaCount : 0
                   return (
                     <LinkDeMenu key={it.href} href={it.locked ? `/configuracoes/faturamento?upgrade=${it.modulo}` : it.href} onClick={() => setOpen(false)}
                       className={cn('flex items-center gap-2.5 rounded-control px-2.5 py-2.5 text-[13.5px] font-medium transition-colors',

@@ -56,8 +56,10 @@ begin
       'pulados_continuam', (select count(*) from negocios n2 join contatos c on c.id = n2.contato_id
                               where c.nome in ('VELHO', 'ARQUIVADO', 'COM DONO') and (n2.responsavel_id is null or n2.responsavel_id = M1)
                                 and not exists (select 1 from negocio_historico h where h.negocio_id = n2.id and h.detalhe ->> 'motivo' = 'liberação diária da esteira'))));
-    -- 3. de novo no mesmo dia: não libera outra vez
-    res := res || jsonb_build_object('3_mesmo_dia', core_liberar_lote_esteira(1, 3, null, TER + interval '2 hours') -> '3' ->> 'pulado');
+    -- 3. de novo no mesmo dia: não libera outra vez. O histórico nasce com now(); o teste simula a terça 24/11,
+    --    então o lote fica datado na terça (senão o teste só passa no dia em que roda — falhou em 25/11/2026).
+    update negocio_historico set em = TER where negocio_id = any(ids) and detalhe ->> 'motivo' = 'liberação diária da esteira';
+    res :=res || jsonb_build_object('3_mesmo_dia', core_liberar_lote_esteira(1, 3, null, TER + interval '2 hours') -> '3' ->> 'pulado');
     raise exception 'desfaz';
   exception when others then if sqlerrm <> 'desfaz' then res := res || jsonb_build_object('2_erro', sqlerrm); end if;
   end;

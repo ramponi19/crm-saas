@@ -16,7 +16,7 @@ export const metadata = { title: 'Pós-venda' }
  * A trava: a linha do módulo em empresa_modulos (lib/posvenda/ligado.ts); o proxy já barra a tela enquanto o módulo
  * está em preparação (só o superadmin entra).
  */
-export default async function PosVendaPage({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
+export default async function PosVendaPage({ searchParams }: { searchParams: Promise<{ ver?: string; pessoa?: string }> }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -39,8 +39,11 @@ export default async function PosVendaPage({ searchParams }: { searchParams: Pro
 
   const podeVerTodos = !!eu?.is_super_admin || ['owner', 'admin'].includes(vinc?.role ?? '')
   const ver = podeVerTodos && sp.ver === 'todos' ? 'todos' : 'meus'
+  // Do painel do gestor: a fila de UMA pessoa (só dono/administrador).
+  const pessoa = podeVerTodos && sp.pessoa && /^[0-9a-f-]{36}$/i.test(sp.pessoa) ? sp.pessoa : null
+  const { data: pessoaRow } = pessoa ? await service.from('usuarios').select('nome').eq('id', pessoa).maybeSingle() : { data: null }
   const { itens, hoje, cortado } = await carregarFilaPosVenda(supabase, {
-    empresaId, fuso, rotuloUsado: cfg.vocabulario.usado ?? 'Usado', so: ver === 'meus' ? user.id : null,
+    empresaId, fuso, rotuloUsado: cfg.vocabulario.usado ?? 'Usado', so: pessoa ?? (ver === 'meus' ? user.id : null),
     categoriasModelo: categoriasPermitidas(cats),
   })
   // Depois da nota: limite do chamado, link de avaliação (loja → empresa) e os textos da empresa.
@@ -54,5 +57,6 @@ export default async function PosVendaPage({ searchParams }: { searchParams: Pro
     textoNeutro: (valor('mensagem_neutro')?.empresa as string | null) ?? null,
   }
   // key: trocar Meus/Todos monta a fila de novo com os itens da outra visão (o estado local começa das props).
-  return <FilaPosVenda key={ver} itens={itens} hoje={hoje} podeVerTodos={podeVerTodos} ver={ver} cortado={cortado} aposNota={aposNota} />
+  return <FilaPosVenda key={`${ver}:${pessoa ?? ''}`} itens={itens} hoje={hoje} podeVerTodos={podeVerTodos} ver={ver} cortado={cortado} aposNota={aposNota}
+    pessoa={pessoa ? { id: pessoa, nome: (pessoaRow as { nome: string | null } | null)?.nome?.trim() || 'Sem nome' } : null} />
 }
