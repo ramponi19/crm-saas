@@ -22,7 +22,10 @@ import { SentryUsuario } from '@/components/layout/sentry-usuario'
 import { AssistenteWidget } from '@/components/assistente/assistente-widget'
 import { resolveTheme, type WlMenu } from '@/lib/wl-menu'
 import { carregarConfigEmpresa, camadasParaMenu, ligadosDaEmpresa, vocabulario } from '@/lib/empresa-config'
-import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
+import { contextoDaSessao, destinoSemEmpresa, permsDoContexto } from '@/lib/sessao'
+import { AvisoSomenteLeitura } from '@/components/layout/aviso-somente-leitura'
+import { RegistrarAcessoPlataforma } from '@/components/superadmin/registrar-acesso-plataforma'
+import { SeletorEmpresa } from '@/components/layout/seletor-empresa'
 import { AvisoModuloIndisponivel } from '@/components/layout/aviso-modulo-indisponivel'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
@@ -49,6 +52,8 @@ export default async function DashboardLayout({
 
   // Impersonação: super admin operando como uma empresa específica.
   const impersonation = await getImpersonation()
+  // Cargo, permissões, empresa ativa e somente leitura numa chamada só (etapa 1.1b).
+  const ctx = await contextoDaSessao()
 
   // Resolver a empresa do contexto: impersonada (super admin) ou a do vínculo.
   let empresa: { nome: string; plano?: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu?: unknown; permissoes?: unknown } | null = null
@@ -68,28 +73,20 @@ export default async function DashboardLayout({
     plano = empImp?.plano ?? undefined
     empresaId = impersonation.empresaId
   } else {
-    // Fluxo normal: usuário precisa de vínculo com uma empresa.
-    const { data: vinculo } = await supabase
-      .from('empresa_usuarios')
-      .select('role, empresa:empresas(id, nome, plano, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_menu:sidebar), permissoes)')
-      .eq('usuario_id', user.id)
-      .eq('ativo', true)
-      .single()
-
-    // Super admin sem vínculo e sem impersonar: mandar para o painel.
-    if (!vinculo) {
-      if (usuario?.is_super_admin) redirect('/superadmin')
-      redirect('/register')
-    }
-
-    const vinculoTyped = vinculo as unknown as {
-      role: string
-      empresa: { nome: string; plano: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu: WlMenu | null; permissoes: unknown } | null
-    }
-    empresa = vinculoTyped.empresa
-    role = vinculoTyped.role
-    plano = vinculoTyped.empresa?.plano ?? undefined
-    empresaId = (vinculoTyped.empresa as { id?: number } | null)?.id
+    // Fluxo normal (etapa 1.1b): a empresa vem do contexto da sessão (get_empresa_id: empresa ativa, ou o
+    // único vínculo). Antes era um .single() em empresa_usuarios sem filtro de empresa: com 0 linhas (superadmin
+    // com a impersonação vencida) o PostgREST respondia 406, e com 2 vínculos a empresa era qualquer uma.
+    if (!ctx?.empresa_id) redirect(destinoSemEmpresa(ctx))
+    const { data: empAtiva } = await supabase
+      .from('empresas')
+      .select('id, nome, plano, ...empresa_branding(wl_cor:cor, wl_logo_url:logo_url, wl_menu:sidebar), permissoes')
+      .eq('id', ctx.empresa_id)
+      .maybeSingle()
+    const empTyped = empAtiva as unknown as { nome: string; plano: string | null; wl_cor: string | null; wl_logo_url: string | null; wl_menu: WlMenu | null; permissoes: unknown } | null
+    empresa = empTyped
+    role = ctx.papel ?? 'vendedor'
+    plano = empTyped?.plano ?? undefined
+    empresaId = ctx.empresa_id
   }
 
   // Situação da assinatura (17/11/2026): teste acabando, pagamento atrasado, modo somente leitura.
@@ -123,7 +120,8 @@ export default async function DashboardLayout({
     .eq('etapa.slug', 'novo')
 
   // Enforcement de permissão do papel: esconde itens que o papel não pode ver.
-  const perms = permsDoPapel(role, (empresa?.permissoes ?? null) as PermissoesMap | null)
+  // As permissões vêm do cargo (etapa 1.1b); a tela antiga de Permissões alimenta os cargos pela ponte do banco.
+  const perms = permsDoContexto(ctx)
   const permHidden: string[] = []
   if (!perms.verFinanceiro) permHidden.push('/financeiro')
   if (!perms.verRelatorios) permHidden.push('/relatorios')
@@ -204,6 +202,9 @@ export default async function DashboardLayout({
           <Suspense fallback={null}><AvisoModuloIndisponivel /></Suspense>
           {impersonation && <ImpersonationBanner empresaNome={impersonation.nome} />}
           {usuario?.is_super_admin && <Suspense fallback={null}><AvisoRotinas /></Suspense>}
+          {impersonation && <RegistrarAcessoPlataforma />}
+          {ctx && ctx.empresas.length > 1 && !impersonation && <SeletorEmpresa empresas={ctx.empresas} atual={ctx.empresa_id} />}
+          {ctx?.cargo?.somente_leitura && <AvisoSomenteLeitura />}
           {avisos.length > 0 && <AvisosBanner avisos={avisos} />}
           <SituacaoBanner situacao={situacao} podePagar={role === 'owner' || role === 'admin'} />
           <LimiteBanner />

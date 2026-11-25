@@ -2,7 +2,7 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { documentosDisponiveis } from '@/lib/contrato-emitir'
 import { Topbar } from '@/components/layout/topbar'
 import { HistoricoView } from '@/components/modules/historico/historico-view'
-import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
+import { permissoesDoVinculo, permsDoContexto } from '@/lib/sessao'
 import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { HREF_CELULARES } from '@/components/modules/celulares/modulo'
 
@@ -15,11 +15,10 @@ export default async function HistoricoPage() {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: vinculo }, { data: usuario }, { data: membrosRaw }, { data: empresaPerm }, { data: taxas }, cfgEmpresa] = await Promise.all([
+  const [{ data: vinculo }, { data: usuario }, { data: membrosRaw }, { data: taxas }, cfgEmpresa] = await Promise.all([
     user ? supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle() : Promise.resolve({ data: null }),
     user ? supabase.from('usuarios').select('is_super_admin').eq('id', user.id).single() : Promise.resolve({ data: null }),
     supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
-    supabase.from('empresas').select('permissoes').eq('id', empresaId).maybeSingle(),
     // O "Entregar" abre a mesma tela de recebimento da aba Encomenda: parcelas e juros vêm das taxas.
     supabase.from('financeiro_taxas').select('id, forma_pagamento, bandeira, parcelas, percentual_taxa').eq('empresa_id', empresaId).eq('ativo', true),
     carregarConfigEmpresa(supabase, empresaId ?? 0),
@@ -32,7 +31,7 @@ export default async function HistoricoPage() {
   // impersonando, que não tem vínculo) vê tudo — mesma regra do funil.
   const papel = (vinculo as { role?: string } | null)?.role ?? ''
   const soMinhas = !isAdmin && !!papel && !!user
-    && !permsDoPapel(papel, (empresaPerm?.permissoes ?? null) as PermissoesMap | null).verVendasOutros
+    && !permsDoContexto(await permissoesDoVinculo(supabase, empresaId, user!.id)).verVendasOutros
 
   const baseVendas = supabase
     .from('vendas_vendas')

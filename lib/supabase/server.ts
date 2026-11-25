@@ -68,16 +68,13 @@ export async function getEmpresaId(): Promise<number> {
     if (error) console.warn('[impersonacao] nao consegui limpar o TTL vencido:', error.message)
   }
 
-  const { data: vinculo } = await supabase
-    .from('empresa_usuarios')
-    .select('empresa_id')
-    .eq('usuario_id', user.id)
-    .eq('ativo', true)
-    .limit(1)
-    .maybeSingle()
-
-  if (!vinculo) redirect('/login')
-  return vinculo.empresa_id
+  // Etapa 1.1b: a mesma regra do banco (get_empresa_id: empresa ativa escolhida, ou o único vínculo ativo).
+  // Antes era o primeiro vínculo de um limit(1) sem ordem: com dois vínculos, qualquer um.
+  const { data: empresaId } = await supabase.rpc('get_empresa_id')
+  if (typeof empresaId === 'number' && empresaId > 0) return empresaId
+  const { count } = await supabase.from('empresa_usuarios').select('empresa_id', { count: 'exact', head: true })
+    .eq('usuario_id', user.id).eq('ativo', true)
+  redirect((count ?? 0) > 1 ? '/escolher-empresa' : '/login')
 }
 
 /** Returns the impersonated empresa info if the current super admin is impersonating, else null. */

@@ -1,5 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { requireEmpresaRole } from '@/lib/owner'
+import { exigirPermissao } from '@/lib/sessao'
 import { Topbar } from '@/components/layout/topbar'
 import { RelatoriosView } from '@/components/modules/relatorios/relatorios-view'
 import { RelatoriosImobView } from '@/components/modules/imoveis/relatorios-imob-view'
@@ -21,7 +21,8 @@ const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 export default async function RelatoriosPage({ searchParams }: {
   searchParams: Promise<{ de?: string; ate?: string; corretor?: string }>
 }) {
-  await requireEmpresaRole(['owner', 'admin'])
+  // Etapa 1.1b: a permissão do cargo decide (Dono, Administrador e Consulta, de fábrica).
+  await exigirPermissao('core.ver_relatorios')
   const [supabase, empresaId, sp] = await Promise.all([createClient(), getEmpresaId(), searchParams])
   // Mesma capacidade do dashboard: o módulo ligado traz as próprias telas de leitura.
   const cfg = await carregarConfigEmpresa(supabase, empresaId ?? 0)

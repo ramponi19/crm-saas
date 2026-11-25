@@ -1,5 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
+import { permissoesDoVinculo, permsDoContexto } from '@/lib/sessao'
 import { NextResponse } from 'next/server'
 import { consultaClientes, clienteDoContato } from '@/lib/clientes'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -79,12 +79,8 @@ export async function GET(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  // Permissão de exportar: papel do usuário nesta empresa + matriz da empresa.
-  const [{ data: vinculo }, { data: empresa }] = await Promise.all([
-    supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle(),
-    supabase.from('empresas').select('permissoes').eq('id', empresaId).single(),
-  ])
-  const perms = permsDoPapel(vinculo?.role ?? null, (empresa?.permissoes ?? null) as PermissoesMap | null)
+  // Permissão de exportar: a do cargo do usuário nesta empresa (etapa 1.1b).
+  const perms = permsDoContexto(await permissoesDoVinculo(supabase, empresaId, user.id))
   if (!perms.exportar) {
     return NextResponse.json({ error: 'Seu perfil não tem permissão para exportar dados.' }, { status: 403 })
   }

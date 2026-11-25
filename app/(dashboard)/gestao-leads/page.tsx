@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
+import { permissoesDoVinculo, permsDoContexto } from '@/lib/sessao'
 import { diasParado, DIAS_ATENCAO } from '@/lib/lead-parado'
 import { getKanbanColumns, type KanbanColumn } from '@/components/modules/leads/types'
 import { COLUNAS_LEAD, conversasDosLeads, leadDoNegocio } from '@/lib/leads'
@@ -27,9 +27,8 @@ export default async function GestaoLeadsPage() {
   if (!user) redirect('/login')
   if (!empresaId) redirect('/login')
 
-  const [{ data: vinculo }, { data: empresa }, { data: usuarioLogado }] = await Promise.all([
+  const [{ data: vinculo }, { data: usuarioLogado }] = await Promise.all([
     supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle(),
-    supabase.from('empresas').select('permissoes').eq('id', empresaId).maybeSingle(),
     supabase.from('usuarios').select('is_super_admin').eq('id', user.id).maybeSingle(),
   ])
   const role = vinculo?.role ?? ''
@@ -41,7 +40,7 @@ export default async function GestaoLeadsPage() {
    * seria transformar acompanhamento em vigilância de mão única. O corte é no
    * servidor, como no funil.
    */
-  const restringe = !!role && !permsDoPapel(role, (empresa?.permissoes ?? null) as PermissoesMap | null).verLeadsOutros
+  const restringe = !!role && !permsDoContexto(await permissoesDoVinculo(supabase, empresaId, user.id)).verLeadsOutros
 
   // Lead = negócio ativo (a view `leads` caiu); a última mensagem vem da conversa, abaixo.
   let qLeads = supabase.from('negocios').select(COLUNAS_LEAD)

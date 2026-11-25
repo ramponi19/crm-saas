@@ -37,21 +37,20 @@ export function SeletorFilial() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const [{ data: lojas }, { data: vinculo }, { data: usuario }] = await Promise.all([
+      // Etapa 1.1b: loja da pessoa, loja escolhida e permissão vêm do contexto da sessão (empresa ativa), não
+      // de um vínculo qualquer; quem vê a rede é quem tem lojas.ver_rede (o mesmo que filiais_visiveis usa).
+      const [{ data: lojas }, { data: ctx }] = await Promise.all([
         // A RLS de `filiais` deixa qualquer membro LER a lista; só admin escreve.
         supabase.from('filiais').select('id, nome, cidade').eq('ativo', true).order('matriz', { ascending: false }).order('nome'),
-        supabase.from('empresa_usuarios').select('role, filial_id').eq('usuario_id', user.id).eq('ativo', true).maybeSingle(),
-        supabase.from('usuarios').select('filial_atual_id, is_super_admin').eq('id', user.id).maybeSingle(),
+        supabase.rpc('sessao_contexto' as never),
       ])
       if (!vivo) return
 
-      const papel = (vinculo as { role?: string } | null)?.role ?? ''
-      const u = usuario as { filial_atual_id: number | null; is_super_admin: boolean | null } | null
-
+      const c = ctx as { loja_da_pessoa: number | null; filial_atual: number | null; superadmin: boolean; permissoes: string[] } | null
       setFiliais((lojas ?? []) as unknown as Filial[])
-      setMinhaLoja((vinculo as { filial_id?: number | null } | null)?.filial_id ?? null)
-      setSelecionada(u?.filial_atual_id ?? null)
-      setPodeTrocar(papel === 'owner' || papel === 'admin' || !!u?.is_super_admin)
+      setMinhaLoja(c?.loja_da_pessoa ?? null)
+      setSelecionada(c?.filial_atual ?? null)
+      setPodeTrocar(!!c && (c.superadmin || c.permissoes.includes('lojas.ver_rede')))
     })()
 
     return () => { vivo = false }

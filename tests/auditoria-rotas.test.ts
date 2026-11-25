@@ -366,8 +366,12 @@ describe('leads/mover: perda só com motivo; sair da perda limpa o rastro', () =
 
 describe('exportar: escopo do vendedor e planilha sem fórmula', () => {
   const banco = (papel: string, verLeadsOutros: boolean): Responder => (c) => {
-    if (c.tabela === 'empresa_usuarios') return ok({ role: papel })
-    if (c.tabela === 'empresas') return ok({ permissoes: { vendedor: { exportar: true, verLeadsOutros } } })
+    // Etapa 1.1b: a permissão vem do cargo do vínculo (empresa_cargos), não mais de empresas.permissoes.
+    if (c.tabela === 'empresa_usuarios') {
+      return ok({ role: papel, cargo: { sistema: papel === 'owner', permissoes: [
+        { permissao: 'core.exportar' }, ...(verLeadsOutros ? [{ permissao: 'core.ver_leads_outros' }] : []),
+      ] } })
+    }
     if (c.tabela === 'negocios') {
       return ok([{ id: 1, dados: {}, contato: { nome: '=HYPERLINK("http://x")', telefone: '+5511999', origem: 'wa' } }])
     }

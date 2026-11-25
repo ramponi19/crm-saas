@@ -1,5 +1,5 @@
 import type {} from '@supabase/supabase-js'
-import { permsDoPapel, type PermissoesMap } from './permissoes'
+import { permissoesDoVinculo, permsDoContexto } from './permissoes-cargo'
 
 /**
  * Decide se o usuário vê apenas o que é DELE (vendas, histórico, orçamentos,
@@ -31,18 +31,17 @@ export async function escopoDoUsuario(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { soMeu: true, userId: null, papel: '', motivo: 'sem sessão' }
 
-  const [{ data: vinculo }, { data: usuarioRow }, { data: empresa }] = await Promise.all([
-    supabase.from('empresa_usuarios').select('role')
-      .eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle(),
+  // Etapa 1.1b: papel e permissões vêm do cargo do vínculo.
+  const [vinculo, { data: usuarioRow }] = await Promise.all([
+    permissoesDoVinculo(supabase, empresaId, user.id),
     supabase.from('usuarios').select('is_super_admin').eq('id', user.id).maybeSingle(),
-    supabase.from('empresas').select('permissoes').eq('id', empresaId).maybeSingle(),
   ])
 
   // Super admin (inclusive impersonando) enxerga a empresa inteira: é o papel de
   // suporte, e sem isso ele não consegue conferir a loja de ninguém.
   if (usuarioRow?.is_super_admin) return { soMeu: false, userId: user.id, papel: 'superadmin', motivo: 'super admin' }
 
-  const papel = (vinculo?.role as string | undefined) ?? ''
+  const papel = vinculo.papel ?? ''
   if (papel === 'owner' || papel === 'admin') {
     return { soMeu: false, userId: user.id, papel, motivo: 'dono ou admin' }
   }
@@ -53,7 +52,7 @@ export async function escopoDoUsuario(
     return { soMeu: true, userId: user.id, papel: '', motivo: 'papel não determinado — restringindo por segurança' }
   }
 
-  const perms = permsDoPapel(papel, (empresa?.permissoes ?? null) as PermissoesMap | null)
+  const perms = permsDoContexto(vinculo)
   return perms.verVendasOutros
     ? { soMeu: false, userId: user.id, papel, motivo: 'permissão verVendasOutros' }
     : { soMeu: true, userId: user.id, papel, motivo: 'sem permissão de ver de outros' }

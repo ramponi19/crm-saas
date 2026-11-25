@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       .eq('usuario_id', user.id)
       .eq('empresa_id', empresaId)
       .eq('ativo', true)
-      .single()
+      .maybeSingle()
 
     if (!eu || !['owner', 'admin'].includes(eu.role))
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })

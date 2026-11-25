@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { contextoDaSessao, destinoSemEmpresa } from '@/lib/sessao'
 import { resolverMenu } from '@/lib/menu'
 import { carregarConfigEmpresa, camadasParaMenu } from '@/lib/empresa-config'
 
@@ -22,15 +23,11 @@ export default async function EntrarPage() {
   }
 
   // Não é super admin: precisa de vínculo ativo com uma empresa
-  const { data: vinculo } = await supabase
-    .from('empresa_usuarios')
-    .select('empresa_id, role')
-    .eq('usuario_id', user.id)
-    .eq('ativo', true)
-    .limit(1)
-    .maybeSingle()
-
-  if (!vinculo) redirect('/register')
+  // Etapa 1.1b: a empresa e o papel vêm do contexto da sessão (empresa ativa, ou o único vínculo); com duas
+  // empresas e nenhuma escolhida, vai para "Escolha a empresa". Antes era o primeiro vínculo de um limit(1).
+  const ctx = await contextoDaSessao()
+  if (!ctx?.empresa_id) redirect(destinoSemEmpresa(ctx))
+  const vinculo = { empresa_id: ctx.empresa_id, role: ctx.papel }
 
   // Dono/admin abrem direto na Visão geral (era o /admin até 21/10/2026); demais no CRM.
   if (vinculo.role === 'owner' || vinculo.role === 'admin') {

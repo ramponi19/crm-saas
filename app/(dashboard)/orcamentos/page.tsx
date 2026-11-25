@@ -1,6 +1,6 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
+import { permissoesDoVinculo, permsDoContexto } from '@/lib/sessao'
 import { cotacaoDeTrocaLiberada } from '@/lib/troca-acesso'
 import { chaveLinha } from '@/lib/troca-modelos'
 import type { ValoresDoModelo } from '@/components/modules/orcamentos/avaliar-aparelho'
@@ -21,15 +21,14 @@ export default async function OrcamentosPage() {
 
   // Orçamento é negociação em andamento, colada no lead: cada vendedor vê os
   // seus. O admin vê todos.
-  const [{ data: vinculo }, { data: usuarioRow }, { data: empresaPerm }] = await Promise.all([
+  const [{ data: vinculo }, { data: usuarioRow }] = await Promise.all([
     supabase.from('empresa_usuarios').select('role').eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle(),
     supabase.from('usuarios').select('is_super_admin').eq('id', user.id).maybeSingle(),
-    supabase.from('empresas').select('permissoes').eq('id', empresaId).maybeSingle(),
   ])
   const papel = vinculo?.role ?? ''
   const ehGestor = !!usuarioRow?.is_super_admin || papel === 'owner' || papel === 'admin'
   const soMeus = !ehGestor && !!papel
-    && !permsDoPapel(papel, (empresaPerm?.permissoes ?? null) as PermissoesMap | null).verVendasOutros
+    && !permsDoContexto(await permissoesDoVinculo(supabase, empresaId, user.id)).verVendasOutros
 
   const baseOrc = supabase.from('orcamentos_orcamentos')
     .select('id, lead_id, tipo, status, cliente_nome, cliente_telefone, cliente_id, aparelho, imei, defeito, prazo_dias, garantia_dias, itens, aparelho_novo, valor_novo, aparelho_usado, valor_entrada, unidade_id, total, valor_devolver, acerto, observacoes, token, created_at')

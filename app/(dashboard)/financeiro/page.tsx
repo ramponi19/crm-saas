@@ -1,5 +1,5 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { requireEmpresaRole } from '@/lib/owner'
+import { exigirPermissao } from '@/lib/sessao'
 import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
 import { mesclarTaxas, type TaxasComissao } from '@/lib/comissao-imob'
 import type { NegocioComissao } from '@/components/modules/imoveis/comissoes-imob'
@@ -11,7 +11,9 @@ import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { filtroConcluidaDesde } from '@/lib/vendas-mes'
 
 export default async function FinanceiroPage() {
-  const { role } = await requireEmpresaRole(['owner', 'admin'])
+  // Etapa 1.1b: a permissão do cargo decide na página (antes só o menu respeitava verFinanceiro).
+  const ctx = await exigirPermissao('core.ver_financeiro')
+  const role = ctx.papel ?? 'vendedor'
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
   /**
    * O faturamento das VENDAS entra aqui só para a tela poder AVISAR que ele não

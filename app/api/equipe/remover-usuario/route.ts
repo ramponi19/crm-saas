@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   if (!usuarioAtual?.is_super_admin) {
     const { data: eu } = await supabase
       .from('empresa_usuarios').select('role')
-      .eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).single()
+      .eq('usuario_id', user.id).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle()
     if (!eu || !['owner', 'admin'].includes(eu.role)) {
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
     }

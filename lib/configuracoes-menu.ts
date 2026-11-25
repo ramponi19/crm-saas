@@ -72,7 +72,7 @@ export function secoesDeConfiguracoes({ isAdmin, abasDosModulos, zapintel }: {
       ] },
       { label: 'Usuários', itens: [
         { href: '/configuracoes/usuarios', label: 'Usuários' },
-        { href: '/configuracoes/permissoes', label: 'Permissões' },
+        { href: '/configuracoes/cargos', label: 'Cargos' },
         { href: '/configuracoes/auditoria', label: 'Auditoria' },
       ] },
       { label: 'Vendas e atendimento', itens: [

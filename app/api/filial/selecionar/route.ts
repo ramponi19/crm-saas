@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { requireEmpresaRoleApi } from '@/lib/owner'
+import { exigirPermissaoApi } from '@/lib/sessao'
 import { filialEscolhida } from '@/lib/filial-escolha'
 
 /**
@@ -14,15 +14,16 @@ import { filialEscolhida } from '@/lib/filial-escolha'
  *
  * `filialId: null` significa "Rede (todas as lojas)".
  *
- * SÓ DONO E ADMIN. Para o vendedor a função `filiais_visiveis()` ignora esta
+ * SÓ QUEM VÊ A REDE (permissão lojas.ver_rede: Dono, Administrador e Consulta, de fábrica; etapa 1.1b). Para o vendedor a função `filiais_visiveis()` ignora esta
  * seleção e devolve a loja dele — então mesmo que ele grave o campo por outro
  * caminho, não vê nada além da própria loja. A checagem aqui é a primeira porta,
  * não a única.
  */
 export async function POST(req: Request) {
-  const auth = await requireEmpresaRoleApi(['owner', 'admin'])
-  if (auth.error) return auth.error
-  const { userId, empresaId } = auth
+  const auth = await exigirPermissaoApi('lojas.ver_rede')
+  if (auth.erro) return auth.erro
+  const userId = auth.ctx.usuario_id
+  const empresaId = auth.ctx.empresa_id!
 
   // Corpo mal formado é 400, não 500 (lib/filial-escolha.ts).
   const filialId = filialEscolhida(await req.json().catch(() => undefined))

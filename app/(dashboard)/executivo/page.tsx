@@ -1,6 +1,6 @@
 import { VitrineDoModulo } from '@/components/modulos/vitrine-do-modulo'
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
-import { requireEmpresaRole } from '@/lib/owner'
+import { exigirPermissao } from '@/lib/sessao'
 import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { ExecutivoImob } from '@/components/modules/imoveis/executivo-imob'
 
@@ -14,7 +14,7 @@ export const metadata = { title: 'Executivo' }
  * vitrine (etapa 0).
  */
 export default async function ExecutivoPage({ searchParams }: { searchParams: Promise<{ tipo?: string }> }) {
-  await requireEmpresaRole(['owner', 'admin'])
+  await exigirPermissao('core.ver_relatorios')
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   const ligados = ligadosDaEmpresa(await carregarConfigEmpresa(supabase, empresaId))

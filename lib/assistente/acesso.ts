@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { permsDoPapel, type PermissoesMap } from '@/lib/permissoes'
+import { permissoesDoVinculo, permsDoContexto } from '@/lib/permissoes-cargo'
 
 /**
  * O QUE QUEM PERGUNTA PODE VER — decidido antes de o chat ler qualquer coisa.
@@ -32,11 +32,10 @@ export async function acessoDoUsuario(
   empresaId: number,
   userId: string,
 ): Promise<Acesso> {
-  const [{ data: vinculo }, { data: usuario }, { data: empresa }] = await Promise.all([
-    supabase.from('empresa_usuarios').select('role')
-      .eq('usuario_id', userId).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle(),
+  // Etapa 1.1b: papel e permissões vêm do cargo do vínculo (empresa_cargos), não de empresas.permissoes.
+  const [vinculo, { data: usuario }] = await Promise.all([
+    permissoesDoVinculo(supabase, empresaId, userId),
     supabase.from('usuarios').select('nome, is_super_admin').eq('id', userId).maybeSingle(),
-    supabase.from('empresas').select('permissoes').eq('id', empresaId).maybeSingle(),
   ])
   const nome = (usuario?.nome as string | null) || 'Usuário'
 
@@ -44,11 +43,11 @@ export async function acessoDoUsuario(
   if (usuario?.is_super_admin) {
     return { empresaId, userId, nome, papel: 'superadmin', soMinhasVendas: false, soMeusLeads: false, verFinanceiro: true }
   }
-  const papel = (vinculo?.role as string | undefined) ?? ''
+  const papel = vinculo.papel ?? ''
   if (!papel) {
     return { empresaId, userId, nome, papel: '', soMinhasVendas: true, soMeusLeads: true, verFinanceiro: false }
   }
-  const p = permsDoPapel(papel, (empresa?.permissoes ?? null) as PermissoesMap | null)
+  const p = permsDoContexto(vinculo)
   return {
     empresaId, userId, nome, papel,
     soMinhasVendas: !p.verVendasOutros,

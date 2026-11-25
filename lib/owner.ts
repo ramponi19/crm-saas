@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { NextResponse } from 'next/server'
+import { contextoDaSessao } from '@/lib/sessao'
 
 /**
  * Guards de papel escopados ao TENANT (empresa do usuário logado).
@@ -17,43 +18,20 @@ export type EmpresaRole = 'owner' | 'admin' | 'vendedor' | 'tecnico' | 'member'
 
 type Resolved = { empresaId: number | null; role: EmpresaRole; isSuper: boolean }
 
-/** Resolve empresa ativa + papel do usuário SEM redirecionar (uso interno/API). */
+/**
+ * Resolve empresa ativa + papel do usuário SEM redirecionar (uso interno/API).
+ *
+ * Etapa 1.1b: lê o contexto da sessão (sessao_contexto no banco): a empresa é a de get_empresa_id (empresa
+ * ativa ou único vínculo) e o papel é o do cargo NESSA empresa. Antes lia o primeiro vínculo sem filtro de
+ * empresa. Superadmin impersonando continua 'owner' da empresa impersonada.
+ */
 async function resolveEmpresaERole(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
+  _supabase: Awaited<ReturnType<typeof createClient>>,
+  _userId: string,
 ): Promise<Resolved> {
-  const { data: usuario } = await supabase
-    .from('usuarios')
-    .select('is_super_admin, impersonando_empresa_id, impersonando_expires_at')
-    .eq('id', userId)
-    .single()
-
-  const isSuper = !!usuario?.is_super_admin
-
-  // super admin impersonando (dentro do TTL) => owner da empresa impersonada
-  if (
-    isSuper &&
-    usuario?.impersonando_empresa_id &&
-    usuario.impersonando_expires_at &&
-    new Date(usuario.impersonando_expires_at) > new Date()
-  ) {
-    return { empresaId: usuario.impersonando_empresa_id, role: 'owner', isSuper }
-  }
-
-  const { data: vinculo } = await supabase
-    .from('empresa_usuarios')
-    .select('empresa_id, role')
-    .eq('usuario_id', userId)
-    .eq('ativo', true)
-    .limit(1)
-    .maybeSingle()
-
-  if (!vinculo) return { empresaId: null, role: 'member', isSuper }
-  return {
-    empresaId: vinculo.empresa_id,
-    role: (isSuper ? 'owner' : (vinculo.role as EmpresaRole)) ?? 'member',
-    isSuper,
-  }
+  const ctx = await contextoDaSessao()
+  if (!ctx || !ctx.empresa_id) return { empresaId: null, role: 'member', isSuper: !!ctx?.superadmin }
+  return { empresaId: ctx.empresa_id, role: (ctx.papel ?? 'member') as EmpresaRole, isSuper: ctx.superadmin }
 }
 
 /**

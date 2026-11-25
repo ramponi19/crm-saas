@@ -43,7 +43,7 @@ export async function PATCH(req: NextRequest) {
       .eq('usuario_id', user.id)
       .eq('empresa_id', empresaId)
       .eq('ativo', true)
-      .single()
+      .maybeSingle()
 
     if (!eu || !['owner', 'admin'].includes(eu.role))
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
@@ -62,7 +62,7 @@ export async function PATCH(req: NextRequest) {
     .eq('usuario_id', id)
     .eq('empresa_id', empresaId)
     .eq('ativo', true)
-    .single()
+    .maybeSingle()
 
   if (!alvo)
     return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
