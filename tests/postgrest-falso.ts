@@ -118,9 +118,16 @@ export function postgrestFalso(tabelas: Record<string, Linha[]>, chaves: Record<
     limit(n: number) { this.faixa = [0, n - 1]; return this }
     single() { this.unico = 'single'; return this }
     maybeSingle() { this.unico = 'maybe'; return this }
+    /** UPDATE: aplica o patch nas linhas que passarem nos filtros; com `.select()` devolve as linhas mudadas. */
+    private patch: Linha | null = null
+    update(p: Linha) { this.patch = p; return this }
 
     private executar() {
       let linhas = (tabelas[this.tabela] ?? []).filter((l) => this.filtros.every((f) => f(l)))
+      if (this.patch) {
+        for (const l of linhas) Object.assign(l, this.patch)
+        linhas = linhas.map((l) => ({ ...l }))
+      }
       for (const { col, asc } of [...this.ordem].reverse()) {
         linhas = [...linhas].sort((a, b) => (comparar(a[col], b[col]) || 0) * (asc ? 1 : -1))
       }
@@ -144,9 +151,24 @@ export function postgrestFalso(tabelas: Record<string, Linha[]>, chaves: Record<
     }
   }
 
+  /** Storage falso: guarda o que foi enviado; `falhar` devolve o erro dado no próximo upload. */
+  const arquivos = new Map<string, { bytes: number; contentType?: string }>()
+  const storageFalso = { falhar: null as null | { message: string; status?: number } }
+  const storage = {
+    from: (bucket: string) => ({
+      async upload(caminho: string, corpo: { byteLength?: number; length?: number }, o?: { contentType?: string }) {
+        if (storageFalso.falhar) { const e = storageFalso.falhar; storageFalso.falhar = null; return { data: null, error: e } }
+        arquivos.set(`${bucket}/${caminho}`, { bytes: corpo.byteLength ?? corpo.length ?? 0, contentType: o?.contentType })
+        return { data: { path: caminho }, error: null }
+      },
+      getPublicUrl: (caminho: string) => ({ data: { publicUrl: `https://falso.supabase.co/storage/v1/object/public/${bucket}/${caminho}` } }),
+    }),
+  }
+
   return {
     from: (t: string) => new Consulta(t),
     rpc: async () => ({ data: [], error: null }),
+    storage, arquivos, storageFalso,
     /** O que foi pedido ao banco (tabela e os `or` mandados), para o teste conferir. */
     pedidos,
   }

@@ -13,6 +13,7 @@ import { processarTransmissoes } from '@/lib/transmissao/motor'
 import { processarPublicos } from '@/lib/publicos/rodada'
 import { limparExportacoes } from '@/lib/lgpd/exportacao'
 import { verificarEntradaParada } from '@/lib/alertas-entrada'
+import { resgatarMidiasPendentes } from '@/lib/midia/resgate'
 
 // ============================================================
 // Cron jobs de manutenção. Protegidos por CRON_SECRET.
@@ -204,6 +205,12 @@ export async function GET(
       case 'entrada-parada': {
         // pg_cron de 5 em 5 min, só quando há o que fazer (migração 20261118000300). lib/alertas-entrada.ts.
         const r = await verificarEntradaParada(supabase as unknown as SupabaseClient)
+        return NextResponse.json({ ok: true, job, ...r })
+      }
+
+      case 'resgatar-midias': {
+        // pg_cron de 15 em 15 min, só quando há mídia pendente (migração 20261125000200). lib/midia/resgate.ts.
+        const r = await resgatarMidiasPendentes(supabase as unknown as SupabaseClient)
         return NextResponse.json({ ok: true, job, ...r })
       }
 

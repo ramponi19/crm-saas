@@ -134,6 +134,7 @@ export function ConversaPainel({
       id: m.id, conversa_id: m.conversa_id, direcao: m.direcao, conteudo: m.conteudo, created_at: m.created_at,
       tipo: m.tipo, origem: null, midia_url: m.midia_url, status_entrega: m.status_entrega, erro_envio: m.erro_envio,
       external_id: m.external_id, usuario_id: m.usuario_id, transcricao: null, midia_retida_em: null, lida: m.lida,
+      midia_status: m.midia_status ?? null,
     }
     if (e.tipo === 'INSERT') {
       setMensagens((l) => (l && !l.some((x) => x.id === m.id) ? [...l, linha] : l))
@@ -431,7 +432,7 @@ export function ConversaPainel({
                   onApagou={(id) => setNotas((l) => l.filter((x) => x.id !== id))} />
                 : i.tipo === 'otimista' ? <Bolha key={i.o.chave} lado="loja" conteudo={i.o.conteudo} tipo={i.o.tipo} midia={i.o.midia_url} hora="agora" status={i.o.status} erro={i.o.erro} />
                 : <Bolha key={i.m.id} id={i.m.id} lado={i.m.direcao === 'enviada' ? 'loja' : 'cliente'} conteudo={i.m.conteudo} tipo={i.m.tipo ?? 'texto'}
-                    midia={i.m.midia_url} retida={i.m.midia_retida_em} transcricao={i.m.transcricao} hora={horaCurta(i.m.created_at, fuso)}
+                    midia={i.m.midia_url} retida={i.m.midia_retida_em} midiaStatus={i.m.midia_status} transcricao={i.m.transcricao} hora={horaCurta(i.m.created_at, fuso)}
                     status={i.m.status_entrega} erro={i.m.erro_envio} autor={i.m.direcao === 'enviada' ? nomeDe(i.m.usuario_id) : null} />
             ))}
             <div ref={fimRef} />
@@ -606,9 +607,12 @@ function BolhaNota({ n, autor, minha, onMudou, onApagou }: {
   )
 }
 
-function Bolha({ id, lado, conteudo, tipo, midia, retida, transcricao, hora, status, erro, autor }: {
+/** Nome da mídia na bolha sem arquivo. */
+const NOME_TIPO: Record<string, string> = { audio: 'Áudio', imagem: 'Imagem', video: 'Vídeo', documento: 'Documento' }
+
+function Bolha({ id, lado, conteudo, tipo, midia, retida, midiaStatus, transcricao, hora, status, erro, autor }: {
   id?: number; lado: 'cliente' | 'loja'; conteudo: string | null; tipo: string; midia: string | null
-  retida?: string | null; transcricao?: string | null; hora: string; status?: string | null; erro?: string | null; autor?: string | null
+  retida?: string | null; midiaStatus?: string | null; transcricao?: string | null; hora: string; status?: string | null; erro?: string | null; autor?: string | null
 }) {
   const url = midia ? urlDeMidia(midia) : null
   // Mensagem de anúncio: o conteúdo é o JSON do anúncio e a mídia é a imagem dele.
@@ -629,6 +633,9 @@ function Bolha({ id, lado, conteudo, tipo, midia, retida, transcricao, hora, sta
         {anuncio && <AnuncioChat conteudo={conteudo ?? ''} midiaUrl={url} />}
         {url && !anuncio && !['imagem', 'video', 'audio'].includes(tipo) && <a href={url} target="_blank" rel="noreferrer" className="mb-1 block text-accent underline">Abrir arquivo</a>}
         {!url && retida && <div className="mb-1 text-[11.5px] italic text-ink-3">Arquivo retirado pela retenção de mídia.</div>}
+        {/* Mídia que falhou de passagem (25/11/2026): a rotina resgatar-midias busca na Meta por até 7 dias. */}
+        {!url && !retida && midiaStatus === 'pendente' && <div className="mb-1 text-[11.5px] italic text-ink-3">{NOME_TIPO[tipo] ?? 'Anexo'} — arquivo sendo recuperado</div>}
+        {!url && !retida && midiaStatus === 'indisponivel' && <div className="mb-1 text-[11.5px] italic text-ink-3">{NOME_TIPO[tipo] ?? 'Anexo'} — arquivo indisponível</div>}
         {transcricao && <div className="mb-1 text-[12px] italic text-ink-2">“{transcricao}”</div>}
         {texto && <div className="whitespace-pre-wrap break-words">{formatarTextoChat(texto)}</div>}
         <div className="mt-0.5 flex items-center justify-end gap-1 text-[10.5px] text-ink-3">
