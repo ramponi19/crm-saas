@@ -7,6 +7,7 @@ import { conversasDosLeads, umPorContatoELoja } from '@/lib/leads'
 import type { Acesso } from './acesso'
 import { agora, diaNoFuso, formatarDataHora, instanteLocal, paraData, somarDias } from '@/lib/datas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { dataDaConclusao, filtroConcluidaNoPeriodo } from '@/lib/vendas-mes'
 
 /**
  * AS CONSULTAS QUE O ASSISTENTE PODE FAZER — TODAS SÓ DE LEITURA.
@@ -473,7 +474,7 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
   const filialId = loja.filialId
 
   type V = {
-    id: number; data_venda: string | null; created_at: string; valor_venda: number | null; valor_custo: number | null
+    id: number; data_venda: string | null; concluida_em: string | null; created_at: string; valor_venda: number | null; valor_custo: number | null
     lucro: number | null; forma_pagamento: string | null; canal_venda: string | null; status: string | null
     vendedor_id: string | null; produto_id: number | null; quantidade: number | null; filial_id: number | null
     grupo_pdv: string | null; cliente_id: number | null
@@ -481,10 +482,11 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
   // A contagem vem com a primeira página: depois, só as páginas que existem.
   const vendas = await buscarTudo<V>((de, ate, primeira) => {
     let q = ler(c).from('vendas_vendas')
-      .select('id, data_venda, created_at, valor_venda, valor_custo, lucro, forma_pagamento, canal_venda, status, vendedor_id, produto_id, quantidade, filial_id, grupo_pdv, cliente_id',
+      .select('id, data_venda, concluida_em, created_at, valor_venda, valor_custo, lucro, forma_pagamento, canal_venda, status, vendedor_id, produto_id, quantidade, filial_id, grupo_pdv, cliente_id',
         primeira ? { count: 'exact' } : undefined)
       .eq('empresa_id', c.acesso.empresaId)
-      .gte('data_venda', inicio(e.de as string, fuso)).lt('data_venda', fimInclusivo(e.ate as string, fuso))
+      // Pelo dia da CONCLUSÃO (lib/vendas-mes): encomenda entregue hoje é venda de hoje, não do dia em que foi lançada.
+      .or(filtroConcluidaNoPeriodo(inicio(e.de as string, fuso), fimInclusivo(e.ate as string, fuso)))
     if (filialId) q = q.eq('filial_id', filialId)
     if (c.acesso.soMinhasVendas) q = q.eq('vendedor_id', c.acesso.userId)
     return q.order('id', { ascending: true }).range(de, ate)
@@ -537,7 +539,7 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
 
   const chave = (v: V): string => {
     switch (e.agrupar_por) {
-      case 'dia': return diaDe(v.data_venda ?? v.created_at, fuso)
+      case 'dia': return diaDe(dataDaConclusao(v) ?? v.created_at, fuso)
       case 'vendedor': return (v.vendedor_id && equipe.get(v.vendedor_id)) || 'sem vendedor'
       case 'produto': return (v.produto_id && produtos.get(v.produto_id)) || 'sem produto'
       case 'forma_pagamento': return v.forma_pagamento || 'não informada'
@@ -569,10 +571,10 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
   let lista: unknown = undefined
   if (e.listar) {
     lista = [...vendas]
-      .sort((a, b) => ((a.data_venda ?? a.created_at) < (b.data_venda ?? b.created_at) ? 1 : -1))
+      .sort((a, b) => ((dataDaConclusao(a) ?? a.created_at) < (dataDaConclusao(b) ?? b.created_at) ? 1 : -1))
       .slice(0, 40)
       .map((v) => ({
-        quando: quando(v.data_venda ?? v.created_at, fuso),
+        quando: quando(dataDaConclusao(v) ?? v.created_at, fuso),
         produto: (v.produto_id && produtos.get(v.produto_id)) || null,
         valor: reais(Number(v.valor_venda ?? 0)),
         ...(fin && lucroDe(v) != null ? { lucro: reais(lucroDe(v)!) } : {}),

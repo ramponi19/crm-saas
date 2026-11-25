@@ -13,6 +13,7 @@ import {
 import { consultaClientes } from '@/lib/clientes'
 import { periodo } from '@/lib/datas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { filtroConcluidaNoPeriodo } from '@/lib/vendas-mes'
 
 export const metadata = { title: 'Administração' }
 
@@ -36,7 +37,8 @@ export default async function AdminOverviewPage() {
     supabase.from('negocios').select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('estoque_produtos').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     supabase.from('empresa_usuarios').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId).eq('ativo', true),
-    supabase.from('vendas_vendas').select('valor_venda').eq('empresa_id', empresaId).eq('status', 'concluida').gte('data_venda', inicioMes).lt('data_venda', fimMes),
+    // Pelo mês da conclusão (lib/vendas-mes): a encomenda conta no mês em que foi entregue.
+    supabase.from('vendas_vendas').select('valor_venda').eq('empresa_id', empresaId).eq('status', 'concluida').or(filtroConcluidaNoPeriodo(inicioMes, fimMes)),
     supabase.from('empresas').select('plano').eq('id', empresaId).single(),
   ])
 

@@ -3,6 +3,7 @@ import type { Database } from '@/types/database'
 import { aplicarEscopo, type Escopo } from '@/lib/escopo'
 import { SEM_NOME } from '@/lib/sem-nome'
 import { lerFechamentos } from '@/lib/fechamentos'
+import { dataDaConclusao, filtroConcluidaDesde, resumoEmAberto, STATUS_EM_ABERTO, type ResumoEmAberto } from '@/lib/vendas-mes'
 import { FUSO_PADRAO, agora, inicioDoAno, inicioDoDia, inicioDoDiaHaDias, inicioDoMes, mesNoFuso, paraData } from '@/lib/datas'
 
 /**
@@ -112,6 +113,8 @@ export interface VendaDoPainel {
   valor_venda: number
   valor_custo: number | null
   data_venda: string | null
+  /** Quando foi concluída (hotfix H1). O mês do faturamento é `concluida_em ?? data_venda` (lib/vendas-mes). */
+  concluida_em: string | null
   canal_venda: string | null
   forma_pagamento: string | null
   status: string | null
@@ -124,7 +127,7 @@ export interface VendaDoPainel {
 const FORA_DO_PAINEL = '("encomenda","pendente_entrega")'
 
 const COLUNAS_VENDA =
-  'id, valor_venda, valor_custo, data_venda, canal_venda, forma_pagamento, status, vendedor_id, ' +
+  'id, valor_venda, valor_custo, data_venda, concluida_em, canal_venda, forma_pagamento, status, vendedor_id, ' +
   'produto:estoque_produtos!produto_id(nome), cliente:contatos!cliente_id(nome)'
 
 type LinhaVenda = Omit<VendaDoPainel, 'produto_nome' | 'cliente_nome'> & {
@@ -142,13 +145,17 @@ function normalizarVenda(v: LinhaVenda): VendaDoPainel {
   }
 }
 
-/** Vendas desde `desde` (inclusive), no escopo do usuário. */
+/**
+ * Vendas CONCLUÍDAS (ou de balcão) desde `desde`, no escopo do usuário — pelo mês da conclusão:
+ * `coalesce(concluida_em, data_venda) >= desde` (lib/vendas-mes). A encomenda lançada em outubro e
+ * entregue em novembro entra em novembro.
+ */
 export async function vendasDesde(db: Db, empresaId: number, escopo: Escopo, desde: Date): Promise<VendaDoPainel[]> {
   const { data } = await aplicarEscopo(
     db.from('vendas_vendas').select(COLUNAS_VENDA)
       .eq('empresa_id', empresaId)
       .not('status', 'in', FORA_DO_PAINEL)
-      .gte('data_venda', desde.toISOString()),
+      .or(filtroConcluidaDesde(desde.toISOString())),
     escopo, 'vendedor_id',
   )
   return ((data ?? []) as unknown as LinhaVenda[]).map(normalizarVenda)
@@ -173,6 +180,20 @@ export async function vendasRecentes(db: Db, empresaId: number, escopo: Escopo, 
 }
 
 export const concluidas = (vendas: VendaDoPainel[]) => vendas.filter((v) => v.status === 'concluida')
+
+/**
+ * Encomendas e pendentes de entrega em aberto, no escopo do usuário — FORA do faturamento.
+ * Sem filtro de data: é o estado de agora (o que está comprometido e ainda não virou venda).
+ */
+export async function emAbertoDoPainel(db: Db, empresaId: number, escopo: Escopo): Promise<ResumoEmAberto> {
+  const { data } = await aplicarEscopo(
+    db.from('vendas_vendas').select('id, valor_venda, status, grupo_pdv, pagamentos:vendas_pagamentos(valor_pago)')
+      .eq('empresa_id', empresaId)
+      .in('status', [...STATUS_EM_ABERTO]),
+    escopo, 'vendedor_id',
+  )
+  return resumoEmAberto((data ?? []) as unknown as Parameters<typeof resumoEmAberto>[0])
+}
 
 // ── Contagens ─────────────────────────────────────────────────────────────
 
@@ -310,6 +331,8 @@ export interface DadosPainel {
   topVendedores: VendedorDoPainel[]
   vendasRecentes: VendaRecente[]
   contagens: ContagensDoPainel
+  /** Encomendas e pendentes de entrega: comprometido, FORA dos números acima. */
+  emAberto: ResumoEmAberto
 }
 
 /**
@@ -322,30 +345,48 @@ export interface DadosPainel {
  * (a troca Hoje/7 dias/Mês/Ano é só escolher qual mostrar).
  */
 export async function painelCompleto(db: Db, empresaId: number, escopo: Escopo, fuso: string = FUSO_PADRAO, agoraRef: Date = agora()): Promise<DadosPainel> {
-  const starts = inicioDosPeriodos(agoraRef, fuso)
   const inicio12m = inicioDoMes(agoraRef, fuso, -12)
   // A meta do mês é a do mês DA LOJA: no dia 30 às 21h o UTC já está no mês seguinte.
   const mesAtual = mesNoFuso(agoraRef, fuso) // YYYY-MM
 
-  const [vendas, recentes, contagens, { vendedores, metaPorUsuario }] = await Promise.all([
+  const [vendas, recentes, contagens, { vendedores, metaPorUsuario }, emAberto] = await Promise.all([
     vendasDesde(db, empresaId, escopo, inicio12m),
     vendasRecentes(db, empresaId, escopo, 6),
     contagensDoPainel(db, empresaId, escopo),
     equipeEMetas(db, empresaId, mesAtual),
+    emAbertoDoPainel(db, empresaId, escopo),
   ])
+
+  return {
+    ...resultadosDoPainel(vendas, { vendedores, metaPorUsuario }, escopo, fuso, agoraRef),
+    vendasRecentes: recentes, contagens, emAberto,
+  }
+}
+
+/**
+ * A conta do painel sobre as vendas já buscadas — sem banco, para o teste.
+ * Cada venda cai no período e no mês pela data da CONCLUSÃO (`concluida_em ?? data_venda`).
+ */
+export function resultadosDoPainel(
+  vendas: VendaDoPainel[],
+  { vendedores, metaPorUsuario }: { vendedores: { id: string; nome: string }[]; metaPorUsuario: Record<string, number | null> },
+  escopo: Escopo, fuso: string = FUSO_PADRAO, agoraRef: Date = agora(),
+): Pick<DadosPainel, 'periods' | 'faturamentoMensal' | 'porCanal' | 'topProdutos' | 'topVendedores'> {
+  const starts = inicioDosPeriodos(agoraRef, fuso)
+  const quando = (v: VendaDoPainel) => paraData(dataDaConclusao(v))?.getTime() ?? null
 
   // KPIs por período (só concluídas). Lucro e margem só onde há custo lançado.
   const fechadas = concluidas(vendas)
   const periods: Record<string, ResultadoVendas> = {}
   for (const [key, start] of Object.entries(starts)) {
     const startMs = start.getTime()
-    periods[key] = resultadoDasVendas(fechadas.filter((v) => v.data_venda && new Date(v.data_venda).getTime() >= startMs))
+    periods[key] = resultadoDasVendas(fechadas.filter((v) => (quando(v) ?? -Infinity) >= startMs))
   }
 
   // Faturamento mensal, 12 meses — a venda das 21h do dia 30 é do mês dela, no fuso da loja.
   const porMes: Record<string, number> = {}
   for (const v of fechadas) {
-    const d = paraData(v.data_venda)
+    const d = paraData(dataDaConclusao(v))
     if (!d) continue
     const k = mesNoFuso(d, fuso)
     porMes[k] = (porMes[k] ?? 0) + v.valor_venda
@@ -354,7 +395,7 @@ export async function painelCompleto(db: Db, empresaId: number, escopo: Escopo, 
 
   // O mês: produtos, canais e ranking.
   const inicioMes = starts.mes.getTime()
-  const vendasMes = fechadas.filter((v) => v.data_venda && new Date(v.data_venda).getTime() >= inicioMes)
+  const vendasMes = fechadas.filter((v) => (quando(v) ?? -Infinity) >= inicioMes)
 
   const produtoCount: Record<string, number> = {}
   for (const v of vendasMes) if (v.produto_nome) produtoCount[v.produto_nome] = (produtoCount[v.produto_nome] ?? 0) + 1
@@ -386,5 +427,5 @@ export async function painelCompleto(db: Db, empresaId: number, escopo: Escopo, 
     .sort((a, b) => b.total - a.total)
     .slice(0, 5)
 
-  return { periods, faturamentoMensal, porCanal, topProdutos, topVendedores, vendasRecentes: recentes, contagens }
+  return { periods, faturamentoMensal, porCanal, topProdutos, topVendedores }
 }

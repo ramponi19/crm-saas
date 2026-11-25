@@ -6,6 +6,7 @@ import { RelatoriosImobView } from '@/components/modules/imoveis/relatorios-imob
 import { exigirPlano } from '@/lib/acesso'
 import { capacidades, carregarConfigEmpresa, vocabulario } from '@/lib/empresa-config'
 import type { Tables } from '@/types/database'
+import { resumoEmAberto, STATUS_EM_ABERTO, type LinhaEmAberto } from '@/lib/vendas-mes'
 
 export const metadata = { title: 'Relatórios' }
 
@@ -32,10 +33,10 @@ export default async function RelatoriosPage({ searchParams }: {
 
   await exigirPlano('bi')
 
-  const [{ data: vendasRaw }, { data: lancamentos }, { data: vendedoresRaw }, { data: trocasPendentes }] = await Promise.all([
+  const [{ data: vendasRaw }, { data: lancamentos }, { data: vendedoresRaw }, { data: trocasPendentes }, { data: abertasRaw }] = await Promise.all([
     supabase
       .from('vendas_vendas')
-      .select('id, data_venda, valor_venda, valor_custo, desconto_valor, lucro, forma_pagamento, canal_venda, status, grupo_pdv, observacoes, clientes:contatos!cliente_id(nome), produtos:estoque_produtos!produto_id(nome), usuarios!vendedor_id(nome)')
+      .select('id, data_venda, concluida_em, valor_venda, valor_custo, desconto_valor, lucro, forma_pagamento, canal_venda, status, grupo_pdv, observacoes, clientes:contatos!cliente_id(nome), produtos:estoque_produtos!produto_id(nome), usuarios!vendedor_id(nome)')
       .eq('empresa_id', empresaId).not('status', 'in', '("encomenda","pendente_entrega")').order('data_venda', { ascending: false }).limit(500),
     supabase
       .from('financeiro_lancamentos')
@@ -50,6 +51,9 @@ export default async function RelatoriosPage({ searchParams }: {
     // faturamento ainda depende de um aparelho entrar na loja.
     supabase.from('estoque_unidades').select('grupo_pdv')
       .eq('empresa_id', empresaId).eq('status', 'pendente').eq('ativo', true).not('grupo_pdv', 'is', null),
+    // Encomendas e pendentes de entrega: fora do faturamento, num bloco à parte (lib/vendas-mes).
+    supabase.from('vendas_vendas').select('id, valor_venda, status, grupo_pdv, pagamentos:vendas_pagamentos(valor_pago)')
+      .eq('empresa_id', empresaId).in('status', [...STATUS_EM_ABERTO]),
   ])
 
   type VendaRow = Tables<'vendas_vendas'> & {
@@ -77,7 +81,8 @@ export default async function RelatoriosPage({ searchParams }: {
   return (
     <>
       <Topbar title="Relatórios" />
-      <RelatoriosView vendas={vendas} lancamentos={lancamentos ?? []} vendedores={vendedores} />
+      <RelatoriosView vendas={vendas} lancamentos={lancamentos ?? []} vendedores={vendedores}
+        emAberto={resumoEmAberto((abertasRaw ?? []) as unknown as LinhaEmAberto[])} />
     </>
   )
 }

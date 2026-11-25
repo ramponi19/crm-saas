@@ -13,10 +13,14 @@ import { useFuso } from '@/components/fuso-provider'
 import { useCelulares } from '@/components/modules/celulares/use-celulares'
 import { RELATORIOS_CELULAR } from '@/components/modules/celulares/rotulos'
 import { agora, diaNoFuso, formatarData, formatarDiaMes, mesNoFuso, paraData, primeiroDoMes, rotuloDoMes, somarDias } from '@/lib/datas'
+import { dataDaConclusao, type ResumoEmAberto } from '@/lib/vendas-mes'
+import { EmAbertoFaixa } from '@/components/em-aberto-faixa'
 
 interface Venda {
   id: number
   data_venda: string | null
+  /** Quando foi concluída (hotfix H1). O dia do relatório é `concluida_em ?? data_venda` (lib/vendas-mes). */
+  concluida_em?: string | null
   cliente_nome: string | null
   produto_nome: string | null
   vendedor_nome: string | null
@@ -51,6 +55,8 @@ interface Props {
   vendas: Venda[]
   lancamentos: Lancamento[]
   vendedores: string[]
+  /** Encomendas e pendentes de entrega: fora do faturamento, mostradas à parte. */
+  emAberto?: ResumoEmAberto
 }
 
 const CANAL_LABEL: Record<string, string> = {
@@ -94,8 +100,10 @@ function exportCSV(rows: Venda[], fuso: string) {
     'vendas',
     // Coluna de troca também no CSV: quem fecha o mês na planilha precisa poder
     // separar lá o que a tela separa aqui.
-    ['Data', 'Cliente', 'Produto', 'Vendedor', 'Canal', 'Valor', 'Desconto', 'Lucro', 'Troca pendente'],
+    // "Data" é a da conclusão (a que põe a venda no período); "Lançada em" é a data_venda — só difere na encomenda.
+    ['Data', 'Lançada em', 'Cliente', 'Produto', 'Vendedor', 'Canal', 'Valor', 'Desconto', 'Lucro', 'Troca pendente'],
     rows.map(v => [
+      formatarData(dataDaConclusao(v), undefined, '', fuso),
       formatarData(v.data_venda, undefined, '', fuso),
       v.cliente_nome ?? '', v.produto_nome ?? '', v.vendedor_nome ?? '',
       CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '',
@@ -173,7 +181,7 @@ function BarChart({ vendas }: { vendas: Venda[] }) {
     const key = somarDias(hoje, i - 6)
     const label = formatarDiaMes(key)
     const total = vendas
-      .filter(v => v.status === 'concluida' && diaDaLoja(v.data_venda, fuso) === key)
+      .filter(v => v.status === 'concluida' && diaDaLoja(dataDaConclusao(v), fuso) === key)
       .reduce((s, v) => s + v.valor_venda, 0)
     return { label, total }
   })
@@ -195,7 +203,7 @@ function BarChart({ vendas }: { vendas: Venda[] }) {
   )
 }
 
-export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
+export function RelatoriosView({ vendas, lancamentos, vendedores, emAberto }: Props) {
   const fuso = useFuso()
   const celulares = useCelulares()
   const [aba, setAba]           = useState('vendas')
@@ -206,8 +214,8 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
   const [vendedor, setVendedor] = useState('Todos')
 
   const vendasFiltradas = useMemo(() => vendas.filter(v => {
-    // data_venda é instante: o dia que conta é o da loja, não o do UTC.
-    const d = diaDaLoja(v.data_venda, fuso)
+    // O dia que conta é o da CONCLUSÃO (encomenda entra no dia em que foi entregue), no calendário da loja.
+    const d = diaDaLoja(dataDaConclusao(v), fuso)
     if (!d) return false
     if (d < dataIni || d > dataFim) return false
     if (vendedor !== 'Todos' && v.vendedor_nome !== vendedor) return false
@@ -265,7 +273,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
   const saldo     = entradas - saidas
 
   const vendaCols: Column<Venda>[] = [
-    { key: 'data', header: 'Data', className: 'num w-[100px]', render: v => <span className="text-ink-2">{formatarData(v.data_venda, undefined, '—', fuso)}</span> },
+    { key: 'data', header: 'Data', className: 'num w-[100px]', render: v => <span className="text-ink-2">{formatarData(dataDaConclusao(v), undefined, '—', fuso)}</span> },
     { key: 'cliente', header: 'Cliente', render: v => <span className="font-medium text-ink">{v.cliente_nome ?? '—'}</span> },
     {
       // Venda sem cadastro de produto (acessório, aparelho de troca) guarda a
@@ -370,6 +378,9 @@ export function RelatoriosView({ vendas, lancamentos, vendedores }: Props) {
               </p>
             </div>
           )}
+
+          {/* Encomendas ainda não entregues: fora do total acima (cada uma entra no mês da entrega). */}
+          {emAberto && <EmAbertoFaixa resumo={emAberto} className="mt-3" />}
 
           {/* Gráfico */}
           <Card title="Vendas por dia" actions={<span className="num text-[11px] text-ink-3">Últimos 7 dias</span>}>

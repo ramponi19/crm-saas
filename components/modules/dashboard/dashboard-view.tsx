@@ -17,6 +17,7 @@ import { meusFollowUps, type ResultadoVendas, type DadosPainel, type FunilDoPain
 import { useFuso } from '@/components/fuso-provider'
 import { formatarDiaMes } from '@/lib/datas'
 import { useModulosLigados } from '@/components/layout/ferramentas-context'
+import { EmAbertoFaixa } from '@/components/em-aberto-faixa'
 
 /**
  * Tudo vem pronto do servidor (lib/painel/metricas.ts → painelCompleto), inclusive
@@ -311,6 +312,9 @@ export function DashboardView({ data }: { data: DashboardData }) {
             <StatCard bare label="Ticket médio" value={<AnimatedCurrency value={ticketMedio} />} delta="por venda fechada" deltaTone="neutral" />
             <StatCard bare label="Vendas fechadas" value={<AnimatedInt value={qtdVendas} />} delta="no período" deltaTone="neutral" />
           </div>}
+
+          {/* Encomendas ainda não entregues: comprometido, fora dos números acima. */}
+          {comVendas && data.emAberto && <EmAbertoFaixa resumo={data.emAberto} />}
 
           {/* Strip secundário */}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

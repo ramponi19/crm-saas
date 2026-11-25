@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { FUSO_PADRAO, limitesDoMes } from '@/lib/datas'
+import { filtroConcluidaNoPeriodo } from '@/lib/vendas-mes'
 
 /**
  * Ranking gamificado (Sprint 3.1) — métricas por vendedor no período + score.
@@ -72,7 +73,8 @@ export async function calcularRanking(
 
   const [{ data: membrosRaw }, { data: vendas }, { data: visitas }, { data: leads }, { data: propostas }, { data: trocasPendentes }] = await Promise.all([
     db.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
-    db.from('vendas_vendas').select('vendedor_id, valor_venda, data_venda, status, grupo_pdv').eq('empresa_id', empresaId).gte('data_venda', ini).lt('data_venda', fim),
+    // Pelo mês da CONCLUSÃO (lib/vendas-mes): a encomenda sobe o vendedor no mês em que foi entregue.
+    db.from('vendas_vendas').select('vendedor_id, valor_venda, data_venda, status, grupo_pdv').eq('empresa_id', empresaId).or(filtroConcluidaNoPeriodo(ini, fim)),
     opts.comVisitas === false
       ? Promise.resolve({ data: [] as { corretor_id: string | null }[] })
       : db.from('agenda_visitas').select('corretor_id, status, data_hora').eq('empresa_id', empresaId).eq('status', 'realizada').gte('data_hora', ini).lt('data_hora', fim),

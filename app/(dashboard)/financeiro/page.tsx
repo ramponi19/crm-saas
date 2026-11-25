@@ -8,6 +8,7 @@ import { comNomeDoCliente } from '@/lib/sem-nome'
 import { consultaClientes } from '@/lib/clientes'
 import { inicioDoMes } from '@/lib/datas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { filtroConcluidaDesde } from '@/lib/vendas-mes'
 
 export default async function FinanceiroPage() {
   const { role } = await requireEmpresaRole(['owner', 'admin'])
@@ -36,8 +37,9 @@ export default async function FinanceiroPage() {
       .eq('empresa_id', empresaId)
       .order('created_at', { ascending: false })
       .limit(200),
+    // Faturamento do mês pela CONCLUSÃO (lib/vendas-mes): encomenda entra no mês em que foi entregue.
     supabase.from('vendas_vendas').select('valor_venda')
-      .eq('empresa_id', empresaId).eq('status', 'concluida').gte('data_venda', inicioMes),
+      .eq('empresa_id', empresaId).eq('status', 'concluida').or(filtroConcluidaDesde(inicioMes)),
   ])
 
   const faturamentoVendas = (vendasMes ?? []).reduce((s, v) => s + Number(v.valor_venda ?? 0), 0)
