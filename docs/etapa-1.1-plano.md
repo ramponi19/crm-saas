@@ -181,6 +181,16 @@ Nenhuma permissão sem ponto de aplicação entra no catálogo, **exceto** as du
 
 **Decisão pendente D-A1 (LGPD), antes do código da auditoria da plataforma:** a auditoria não guarda dado pessoal de cliente em texto (nome, telefone, CPF, e-mail, endereço, observação livre), só identificadores e os nomes dos campos alterados, porque a tabela é imutável e um pedido de exclusão não conseguiria apagá-los. O gatilho genérico de "escrita da plataforma" (acima) grava `{tabela, id, campos_alterados}` e só os valores de campos não pessoais; lista de campos pessoais por tabela no código, com teste. Registrada no roteiro §7.
 
+**Como ficou no código (25/11, local, sem deploy; migração `20261125000700_cargos_permissoes`, commits `ba24d8fc`, `e3289961`):**
+- **406 reproduzido no local antes da correção** (gateway local: `GET /rest/v1/empresa_usuarios?select=role,empresa:empresas(...)&usuario_id=eq.<superadmin>&ativo=eq.true` → **406**, superadmin com a impersonação vencida abrindo `/dashboard`). Depois da correção, o mesmo caminho vai ao painel do superadmin sem nenhuma resposta 4xx/5xx.
+- Contexto da sessão em `lib/sessao.ts` (servidor) e `lib/permissoes-cargo.ts` (parte pura, que pode chegar ao navegador: `lib/escopo.ts` entra no painel; a conferência visual pegou o erro de importar `next/headers` por esse caminho).
+- O cargo de cada pessoa é trocado na própria tela de **Cargos** (seção Pessoas), não na tela de Equipe; a Equipe continua igual até ser tocada.
+- **Relatórios** e **Executivo** passam a `core.ver_relatorios`, **Financeiro** a `core.ver_financeiro`, na página (antes, dono/admin pelo papel). Na JM isso não muda ninguém hoje (vendedores com as duas desligadas). A Consulta abre Relatórios (Q2); o lucro que aparece lá some para quem não tem `estoque.ver_custo` na 1.1e.
+- O **seletor de loja** e `/api/filial/selecionar` passam a `lojas.ver_rede` (Dono, Administrador e Consulta de fábrica): a Consulta escolhe a loja ou a rede.
+- Auditoria da escrita da plataforma (gatilho `zz_plataforma_auditar` nas tabelas da empresa) grava **só tabela, id e os nomes dos campos alterados** (D-A1 já respeitada). O fim da impersonação **por prazo vencido** não gera linha de "saiu" (só a saída pelo botão).
+- Trava `scripts/check-papel.mjs` no `npm run build`: **219** checagens de papel (só pode cair até a E1.6).
+- Verde: ritual do zero (todos os `teste-*.sql`, inclusive `teste-cargos`; 44 de integração, com `cargos-local`), `npm test` 643, `npm run check`, build. Conferência visual local: Cargos (lista, editor, troca de cargo), Consulta (faixa, rede, Relatórios abre, Financeiro não), Escolha a empresa e seletor de empresa, auditoria das ações.
+
 ### 2.4 App
 
 | Área | Arquivos | Mudança |
