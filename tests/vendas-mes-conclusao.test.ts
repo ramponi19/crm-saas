@@ -99,3 +99,103 @@ describe('Em aberto (fora do faturamento)', () => {
     assert.deepEqual(resumoEmAberto(null), { pedidos: 0, valor: 0, sinal: 0, falta: 0 })
   })
 })
+
+// ── a consulta, executada num PostgREST falso que aplica os filtros de verdade ────────────────────────
+import { postgrestFalso } from './postgrest-falso'
+import { vendasDoPeriodo } from '@/lib/vendas-periodo'
+import { executar, type Contexto } from '@/lib/assistente/ferramentas'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+/**
+ * A loja: 1.200 vendas de balcão em novembro (mais de uma página de 1.000) e, lançada ANTES de todas elas,
+ * a encomenda 1: lançada em 01/08, entregue em 18/11. Pelo lançamento ela é a mais antiga de 1.201 — fora das
+ * "500 mais recentes" que os Relatórios carregavam. Mais: uma encomenda ainda aberta (com sinal), uma venda
+ * concluída em outubro e uma devolvida em novembro.
+ */
+function loja() {
+  const vendas: Record<string, unknown>[] = [
+    { id: 1, empresa_id: 1, filial_id: 3, status: 'concluida', valor_venda: 5000, valor_custo: 0, quantidade: 1, grupo_pdv: null,
+      vendedor_id: 'u1', data_venda: '2026-08-01T15:00:00.000Z', concluida_em: '2026-11-18T17:30:00.000Z', created_at: '2026-08-01T15:00:00.000Z' },
+  ]
+  for (let i = 0; i < 1200; i++) {
+    const dia = String(1 + (i % 24)).padStart(2, '0')
+    vendas.push({ id: 100 + i, empresa_id: 1, filial_id: 3, status: 'concluida', valor_venda: 100, valor_custo: 0, quantidade: 1,
+      grupo_pdv: null, vendedor_id: 'u1', data_venda: `2026-11-${dia}T15:00:00.000Z`, concluida_em: null, created_at: `2026-11-${dia}T15:00:00.000Z` })
+  }
+  vendas.push(
+    { id: 2001, empresa_id: 1, filial_id: 3, status: 'encomenda', valor_venda: 3000, valor_custo: 0, quantidade: 1, grupo_pdv: null,
+      vendedor_id: 'u1', data_venda: '2026-11-20T15:00:00.000Z', concluida_em: null, created_at: '2026-11-20T15:00:00.000Z' },
+    { id: 2002, empresa_id: 1, filial_id: 3, status: 'concluida', valor_venda: 700, valor_custo: 0, quantidade: 1, grupo_pdv: null,
+      vendedor_id: 'u1', data_venda: '2026-10-10T15:00:00.000Z', concluida_em: null, created_at: '2026-10-10T15:00:00.000Z' },
+    { id: 2003, empresa_id: 1, filial_id: 3, status: 'devolvido', valor_venda: 900, valor_custo: 0, quantidade: 1, grupo_pdv: null,
+      vendedor_id: 'u1', data_venda: '2026-11-10T15:00:00.000Z', concluida_em: null, created_at: '2026-11-10T15:00:00.000Z' },
+    // outra empresa, mesmo período
+    { id: 3001, empresa_id: 2, filial_id: 9, status: 'concluida', valor_venda: 999, valor_custo: 0, quantidade: 1, grupo_pdv: null,
+      vendedor_id: 'u9', data_venda: '2026-11-05T15:00:00.000Z', concluida_em: null, created_at: '2026-11-05T15:00:00.000Z' },
+  )
+  return postgrestFalso({
+    vendas_vendas: vendas,
+    vendas_pagamentos: [{ id: 1, venda_id: 2001, valor_pago: 800 }],
+    filiais: [{ id: 3, empresa_id: 1, nome: 'JM · Mogi Guaçu', cidade: 'Mogi Guaçu' }],
+    empresa_usuarios: [{ usuario_id: 'u1', empresa_id: 1 }],
+    estoque_produtos: [],
+  }, { vendas_pagamentos: 'venda_id' })
+}
+
+describe('Relatórios: o período vai para o banco, pela conclusão, sem teto', () => {
+  test('encomenda lançada há mais de 500 vendas e entregue no período ENTRA', async () => {
+    const db = loja()
+    const vendas = await vendasDoPeriodo<{ id: number; status: string; data_venda: string; concluida_em: string | null }>(
+      db as unknown as SupabaseClient, 1, 'id, status, data_venda, concluida_em', { de: '2026-11-01', ate: '2026-11-30' }, FUSO)
+    const ids = new Set(vendas.map((v) => v.id))
+    assert.ok(ids.has(1), 'a encomenda entregue em 18/11 tem de estar no relatório de novembro')
+    // 1.200 de balcão + a encomenda + a devolvida (a lista mostra o status; os KPIs só somam concluídas,
+    // como antes) — duas páginas de 1.000 lidas até o fim
+    assert.equal(vendas.length, 1202)
+    assert.ok(ids.has(2003))
+    assert.ok(!ids.has(2001), 'encomenda aberta fica fora (é o bloco Em aberto)')
+    assert.ok(!ids.has(2002), 'venda de outubro fica fora')
+    assert.ok(!ids.has(3001), 'outra empresa fica fora')
+    // ordenadas pela conclusão: a encomenda (18/11 17h30) vem antes das vendas de 18/11 15h
+    assert.ok(vendas.findIndex((v) => v.id === 1) < vendas.findIndex((v) => v.id === 117))
+  })
+  test('a consulta antiga (500 mais recentes pelo lançamento) perdia a encomenda — o defeito corrigido', async () => {
+    const { data } = await loja().from('vendas_vendas').select('id').eq('empresa_id', 1)
+      .not('status', 'in', '("encomenda","pendente_entrega")').order('data_venda', { ascending: false }).limit(500)
+    assert.ok(!(data as { id: number }[]).some((v) => v.id === 1))
+  })
+  test('o relatório de agosto (mês do lançamento) NÃO tem a encomenda', async () => {
+    const vendas = await vendasDoPeriodo<{ id: number }>(loja() as unknown as SupabaseClient, 1, 'id', { de: '2026-08-01', ate: '2026-08-31' }, FUSO)
+    assert.deepEqual(vendas.map((v) => v.id), [])
+  })
+})
+
+describe('Assistente: faturamento = só concluídas pela conclusão; em aberto à parte', () => {
+  test('novembro: 1.200 balcão + encomenda entregue; sem a aberta, sem a devolvida, sem outubro', async () => {
+    const db = loja() as unknown as SupabaseClient
+    const c: Contexto = {
+      db, svc: db, ler: db, fuso: FUSO,
+      acesso: { empresaId: 1, userId: 'u1', nome: 'Dono', papel: 'owner', soMinhasVendas: false, soMeusLeads: false, verFinanceiro: true },
+      recorte: { alcance: [3], loja: null, rotulo: 'Rede JM', escolheLoja: true },
+    }
+    const r = JSON.parse(await executar(c, 'vendas_resumo', { de: '2026-11-01', ate: '2026-11-30' }))
+    assert.equal(r.totais.vendas, 1201)
+    assert.equal(r.totais.faturamento, 1200 * 100 + 5000)
+    assert.equal(r.totais.encomendas_pendentes, undefined)
+    assert.deepEqual(r.em_aberto && { pedidos: r.em_aberto.pedidos, valor: r.em_aberto.valor, sinal: r.em_aberto.sinal_recebido, falta: r.em_aberto.falta_receber },
+      { pedidos: 1, valor: 3000, sinal: 800, falta: 2200 })
+  })
+  test('agrupado por dia: a encomenda cai em 18/11, não em 01/08', async () => {
+    const db = loja() as unknown as SupabaseClient
+    const c: Contexto = {
+      db, svc: db, ler: db, fuso: FUSO,
+      acesso: { empresaId: 1, userId: 'u1', nome: 'Dono', papel: 'owner', soMinhasVendas: false, soMeusLeads: false, verFinanceiro: true },
+      recorte: { alcance: [3], loja: null, rotulo: 'Rede JM', escolheLoja: true },
+    }
+    const r = JSON.parse(await executar(c, 'vendas_resumo', { de: '2026-08-01', ate: '2026-11-30', agrupar_por: 'dia' }))
+    const porDia = Object.fromEntries((r.grupos as { grupo: string; faturamento: number }[]).map((g) => [g.grupo, g.faturamento]))
+    assert.equal(porDia['2026-08-01'], undefined)
+    assert.equal(porDia['2026-11-18'], 50 * 100 + 5000)   // 50 vendas de balcão nesse dia + a encomenda
+    assert.equal(porDia['2026-10-10'], 700)
+  })
+})

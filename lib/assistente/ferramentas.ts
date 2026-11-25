@@ -7,7 +7,7 @@ import { conversasDosLeads, umPorContatoELoja } from '@/lib/leads'
 import type { Acesso } from './acesso'
 import { agora, diaNoFuso, formatarDataHora, instanteLocal, paraData, somarDias } from '@/lib/datas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
-import { dataDaConclusao, filtroConcluidaNoPeriodo } from '@/lib/vendas-mes'
+import { dataDaConclusao, filtroConcluidaNoPeriodo, resumoEmAberto, STATUS_EM_ABERTO, type LinhaEmAberto } from '@/lib/vendas-mes'
 
 /**
  * AS CONSULTAS QUE O ASSISTENTE PODE FAZER — TODAS SÓ DE LEITURA.
@@ -84,7 +84,7 @@ const FILIAL = {
 export const FERRAMENTAS: Anthropic.Tool[] = [
   {
     name: 'vendas_resumo',
-    description: 'Vendas registradas no CRM num período: totais (quantidade, faturamento, ticket médio; custo e lucro só se o usuário puder ver) e, opcionalmente, agrupadas e/ou listadas. Use para relatórios de vendas, faturamento, desempenho de vendedor, produto mais vendido.',
+    description: 'Vendas CONCLUÍDAS num período, pelo dia da conclusão (a encomenda conta no dia em que foi entregue, não no dia em que foi lançada — a mesma regra do painel): totais (quantidade, faturamento, ticket médio; custo e lucro só se o usuário puder ver) e, opcionalmente, agrupadas e/ou listadas. À parte, em "em_aberto", as encomendas e pendentes de entrega de agora (valor, sinal recebido, falta receber) — NÃO são faturamento. Use para relatórios de vendas, faturamento, desempenho de vendedor, produto mais vendido, encomendas em aberto.',
     input_schema: {
       type: 'object',
       properties: {
@@ -479,18 +479,35 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
     vendedor_id: string | null; produto_id: number | null; quantidade: number | null; filial_id: number | null
     grupo_pdv: string | null; cliente_id: number | null
   }
-  // A contagem vem com a primeira página: depois, só as páginas que existem.
+  /**
+   * FATURAMENTO = a mesma definição do painel (25/11/2026): só vendas CONCLUÍDAS, pelo dia da conclusão
+   * (`coalesce(concluida_em, data_venda)`, lib/vendas-mes). Antes entrava todo status, inclusive encomenda
+   * em aberto, e pelo dia do lançamento. Encomenda e pendente de entrega vão para `em_aberto`, à parte.
+   * A contagem vem com a primeira página: depois, só as páginas que existem.
+   */
   const vendas = await buscarTudo<V>((de, ate, primeira) => {
     let q = ler(c).from('vendas_vendas')
       .select('id, data_venda, concluida_em, created_at, valor_venda, valor_custo, lucro, forma_pagamento, canal_venda, status, vendedor_id, produto_id, quantidade, filial_id, grupo_pdv, cliente_id',
         primeira ? { count: 'exact' } : undefined)
       .eq('empresa_id', c.acesso.empresaId)
-      // Pelo dia da CONCLUSÃO (lib/vendas-mes): encomenda entregue hoje é venda de hoje, não do dia em que foi lançada.
+      .eq('status', 'concluida')
       .or(filtroConcluidaNoPeriodo(inicio(e.de as string, fuso), fimInclusivo(e.ate as string, fuso)))
     if (filialId) q = q.eq('filial_id', filialId)
     if (c.acesso.soMinhasVendas) q = q.eq('vendedor_id', c.acesso.userId)
     return q.order('id', { ascending: true }).range(de, ate)
   })
+
+  // Em aberto AGORA (não depende do período), no mesmo recorte de loja e de vendedor — o bloco do painel.
+  const abertas = await buscarTudo<LinhaEmAberto>((de, ate) => {
+    let q = ler(c).from('vendas_vendas')
+      .select('id, valor_venda, status, grupo_pdv, pagamentos:vendas_pagamentos(valor_pago)')
+      .eq('empresa_id', c.acesso.empresaId)
+      .in('status', [...STATUS_EM_ABERTO])
+    if (filialId) q = q.eq('filial_id', filialId)
+    if (c.acesso.soMinhasVendas) q = q.eq('vendedor_id', c.acesso.userId)
+    return q.order('id', { ascending: true }).range(de, ate)
+  })
+  const aberto = resumoEmAberto(abertas)
 
   const [equipe, produtos] = await Promise.all([
     nomesDaEquipe(c),
@@ -512,7 +529,6 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
     itens: vendas.reduce((s, v) => s + Number(v.quantidade ?? 1), 0),
     faturamento: reais(fat),
     ticket_medio: pedidos.size ? reais(fat / pedidos.size) : 0,
-    encomendas_pendentes: vendas.filter((v) => v.status === 'encomenda').length,
   }
   /**
    * LUCRO SÓ ONDE HÁ CUSTO. Medido em 14/10/2026: as vendas da JM não têm
@@ -589,6 +605,10 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
     escopo: c.acesso.soMinhasVendas ? 'só as vendas deste usuário (permissão do papel)' : 'todas as vendas que o usuário pode ver',
     ...(fin ? {} : { aviso: 'custo e lucro ocultos: este usuário não tem permissão financeira' }),
     totais, grupos, vendas: lista,
+    em_aberto: {
+      observacao: 'encomendas e pendentes de entrega de agora; NÃO entram no faturamento acima (cada uma conta no dia em que for entregue)',
+      pedidos: aberto.pedidos, valor: aberto.valor, sinal_recebido: aberto.sinal, falta_receber: aberto.falta,
+    },
   })
 }
 

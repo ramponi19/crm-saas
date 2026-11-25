@@ -7,6 +7,9 @@ import { exigirPlano } from '@/lib/acesso'
 import { capacidades, carregarConfigEmpresa, vocabulario } from '@/lib/empresa-config'
 import type { Tables } from '@/types/database'
 import { resumoEmAberto, STATUS_EM_ABERTO, type LinhaEmAberto } from '@/lib/vendas-mes'
+import { vendasDoPeriodo } from '@/lib/vendas-periodo'
+import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { agora, diaNoFuso, primeiroDoMes, somarDias } from '@/lib/datas'
 
 export const metadata = { title: 'Relatórios' }
 
@@ -33,11 +36,24 @@ export default async function RelatoriosPage({ searchParams }: {
 
   await exigirPlano('bi')
 
-  const [{ data: vendasRaw }, { data: lancamentos }, { data: vendedoresRaw }, { data: trocasPendentes }, { data: abertasRaw }] = await Promise.all([
-    supabase
-      .from('vendas_vendas')
-      .select('id, data_venda, concluida_em, valor_venda, valor_custo, desconto_valor, lucro, forma_pagamento, canal_venda, status, grupo_pdv, observacoes, clientes:contatos!cliente_id(nome), produtos:estoque_produtos!produto_id(nome), usuarios!vendedor_id(nome)')
-      .eq('empresa_id', empresaId).not('status', 'in', '("encomenda","pendente_entrega")').order('data_venda', { ascending: false }).limit(500),
+  /**
+   * O período vai para o banco (lib/vendas-periodo): pelo dia da CONCLUSÃO, paginado até o fim.
+   * Antes eram as 500 mais recentes pelo lançamento, filtradas no navegador — a encomenda lançada há
+   * mais de 500 vendas e entregue no período sumia. Padrão: do dia 1 até hoje, no calendário da loja.
+   * A busca cobre também os 7 últimos dias, que o gráfico "Vendas por dia" mostra sempre.
+   */
+  const fuso = await fusoDaEmpresa(supabase, empresaId)
+  const hoje = diaNoFuso(agora(), fuso)
+  const diaOk = (d?: string) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null)
+  const de = diaOk(sp.de) ?? primeiroDoMes(hoje)
+  const ate = diaOk(sp.ate) ?? hoje
+  const seteDias = somarDias(hoje, -6)
+  const busca = { de: de < seteDias ? de : seteDias, ate: ate > hoje ? ate : hoje }
+
+  const [vendasRaw, { data: lancamentos }, { data: vendedoresRaw }, { data: trocasPendentes }, { data: abertasRaw }] = await Promise.all([
+    vendasDoPeriodo(supabase, empresaId!,
+      'id, data_venda, concluida_em, valor_venda, valor_custo, desconto_valor, lucro, forma_pagamento, canal_venda, status, grupo_pdv, observacoes, clientes:contatos!cliente_id(nome), produtos:estoque_produtos!produto_id(nome), usuarios!vendedor_id(nome)',
+      busca, fuso),
     supabase
       .from('financeiro_lancamentos')
       .select('id, data_venc, descricao, categoria, tipo, valor, status')
@@ -81,7 +97,7 @@ export default async function RelatoriosPage({ searchParams }: {
   return (
     <>
       <Topbar title="Relatórios" />
-      <RelatoriosView vendas={vendas} lancamentos={lancamentos ?? []} vendedores={vendedores}
+      <RelatoriosView vendas={vendas} lancamentos={lancamentos ?? []} vendedores={vendedores} de={de} ate={ate}
         emAberto={resumoEmAberto((abertasRaw ?? []) as unknown as LinhaEmAberto[])} />
     </>
   )

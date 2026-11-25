@@ -15,6 +15,7 @@ import { RELATORIOS_CELULAR } from '@/components/modules/celulares/rotulos'
 import { agora, diaNoFuso, formatarData, formatarDiaMes, mesNoFuso, paraData, primeiroDoMes, rotuloDoMes, somarDias } from '@/lib/datas'
 import { dataDaConclusao, type ResumoEmAberto } from '@/lib/vendas-mes'
 import { EmAbertoFaixa } from '@/components/em-aberto-faixa'
+import { usePathname, useRouter } from 'next/navigation'
 
 interface Venda {
   id: number
@@ -57,6 +58,9 @@ interface Props {
   vendedores: string[]
   /** Encomendas e pendentes de entrega: fora do faturamento, mostradas à parte. */
   emAberto?: ResumoEmAberto
+  /** Período que o servidor buscou (YYYY-MM-DD, calendário da loja). Mudar as datas busca de novo. */
+  de?: string
+  ate?: string
 }
 
 const CANAL_LABEL: Record<string, string> = {
@@ -203,14 +207,23 @@ function BarChart({ vendas }: { vendas: Venda[] }) {
   )
 }
 
-export function RelatoriosView({ vendas, lancamentos, vendedores, emAberto }: Props) {
+export function RelatoriosView({ vendas, lancamentos, vendedores, emAberto, de, ate }: Props) {
   const fuso = useFuso()
   const celulares = useCelulares()
   const [aba, setAba]           = useState('vendas')
   // Período padrão: do dia 1 até hoje, no calendário da loja. O `setDate(1)` antigo
   // mantinha a hora e cortava em UTC: depois das 21h o "início do mês" virava dia 2.
-  const [dataIni, setDataIni]   = useState(() => primeiroDoMes(diaNoFuso(agora(), fuso)))
-  const [dataFim, setDataFim]   = useState(() => diaNoFuso(agora(), fuso))
+  const [dataIni, setDataIniLocal] = useState(() => de ?? primeiroDoMes(diaNoFuso(agora(), fuso)))
+  const [dataFim, setDataFimLocal] = useState(() => ate ?? diaNoFuso(agora(), fuso))
+  // As vendas do período vêm do banco (lib/vendas-periodo): trocar a data pede o período novo ao servidor.
+  const router = useRouter()
+  const pathname = usePathname()
+  const pedirPeriodo = (ini: string, fim: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ini) || !/^\d{4}-\d{2}-\d{2}$/.test(fim)) return
+    router.replace(`${pathname}?de=${ini}&ate=${fim}`, { scroll: false })
+  }
+  const setDataIni = (v: string) => { setDataIniLocal(v); pedirPeriodo(v, dataFim) }
+  const setDataFim = (v: string) => { setDataFimLocal(v); pedirPeriodo(dataIni, v) }
   const [vendedor, setVendedor] = useState('Todos')
 
   const vendasFiltradas = useMemo(() => vendas.filter(v => {
