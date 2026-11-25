@@ -18,6 +18,8 @@ import { diaNoFuso, somarDias } from '@/lib/datas'
 
 export type PeriodoPainel = 'hoje' | '7' | '30'
 export const PERIODOS: Record<PeriodoPainel, string> = { hoje: 'Hoje', '7': '7 dias', '30': '30 dias' }
+/** Na ordem da tela (Object.keys poria '7' e '30' antes de 'hoje': chaves numéricas vêm primeiro). */
+export const ORDEM_PERIODOS: PeriodoPainel[] = ['hoje', '7', '30']
 export const DIAS_DO_PERIODO: Record<PeriodoPainel, number> = { hoje: 1, '7': 7, '30': 30 }
 export type MeioContato = 'app_loja' | 'ligacao' | 'nexus' | 'modelo' | 'sem_registro'
 export const MEIOS: Record<MeioContato, string> = { app_loja: 'App da loja', ligacao: 'Ligação', nexus: 'Nexus', modelo: 'Modelo', sem_registro: 'Sem registro' }

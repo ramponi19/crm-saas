@@ -48,6 +48,7 @@ export function ChamadosView({ chamados, status, equipe, meuId, podeRepassar, np
         <div className="mb-3 flex gap-1 rounded-control border border-line bg-card p-0.5 text-[12.5px]">
           <Link href="/pos-venda" className="flex-1 rounded-[6px] px-2.5 py-1.5 text-center font-medium text-ink-2">Fila</Link>
           <span className="flex-1 rounded-[6px] bg-ink px-2.5 py-1.5 text-center font-medium text-white">Chamados{abertos.length ? ` (${abertos.length})` : ''}</span>
+          {podeRepassar && <Link href="/pos-venda/painel" className="flex-1 rounded-[6px] px-2.5 py-1.5 text-center font-medium text-ink-2">Painel</Link>}
         </div>
 
         <section className="mb-3 rounded-card border border-line bg-card px-3.5 py-3" data-nps>

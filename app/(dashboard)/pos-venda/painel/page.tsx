@@ -6,7 +6,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { diaNoFuso, instanteLocal, somarDias } from '@/lib/datas'
 import { posvendaLigado, semTipo } from '@/lib/posvenda/ligado'
-import { DIAS_DO_PERIODO, MEIOS, PERIODOS, montarPainel, pctNoPrazo, type LinhaPainel, type MeioContato, type PeriodoPainel } from '@/lib/posvenda/painel'
+import { DIAS_DO_PERIODO, MEIOS, ORDEM_PERIODOS, PERIODOS, montarPainel, pctNoPrazo, type LinhaPainel, type MeioContato, type PeriodoPainel } from '@/lib/posvenda/painel'
 import { Topbar } from '@/components/layout/topbar'
 import { Badge } from '@/components/ui'
 import { cn } from '@/lib/utils'
@@ -119,7 +119,7 @@ export default async function PainelPosVendaPage({ searchParams }: { searchParam
         </div>
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <div className="flex rounded-control border border-line bg-card p-0.5">
-            {(Object.keys(PERIODOS) as PeriodoPainel[]).map((p) => <Link key={p} href={filtro({ periodo: p })} className={chip(periodo === p)} replace>{PERIODOS[p]}</Link>)}
+            {ORDEM_PERIODOS.map((p) => <Link key={p} href={filtro({ periodo: p })} className={chip(periodo === p)} replace>{PERIODOS[p]}</Link>)}
           </div>
           {nomeLojaDoTopo ? (
             <span className="text-[12px] text-ink-3">Loja: <strong className="text-ink-2">{nomeLojaDoTopo}</strong> (escolhida no seletor de loja do topo; para ver a rede inteira, escolha todas as lojas lá)</span>
