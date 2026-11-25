@@ -1151,14 +1151,14 @@ isOneToOne: false
                   ]
                 },"empresa_usuarios": {
                   Row: {
-                    "ativo": boolean | null,"ausente": boolean,"ausente_em": string | null,"conta_servico": boolean,"created_at": string | null,"empresa_id": number,"filial_id": number | null,"id": number,"participa_roleta": boolean,"role": string,"usuario_id": string
+                    "atende_clientes": boolean,"ativo": boolean | null,"ausente": boolean,"ausente_em": string | null,"conta_servico": boolean,"created_at": string | null,"empresa_id": number,"filial_id": number | null,"id": number,"participa_roleta": boolean,"role": string,"usuario_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "ativo"?: boolean | null,"ausente"?: boolean,"ausente_em"?: string | null,"conta_servico"?: boolean,"created_at"?: string | null,"empresa_id": number,"filial_id"?: number | null,"id"?: number,"participa_roleta"?: boolean,"role"?: string,"usuario_id": string
+                    "atende_clientes"?: boolean,"ativo"?: boolean | null,"ausente"?: boolean,"ausente_em"?: string | null,"conta_servico"?: boolean,"created_at"?: string | null,"empresa_id": number,"filial_id"?: number | null,"id"?: number,"participa_roleta"?: boolean,"role"?: string,"usuario_id": string
                   }
                   Update: {
-                    "ativo"?: boolean | null,"ausente"?: boolean,"ausente_em"?: string | null,"conta_servico"?: boolean,"created_at"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"id"?: number,"participa_roleta"?: boolean,"role"?: string,"usuario_id"?: string
+                    "atende_clientes"?: boolean,"ativo"?: boolean | null,"ausente"?: boolean,"ausente_em"?: string | null,"conta_servico"?: boolean,"created_at"?: string | null,"empresa_id"?: number,"filial_id"?: number | null,"id"?: number,"participa_roleta"?: boolean,"role"?: string,"usuario_id"?: string
                   }
                   Relationships: [
                     {

@@ -1,0 +1,9 @@
+{
+  "1_padrao": { "desligados": 0, "vinculos_maior_que_zero": true },
+  "2_dono_ligado": { "papel": "owner", "apresentacao_a_mais": 2, "mensagens_do_A": 2 },
+  "3_desligado": { "apresentacao_a_mais": 0, "nenhum_a_mais": 2, "enviadas_a_mais": 2, "linha_do_A": 0 },
+  "4a_consulta_desliga": false,
+  "4b_consulta_nao_religa": false,
+  "5a_vendedor_continua_desligado": false,
+  "5b_ligado_a_mao": true
+}

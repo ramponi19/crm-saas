@@ -9,16 +9,20 @@ import { createServiceClient } from '@/lib/supabase/service'
  *   pós-venda) e não conta como "vendedor do negócio" no pós-venda. Continua ativa.
  * - `participaRoleta`: uma pessoa fora da distribuição automática; continua dona dos próprios clientes.
  *
+ * - `atendeClientes` (25/11/2026; migração 20261125000800): a pessoa conversa com clientes pela loja, e o ZapIntel
+ *   a reconhece quando ela se apresenta pelo nome. Em cargo de Consulta o banco força desligado.
+ *
  * Quem muda: o dono (e o superadmin) muda qualquer pessoa da empresa, inclusive a si mesmo; o administrador
  * muda quem não é dono. Separado de /api/equipe/atualizar-usuario porque lá só se mexe em quem está ABAIXO
  * (o dono não conseguiria tirar a si mesmo da roleta).
  */
 export async function PATCH(req: NextRequest) {
-  const corpo = await req.json().catch(() => null) as { id?: string; contaServico?: unknown; participaRoleta?: unknown } | null
+  const corpo = await req.json().catch(() => null) as { id?: string; contaServico?: unknown; participaRoleta?: unknown; atendeClientes?: unknown } | null
   const id = corpo?.id
-  const patch: { conta_servico?: boolean; participa_roleta?: boolean } = {}
+  const patch: { conta_servico?: boolean; participa_roleta?: boolean; atende_clientes?: boolean } = {}
   if (typeof corpo?.contaServico === 'boolean') patch.conta_servico = corpo.contaServico
   if (typeof corpo?.participaRoleta === 'boolean') patch.participa_roleta = corpo.participaRoleta
+  if (typeof corpo?.atendeClientes === 'boolean') patch.atende_clientes = corpo.atendeClientes
   if (!id || !Object.keys(patch).length) return NextResponse.json({ error: 'Informe o usuário e o que muda' }, { status: 400 })
 
   const supabase = await createClient()
@@ -45,7 +49,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const { data: gravado, error } = await service.from('empresa_usuarios').update(patch)
-    .eq('empresa_id', empresaId).eq('usuario_id', id).select('usuario_id, conta_servico, participa_roleta')
+    .eq('empresa_id', empresaId).eq('usuario_id', id).select('usuario_id, conta_servico, participa_roleta, atende_clientes')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!gravado?.length) return NextResponse.json({ error: 'Nada gravado' }, { status: 409 })
   return NextResponse.json({ ok: true, ...gravado[0] })

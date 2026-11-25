@@ -24,6 +24,8 @@ interface Usuario {
   conta_servico?: boolean
   /** false = pessoa fora da distribuição automática. Só o /admin carrega. */
   participa_roleta?: boolean
+  /** false = não conversa com clientes (o ZapIntel não a reconhece pelo nome). Só o /admin carrega. */
+  atende_clientes?: boolean
 }
 /** Loja para escolher no cadastro. Lista vazia = empresa de uma loja só. */
 export interface LojaOpcao { id: number; nome: string; cidade: string | null }
@@ -142,8 +144,11 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
    * Grava por /api/equipe/roleta, separada do resto: o dono pode tirar a si mesmo da roleta, e lá não.
    */
   const temRoleta = !isNew && typeof usuario?.conta_servico === 'boolean'
-  const [roleta, setRoleta] = useState({ contaServico: !!usuario?.conta_servico, participaRoleta: usuario?.participa_roleta !== false })
-  const mudouRoleta = temRoleta && (roleta.contaServico !== !!usuario?.conta_servico || roleta.participaRoleta !== (usuario?.participa_roleta !== false))
+  const [roleta, setRoleta] = useState({
+    contaServico: !!usuario?.conta_servico, participaRoleta: usuario?.participa_roleta !== false, atendeClientes: usuario?.atende_clientes !== false,
+  })
+  const mudouRoleta = temRoleta && (roleta.contaServico !== !!usuario?.conta_servico || roleta.participaRoleta !== (usuario?.participa_roleta !== false)
+    || roleta.atendeClientes !== (usuario?.atende_clientes !== false))
   const mudouCadastro = !isNew && (form.nome !== (usuario?.nome ?? '') || form.role !== (usuario?.role ?? 'vendedor')
     || form.filialId !== (usuario?.filial_id != null ? String(usuario.filial_id) : ''))
   const [saving, setSaving] = useState(false)
@@ -185,7 +190,7 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
         if (mudouRoleta) {
           const r = await apiFetch<{ error?: string }>('/api/equipe/roleta', {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: usuario!.id, contaServico: roleta.contaServico, participaRoleta: roleta.participaRoleta }),
+            body: JSON.stringify({ id: usuario!.id, contaServico: roleta.contaServico, participaRoleta: roleta.participaRoleta, atendeClientes: roleta.atendeClientes }),
           })
           if (r.sessaoExpirada) return
           if (!r.ok) { notify.bad(r.json.error ?? 'Erro ao salvar a distribuição'); return }
@@ -267,7 +272,7 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
         )}
         {temRoleta && (
           <fieldset className="grid gap-2 rounded-control border border-line px-3 py-2.5">
-            <legend className="px-1 text-[12px] font-medium text-ink-2">Distribuição automática</legend>
+            <legend className="px-1 text-[12px] font-medium text-ink-2">Distribuição e atendimento</legend>
             <label className="flex items-start gap-2 text-[13px] text-ink-2">
               <input type="checkbox" className="mt-0.5" checked={roleta.participaRoleta} disabled={roleta.contaServico}
                 onChange={e => setRoleta(r => ({ ...r, participaRoleta: e.target.checked }))} />
@@ -279,6 +284,12 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
                 onChange={e => setRoleta(r => ({ ...r, contaServico: e.target.checked }))} />
               <span>Conta de serviço (não é uma pessoa)
                 <span className="block text-[11.5px] text-ink-3">Ex.: conta de revisão ou de integração. Fica fora de todas as roletas e continua ativa.</span></span>
+            </label>
+            <label className="flex items-start gap-2 text-[13px] text-ink-2">
+              <input type="checkbox" className="mt-0.5" checked={roleta.atendeClientes}
+                onChange={e => setRoleta(r => ({ ...r, atendeClientes: e.target.checked }))} />
+              <span>Atende clientes
+                <span className="block text-[11.5px] text-ink-3">O ZapIntel reconhece a pessoa quando ela se apresenta pelo nome na conversa. Em cargo de Consulta fica sempre desligado.</span></span>
             </label>
           </fieldset>
         )}
@@ -783,6 +794,7 @@ export default function EquipeView({ usuarios, uso, filiais = [], sinaisIniciais
             <Badge tone={rb?.tone ?? 'neutro'}>{rb?.label ?? u.role ?? '—'}</Badge>
             {u.conta_servico && <Badge tone="neutro">Conta de serviço</Badge>}
             {!u.conta_servico && u.participa_roleta === false && <Badge tone="neutro">Fora da roleta</Badge>}
+            {u.atende_clientes === false && <Badge tone="neutro">Não atende clientes</Badge>}
           </div>
         )
       },
