@@ -27,6 +27,8 @@ interface SidebarProps {
   userRole?: string
   userEmpresa?: string
   leadsCount?: number
+  /** Pós-venda: passos atrasados + de hoje (da pessoa; da equipe para dono e administrador). */
+  posvendaCount?: number
   garantiasCount?: number
   empresaLogo?: string | null
   isSuperAdmin?: boolean
@@ -47,6 +49,7 @@ export function Sidebar({
   userRole = 'Admin',
   userEmpresa,
   leadsCount = 0,
+  posvendaCount = 0,
   garantiasCount = 0,
   empresaLogo = null,
   isSuperAdmin = false,
@@ -103,7 +106,7 @@ export function Sidebar({
   // pessoa esta na tela, e recarregar a pagina para ver recado de colega e
   // exatamente a reclamacao que ele existe para resolver.
   const badgeCount = (key?: string) =>
-    key === 'leads' ? leadsCount : key === 'garantia' ? garantiasCount : key === 'chat' ? chatNaoLidas : 0
+    key === 'leads' ? leadsCount : key === 'garantia' ? garantiasCount : key === 'chat' ? chatNaoLidas : key === 'posvenda' ? posvendaCount : 0
   const strong = t.dark ? 'text-white' : 'text-ink'
   const faint = t.dark ? 'text-white/55' : 'text-ink-3'
   const ativo = (item: MenuItem) => !item.locked && (pathname === item.href || pathname.startsWith(item.href + '/'))

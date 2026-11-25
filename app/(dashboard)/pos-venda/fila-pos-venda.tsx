@@ -22,6 +22,8 @@ interface Props {
   desligado?: boolean
   /** Depois da nota (bloco 4): limite que abre chamado, link de avaliação por loja e os textos da empresa. */
   aposNota?: AposNota
+  /** Aberta pelo painel do gestor: a fila de uma pessoa (dono/administrador). */
+  pessoa?: { id: string; nome: string } | null
 }
 export interface AposNota { limite: number; linkEmpresa: string | null; linkPorLoja: Record<string, string>; textoPromotor: string | null; textoNeutro: string | null }
 
@@ -36,7 +38,7 @@ const ABAS: { value: GrupoFila; rotulo: string }[] = [
  * desde a venda; o que comprou; o passo; os botões), para caber vários na tela sem rolar muito. O WhatsApp abre com a
  * mensagem do roteiro já escrita; quem envia é a pessoa. Depois, "Feito" (ou, no menu, sem resposta, reagendar, pular).
  */
-export function FilaPosVenda({ itens: iniciais, podeVerTodos, ver, cortado, desligado, aposNota }: Props) {
+export function FilaPosVenda({ itens: iniciais, podeVerTodos, ver, cortado, desligado, aposNota, pessoa }: Props) {
   const router = useRouter()
   const [itens, setItens] = useState(iniciais)
   const [aberto, setAberto] = useState<number | null>(null)
@@ -98,8 +100,14 @@ export function FilaPosVenda({ itens: iniciais, podeVerTodos, ver, cortado, desl
         <div className="mb-3 flex gap-1 rounded-control border border-line bg-card p-0.5 text-[12.5px]">
           <span className="flex-1 rounded-[6px] bg-ink px-2.5 py-1.5 text-center font-medium text-white">Fila</span>
           <Link href="/pos-venda/chamados" className="flex-1 rounded-[6px] px-2.5 py-1.5 text-center font-medium text-ink-2">Chamados</Link>
+          {podeVerTodos && <Link href="/pos-venda/painel" className="flex-1 rounded-[6px] px-2.5 py-1.5 text-center font-medium text-ink-2">Painel</Link>}
         </div>
-        {podeVerTodos && (
+        {pessoa ? (
+          <div className="mb-2 flex items-center justify-between gap-2 text-[12.5px]">
+            <span className="min-w-0 truncate text-ink-2">Fila de <strong className="text-ink">{pessoa.nome}</strong></span>
+            <Link href="/pos-venda/painel" className="shrink-0 font-medium text-ink-2 underline">Voltar ao painel</Link>
+          </div>
+        ) : podeVerTodos && (
           <div className="mb-1 flex justify-end">
             <div className="flex rounded-control border border-line bg-card p-0.5 text-[12px]">
               {(['meus', 'todos'] as const).map((v) => (
@@ -123,7 +131,7 @@ export function FilaPosVenda({ itens: iniciais, podeVerTodos, ver, cortado, desl
         ) : (
           <ul className="flex flex-col gap-2">
             {visiveis.map((item) => (
-              <CartaoPasso key={item.id} item={item} mostrarResponsavel={ver === 'todos'}
+              <CartaoPasso key={item.id} item={item} mostrarResponsavel={ver === 'todos' && !pessoa}
                 aberto={aberto === item.id} ocupado={ocupado === item.id}
                 alternar={() => setAberto((a) => (a === item.id ? null : item.id))}
                 registrar={(corpo, aviso) => registrar(item, corpo, aviso)}

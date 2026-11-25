@@ -17,7 +17,7 @@
 import { planoTemAcesso, type ModuloPlano } from './plano'
 import { HREFS_EM_PREPARACAO } from '@/core/modulos'
 
-export type BadgeKey = 'leads' | 'garantia' | 'chat'
+export type BadgeKey = 'leads' | 'garantia' | 'chat' | 'posvenda'
 
 /**
  * Maturidade do módulo — é o que permite liberar o CRM por partes.
@@ -322,7 +322,7 @@ export const CATALOGO: MenuGroupBase[] = [
       { href: '/compras', label: 'Compras', icon: 'ShoppingCart' },
       { href: '/garantia', label: 'Garantia', icon: 'ShieldCheck', badge: 'garantia' },
       { href: '/assistencia', label: 'Assistência', icon: 'Wrench' },
-      { href: '/pos-venda', label: 'Pós-venda', icon: 'HeartHandshake' },
+      { href: '/pos-venda', label: 'Pós-venda', icon: 'HeartHandshake', badge: 'posvenda' },
       // Os itens abaixo são de módulos (core/modulos.ts); sem grupo com nome de ramo de negócio
       // no core (17/11/2026). Quem decide o grupo na barra é GRUPO_DO_HREF.
       { href: '/simular-financiamento', label: 'Financiamento', icon: 'Calculator', opcional: true },
