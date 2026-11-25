@@ -107,3 +107,8 @@ test('contador do menu: pendentes até o fim de hoje no fuso; erro vira 0', asyn
   const quebrado = { from: () => { throw new Error('x') } } as any
   assert.equal(await contarPosVendaDoDia(quebrado, 1, FUSO), 0)
 })
+
+test('períodos na ordem da tela: hoje, 7 dias, 30 dias', async () => {
+  const { ORDEM_PERIODOS, PERIODOS } = await import('@/lib/posvenda/painel')
+  assert.deepEqual(ORDEM_PERIODOS.map((p) => PERIODOS[p]), ['Hoje', '7 dias', '30 dias'])
+})
