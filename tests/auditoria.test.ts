@@ -9,7 +9,13 @@ test('antes → depois: só os campos que mudaram, em ordem', () => {
   assert.deepEqual(diferencas({ a: 1, b: 'x' }, { a: 1, b: 'y', c: true }), [
     { campo: 'b', antes: 'x', depois: 'y' }, { campo: 'c', antes: '—', depois: 'true' },
   ])
-  assert.deepEqual(diferencas({ valor: null }, { valor: { semana: { 1: [] } } }), [{ campo: 'valor', antes: '—', depois: '{"semana":{"1":[]}}' }])
+  // configuração: o invólucro { valor } some e só a folha que mudou aparece, com o caminho
+  assert.deepEqual(diferencas({ valor: null }, { valor: { semana: { 1: [] } } }), [{ campo: 'semana.1', antes: '—', depois: '[]' }])
+  const sab = [{ abre: '09:00', fecha: '13:00' }]
+  assert.deepEqual(
+    diferencas({ valor: { semana: { 1: [{ abre: '09:00', fecha: '18:00' }], 6: [] }, sla: null } },
+               { valor: { semana: { 1: [{ abre: '09:00', fecha: '18:00' }], 6: sab }, sla: null } }),
+    [{ campo: 'semana.6', antes: '[]', depois: JSON.stringify(sab) }])
   assert.deepEqual(diferencas(null, null), [])
   assert.deepEqual(diferencas('a', 'b'), [{ campo: 'valor', antes: 'a', depois: 'b' }])
   assert.deepEqual(diferencas({ a: 1 }, { a: 1 }), [])

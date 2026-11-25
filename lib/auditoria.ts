@@ -39,20 +39,29 @@ function emTexto(v: unknown): string {
   return JSON.stringify(v)
 }
 
+const ehObjeto = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+
+/** Achata um objeto em caminho → folha ("semana.6" → [...]). Lista e valor simples são folha. */
+function achatar(v: unknown, prefixo: string, out: Map<string, unknown>, nivel = 0): void {
+  if (ehObjeto(v) && nivel < 5 && Object.keys(v).length) {
+    for (const [k, x] of Object.entries(v)) achatar(x, prefixo ? `${prefixo}.${k}` : k, out, nivel + 1)
+  } else {
+    out.set(prefixo || 'valor', v)
+  }
+}
+
 /**
- * Compara antes e depois campo a campo (objetos no primeiro nível). Só aparecem os campos que mudaram;
- * valores que não são objeto viram uma linha só ("valor").
+ * Compara antes e depois campo a campo, em profundidade: só aparecem as folhas que mudaram, com o caminho
+ * ("semana.6", "lojas.3"). O invólucro { valor } que a configuração grava some do caminho.
  */
 export function diferencas(antes: unknown, depois: unknown): Diferenca[] {
-  const ehObjeto = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
-  if (!ehObjeto(antes) && !ehObjeto(depois)) {
-    return emTexto(antes) === emTexto(depois) ? [] : [{ campo: 'valor', antes: emTexto(antes), depois: emTexto(depois) }]
-  }
-  const a = ehObjeto(antes) ? antes : {}
-  const d = ehObjeto(depois) ? depois : {}
-  const campos = [...new Set([...Object.keys(a), ...Object.keys(d)])].sort()
+  const a = new Map<string, unknown>(), d = new Map<string, unknown>()
+  achatar(antes, '', a)
+  achatar(depois, '', d)
+  const campos = [...new Set([...a.keys(), ...d.keys()])].sort()
+  const tudoEmValor = campos.every((c) => c === 'valor' || c.startsWith('valor.'))
   return campos
-    .map((campo) => ({ campo, antes: emTexto(a[campo]), depois: emTexto(d[campo]) }))
+    .map((c) => ({ campo: tudoEmValor && c !== 'valor' ? c.slice('valor.'.length) : c, antes: emTexto(a.get(c)), depois: emTexto(d.get(c)) }))
     .filter((x) => x.antes !== x.depois)
 }
 

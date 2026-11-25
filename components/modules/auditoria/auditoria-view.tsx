@@ -82,13 +82,13 @@ export function AuditoriaView({ eventos, total, filtro, pessoas, fuso, erro }: {
         ) : (
           <Card flush>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-[13px]">
+              <table className="w-full min-w-[920px] text-[13px]">
                 <thead>
                   <tr className="border-b border-line text-left">
                     <th className="px-4 py-3 font-medium text-ink-3">Quando</th>
                     <th className="px-3 py-3 font-medium text-ink-3">Quem</th>
                     <th className="px-3 py-3 font-medium text-ink-3">O quê</th>
-                    <th className="px-3 py-3 font-medium text-ink-3">Antes → depois</th>
+                    <th className="min-w-[360px] px-3 py-3 font-medium text-ink-3">Antes → depois</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -113,7 +113,7 @@ export function AuditoriaView({ eventos, total, filtro, pessoas, fuso, erro }: {
                               <summary className="cursor-pointer text-ink-2">{difs.length === 1 ? '1 campo' : `${difs.length} campos`}</summary>
                               <dl className="mt-2 space-y-1">
                                 {difs.map((d) => (
-                                  <div key={d.campo} className="grid grid-cols-[110px_1fr] gap-2">
+                                  <div key={d.campo} className="grid grid-cols-[120px_1fr] gap-2">
                                     <dt className="text-ink-3">{d.campo}</dt>
                                     <dd className="break-all font-mono text-[12px]">
                                       <span className="text-ink-3 line-through">{d.antes}</span>
