@@ -269,6 +269,21 @@ Gravação na JM: **só com ok explícito** (regra de 25/11). Script único com 
 
 **Aceite da 1.1c:** checagem de 30 dias vazia (ou cada pessoa já com conta própria); 2 Donos ativos; JM Store Consulta sem conseguir gravar (tentativa simulada recusada com `SOMENTE_LEITURA`); Meta Reviewer inativa, sem negócio ou conversa aberta; contagem de negócios e conversas da JM igual antes e depois; Auditoria com as mudanças; volta testada no local.
 
+### 3.1 Execução (25/11/2026)
+
+- **Passo 1 em produção (22:52 UTC, ok do Lucas):** Matheus e Eduardo foram de Administrador (cargo 2, `admin`) para Dono (cargo 1, `owner`). Backup `public._backup_empresa_usuarios_1_1c_donos_20261125` (15 vínculos da JM). Só essas 2 linhas mudaram (`cargo_id` e `role`), com 2 linhas em `auditoria_eventos` (origem `script 1.1c`). A matriz dos 18 vínculos é igual à da 1.1b, exceto o papel dos dois; ambos seguem com 13/13 permissões, as mesmas lojas e a mesma escrita. `posvenda_administradores(1)` = `{Matheus, JM Store, Eduardo}`, `eh_dono` verdadeiro. Volta: `conciliacao-pedidos/etapa-1.1c-20261125/1-promover-donos-volta.sql`.
+- **Passo 2 (só leitura):** a checagem da JM Store **não está vazia**: mensagens enviadas, ações em negócios e acessos quase diários. Pelo §3, o passo 3 espera a decisão do Lucas. As ações em lote em nome dela (24/11 16:28, 25/11 08:11) são a esteira de devolução (`lib/esteira.ts`), que roda com a sessão de quem abre `/leads` e grava `por_usuario = auth.uid()`.
+
+### 3.2 Pendências registradas na 1.1c (sem execução)
+
+| # | Pendência | Estado |
+|---|---|---|
+| P1 | **Pós-venda: responsável de reserva configurável por loja**, que pula ausentes, em vez de cair em `posvenda_administradores` (Administradores, senão Donos). Parâmetro por loja via `config_valor`, sem nome de pessoa no código | a fazer |
+| P2 | **Troca de cargo de um Dono por outro Dono:** fica na Auditoria (já fica: `usuario_cargo_trocar` audita) **e gera aviso ao Dono afetado** (falta o aviso) | a fazer |
+| P2-D | **Decisão dos sócios:** só o superadmin pode mudar o cargo de um Dono? | decisão pendente (Matheus e Eduardo) |
+| P3 | **ZapIntel exclui `owner` do reconhecimento pelo nome** (`zapintel_conversa_calc`, CTE `US`: `eu.role <> 'owner'`, herdado do baseline). Depois do passo 1, as apresentações de Eduardo e Matheus pelo celular ("aqui é o Eduardo") deixam de identificá-los: nos 30 dias até 25/11 foram 100 mensagens em 95 conversas (Eduardo) e 19 em 16 (Matheus). Essas mensagens e as seguintes passam ao apresentador anterior (até 72 h), ao responsável do negócio ou a "Não identificado". Direção, contagem do cliente e casamento venda × conversa não mudam. Trocar o critério por um explícito (ex.: excluir só contas de Consulta ou uma marca "não atende") | decisão do Lucas |
+| P4 | **Esteira grava em nome de quem abre `/leads`:** com a JM Store em Consulta, a varredura dela passa a ser recusada pela RLS; a devolução continua quando um vendedor ou Dono abrir a tela. Considerar mover a esteira para rotina do servidor (como a liberação diária) | anotar no passo 3 |
+
 ---
 
 ## 4. Entregas 1.1d a 1.1g: custo protegido em quatro tempos
