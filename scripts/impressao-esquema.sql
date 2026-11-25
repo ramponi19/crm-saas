@@ -1,6 +1,6 @@
 -- Impressão digital do esquema (public + cron.job), por tipo. Mesma consulta no local e na produção; complete com:
 --   select tipo, md5(string_agg(grupo || ':' || h, ',' order by grupo collate "C")) h, count(*) grupos, sum(n) itens from grupos group by tipo order by tipo;
--- Ignora tabelas _backup*, objetos de extensão,  nos corpos e o host das rotinas (o ritual troca pelo app local).
+-- Ignora tabelas _backup*, objetos de extensão, \r nos corpos e o host das rotinas (o ritual troca pelo app local).
 with
 ext as (select objid from pg_depend where deptype = 'e'),
 tabs as (
