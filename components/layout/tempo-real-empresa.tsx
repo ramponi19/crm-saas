@@ -37,6 +37,8 @@ export type LinhaMensagemTR = {
   conteudo: string | null
   tipo: string | null
   midia_url: string | null
+  /** Estado do arquivo da mídia (25/11/2026): 'pendente' | 'indisponivel' | nulo. */
+  midia_status?: string | null
   status_entrega: string | null
   erro_envio: string | null
   external_id: string | null

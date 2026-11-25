@@ -294,12 +294,14 @@ export async function lerConversa(db: Db, id: number): Promise<ConversaInbox | n
 // ── Mensagens ───────────────────────────────────────────────────────────────
 
 export const MSGS_POR_PAGINA = 200
-export const COLUNAS_MSG = 'id, conversa_id, direcao, conteudo, created_at, tipo, origem, midia_url, status_entrega, erro_envio, external_id, usuario_id, transcricao, midia_retida_em, lida'
+export const COLUNAS_MSG = 'id, conversa_id, direcao, conteudo, created_at, tipo, origem, midia_url, status_entrega, erro_envio, external_id, usuario_id, transcricao, midia_retida_em, lida, midia_status'
 export interface MensagemInbox {
   id: number; conversa_id: number | null; direcao: string; conteudo: string | null; created_at: string
   tipo: string | null; origem: string | null; midia_url: string | null; status_entrega: string | null
   erro_envio: string | null; external_id: string | null; usuario_id: string | null
   transcricao: string | null; midia_retida_em: string | null; lida: boolean
+  /** 'pendente' (a rotina resgatar-midias vai buscar) | 'indisponivel' (prazo da Meta acabou) | nulo. 25/11/2026. */
+  midia_status?: string | null
 }
 
 /** As 200 mais recentes (ou as 200 antes de `antes`), em ordem de leitura; `temMais` = há anteriores. */

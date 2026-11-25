@@ -1,0 +1,11 @@
+{
+  "t1_colunas": ["midia_expira_em", "midia_ref", "midia_status", "midia_tentativas"],
+  "t1_tentativas_padrao": "0",
+  "t2_indice": true,
+  "t3_job": "*/15 * * * *",
+  "t3_job_so_com_pendente": true,
+  "t4_antiga_sem_estado": true,
+  "t5_pendente_entra_no_indice": true,
+  "t5_indisponivel_aceito": "indisponivel",
+  "t6_valor_invalido": "RECUSADO"
+}

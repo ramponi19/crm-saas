@@ -99,6 +99,11 @@ interface ChatMsg {
    * indisponivel o arquivo que a propria loja decidiu nao guardar.
    */
   retidaEm?: string | null
+  /**
+   * Estado do arquivo (25/11/2026): 'pendente' = a Edge não conseguiu gravar de passagem e a rotina
+   * resgatar-midias vai buscar na Meta; 'indisponivel' = o prazo de 7 dias da Meta acabou. Nulo = normal.
+   */
+  midiaStatus?: string | null
   /** Marca de tempo crua — usada para calcular a janela de 24h. */
   iso?: string
   /** Confirmação da Meta (só em mensagem enviada): enviada | entregue | lida | falhou. */
@@ -140,6 +145,7 @@ type LinhaMsg = {
   lida: boolean | null; tipo: string | null; midia_url: string | null
   status_entrega?: string | null; erro_envio?: string | null; external_id?: string | null
   canal_id?: number | null; origem?: string | null
+  midia_status?: string | null
 }
 
 // Placeholder textual gravado junto com mídia — não renderiza quando a mídia aparece.
@@ -263,8 +269,27 @@ const NOME_MIDIA: Record<string, string> = {
  * ⚠ Não confundir com "Foto enviada pelo celular", que é escolha nossa de não
  * guardar o arquivo. Ali sabemos o que era e optamos por não ter.
  */
-function MidiaAusente({ placeholder, retidaEm }: { placeholder: string; retidaEm?: string | null }) {
+function MidiaAusente({ placeholder, retidaEm, status }: { placeholder: string; retidaEm?: string | null; status?: string | null }) {
   const fuso = useFuso()
+  /**
+   * MÍDIA PENDENTE (25/11/2026). O arquivo não chegou por uma falha passageira (Storage 5xx, Meta fora) e a
+   * rotina resgatar-midias está buscando de novo na Meta, a cada 15 min, por até 7 dias. Quando ela grava, o
+   * chat recebe o UPDATE e a bolha vira o arquivo sozinha. Passado o prazo, "indisponível".
+   */
+  if (status === 'pendente') {
+    return (
+      <span className="text-[13px] italic text-[#667781]">
+        {NOME_MIDIA[placeholder] ?? 'Anexo'} — arquivo sendo recuperado
+      </span>
+    )
+  }
+  if (status === 'indisponivel') {
+    return (
+      <span className="text-[13px] italic text-[#667781]">
+        {NOME_MIDIA[placeholder] ?? 'Anexo'} — arquivo indisponível
+      </span>
+    )
+  }
   /**
    * DUAS AUSENCIAS QUE PARECEM A MESMA, E NAO SAO.
    *
@@ -755,7 +780,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
    * todas; as anteriores vêm sob pedido, 200 por vez ("ver anteriores").
    */
   const POR_PAGINA = 200
-  const COLUNAS_MSG = 'id, direcao, conteudo, created_at, tipo, midia_url, status_entrega, erro_envio, external_id, usuario_id, transcricao, midia_retida_em, canal_id, origem'
+  const COLUNAS_MSG = 'id, direcao, conteudo, created_at, tipo, midia_url, status_entrega, erro_envio, external_id, usuario_id, transcricao, midia_retida_em, canal_id, origem, midia_status'
   const [temAnteriores, setTemAnteriores] = useState(false)
   const [carregandoAnteriores, setCarregandoAnteriores] = useState(false)
   /** Mensagens antigas entram por cima: a conversa não pode pular para o fim. */
@@ -767,6 +792,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
     usuario_id: string | null; transcricao: string | null
     midia_retida_em: string | null
     canal_id: number | null; origem: string | null
+    midia_status: string | null
   }
   const paraChat = (m: MsgRow): ChatMsg => ({
     id: m.id,
@@ -776,6 +802,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
     tipo: m.tipo ?? 'texto',
     midiaUrl: m.midia_url,
     retidaEm: m.midia_retida_em,
+    midiaStatus: m.midia_status,
     transcricao: m.transcricao,
     status: m.status_entrega,
     erro: m.erro_envio,
@@ -856,6 +883,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
               time: formatarDataHora(m.created_at, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }, '', fuso),
               tipo: m.tipo ?? 'texto',
               midiaUrl: m.midia_url,
+              midiaStatus: m.midia_status ?? null,
               status: m.status_entrega ?? null,
               erro: m.erro_envio ?? null,
               externalId: m.external_id ?? null,
@@ -888,7 +916,9 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
           // provisória, e o UPDATE já chega com o id da Meta no lugar dela.
           setChat((prev) => prev.map((x) =>
             (x.id != null && x.id === m.id) || (x.externalId && x.externalId === m.external_id)
-              ? { ...x, externalId: m.external_id ?? x.externalId, status: m.status_entrega ?? x.status, erro: m.erro_envio ?? null, text: m.conteudo ?? x.text, midiaUrl: m.midia_url ?? x.midiaUrl, tipo: m.tipo ?? x.tipo }
+              ? { ...x, externalId: m.external_id ?? x.externalId, status: m.status_entrega ?? x.status, erro: m.erro_envio ?? null, text: m.conteudo ?? x.text, midiaUrl: m.midia_url ?? x.midiaUrl, tipo: m.tipo ?? x.tipo,
+                  // A rotina de resgate gravou o arquivo (ou o prazo venceu): a bolha troca sozinha.
+                  midiaStatus: 'midia_status' in m ? (m.midia_status ?? null) : x.midiaStatus }
               : x,
           ))
         })
@@ -1796,6 +1826,13 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
                           <MidiaAusente placeholder={`[${m.tipo}]`} retidaEm={m.retidaEm} />
                         </div>
                       )}
+                      {/* Mídia pendente ou indisponível numa mensagem que TEM legenda (o ramo do
+                          placeholder lá embaixo só cobre a bolha sem texto). 25/11/2026. */}
+                      {!m.midiaUrl && m.midiaStatus && !ehPlaceholderMidia(m.text) && (
+                        <div className="mb-1">
+                          <MidiaAusente placeholder={`[${m.tipo}]`} status={m.midiaStatus} />
+                        </div>
+                      )}
                       {/* O texto do áudio aparece com ou sem o arquivo: passada
                           a janela de retenção o som some e a transcrição fica. */}
                       {m.tipo === 'audio' && m.transcricao && (
@@ -1821,7 +1858,7 @@ function LeadModalCarregado({ card, recarregar, usuarios, columns, perfil, motiv
                         // Placeholder SEM arquivo: até 12/08/2026 o eco do celular
                         // não baixava a mídia, e a bolha exibia o texto cru
                         // "[audio]" — que não diz nada a quem lê a conversa.
-                        ? (!m.midiaUrl && <MidiaAusente placeholder={m.text} retidaEm={m.retidaEm} />)
+                        ? (!m.midiaUrl && <MidiaAusente placeholder={m.text} retidaEm={m.retidaEm} status={m.midiaStatus} />)
                         : formatarTextoChat(m.text)}
                       {/* Hora à DIREITA, como no WhatsApp — estava à esquerda. */}
                       <div className="mt-1 flex items-center justify-end gap-1 text-[9.5px] text-[#667781]">
