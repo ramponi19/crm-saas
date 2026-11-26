@@ -85,6 +85,12 @@ echo "    rotinas locais apontam para $APP_LOCAL ($("$B/psql" "$L" -At -c "selec
 echo ">>> 2. Semente fictícia"
 "$B/psql" "$L" -q -v ON_ERROR_STOP=1 -f supabase/scripts/teste-local/semente.sql >/dev/null || { echo "FALHOU a semente"; exit 1; }
 "$B/psql" "$L" -q -v ON_ERROR_STOP=1 -f supabase/scripts/demo/preview-demonstracao.sql >/dev/null || { echo "FALHOU a demonstração"; exit 1; }
+# Sementes de DADOS de migração que leem a equipe (5a e 5b, 26/11/2026): no banco novo as migrações rodam antes da
+# semente fictícia e não acham ninguém; na produção a equipe já existia. Reaplicadas aqui (idempotentes), como lá.
+for s in supabase/migrations/20261126001010_lojas_que_enxerga_semente.sql supabase/migrations/20261126001110_distribuicao_por_loja_semente.sql; do
+  [ -f "$s" ] || continue
+  "$B/psql" "$L" -q -1 -v ON_ERROR_STOP=1 -f "$s" >/dev/null || { echo "FALHOU a semente de dados $s"; exit 1; }
+done
 
 FALHAS=0
 echo ">>> 3. Testes das migrações (supabase/scripts/testes)"

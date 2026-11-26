@@ -19,7 +19,7 @@ export async function PATCH(req: NextRequest) {
   const id = typeof corpo?.id === 'string' ? corpo.id : ''
   const lojas = Array.isArray(corpo?.lojas) ? corpo.lojas.map(Number) : null
   const principal = corpo?.principal == null || corpo.principal === '' ? null : Number(corpo.principal)
-  if (!id || !lojas || lojas.some((n) => !Number.isInteger(n) || n <= 0) || (principal != null && !Number.isInteger(principal))) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) || !lojas || lojas.some((n) => !Number.isInteger(n) || n <= 0) || (principal != null && !Number.isInteger(principal))) {
     return NextResponse.json({ error: 'Informe a pessoa, as lojas e a loja principal' }, { status: 400 })
   }
 

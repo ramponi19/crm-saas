@@ -45,6 +45,10 @@ declare
   c_cad bigint; c_passo bigint; c_jor bigint; c_jor6 bigint; a1 bigint; a2 bigint;
   r record; lista jsonb; v int; iguais int := 0; difs jsonb := '[]'; e bigint; f bigint;
 begin
+  -- 5b (26/11/2026): este teste prova a REGRA ANTIGA (vínculo + participa_roleta), que continua valendo na loja
+  -- sem lista de distribuição. Desliga as listas aqui dentro (a transação é desfeita no fim); a lista é provada em
+  -- teste-distribuicao-por-loja.sql.
+  delete from public.distribuicao_listas;
   create temp table _n (u uuid primary key, n text) on commit drop;
   insert into _n values (M1,'M1'),(M2,'M2'),(SL,'SL'),(J2,'J2'),(VJ,'VJ'),(A,'A'),(B,'B'),(DONO,'DONO');
   D := posvenda_proximo_dia_util(1, 3, hoje);
