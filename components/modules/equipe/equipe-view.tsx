@@ -30,6 +30,27 @@ interface Usuario {
   lojas?: number[]
   /** 5a: o cargo vê a rede (dono, admin, cargo de sistema ou `lojas.ver_rede`): enxerga todas sem marcar. */
   ve_rede?: boolean
+  /** 5b: loja em que a pessoa aparece em Metas e Comissões (vazia = a principal). Só o /admin carrega. */
+  loja_comissao?: number | null
+}
+
+/**
+ * 5b (26/11/2026): em Metas e Comissões cada pessoa aparece na LOJA DA COMISSÃO (Configurações › Distribuição). Com a
+ * loja do topo escolhida, só as pessoas daquela loja; em todas as lojas, todo mundo com o nome da loja. As vendas
+ * continuam com a loja em que foram feitas.
+ */
+interface EscopoLoja { filiais: LojaOpcao[]; lojaTopo: number | null }
+function lojaDaComissao(u: Usuario, filiais: LojaOpcao[]): number | null {
+  return u.loja_comissao ?? u.filial_id ?? filiais[0]?.id ?? null
+}
+function naLojaDoTopo(u: Usuario, e?: EscopoLoja): boolean {
+  if (!e || e.filiais.length < 2 || e.lojaTopo == null) return true
+  return lojaDaComissao(u, e.filiais) === e.lojaTopo
+}
+function rotuloLojaComissao(u: Usuario, e?: EscopoLoja): string {
+  if (!e || e.filiais.length < 2) return ''
+  const f = e.filiais.find(x => x.id === lojaDaComissao(u, e.filiais))
+  return f ? ' · ' + f.nome : ''
 }
 /** Loja para escolher no cadastro. Lista vazia = empresa de uma loja só. */
 export interface LojaOpcao { id: number; nome: string; cidade: string | null }
@@ -58,6 +79,8 @@ interface Props {
    * Vem pronto de cima porque a consulta é do servidor e exige papel de admin.
    */
   uso?: React.ReactNode
+  /** 5b: loja escolhida no topo (Metas e Comissões mostram só as pessoas dessa loja da comissão). */
+  lojaTopo?: number | null
   /**
    * Lojas da empresa. Mesma convenção da prop `uso`: só o /admin passa, então no
    * CRM não existe campo de loja nenhum — quem define onde a pessoa trabalha é o
@@ -337,12 +360,10 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
         {temRoleta && (
           <fieldset className="grid gap-2 rounded-control border border-line px-3 py-2.5">
             <legend className="px-1 text-[12px] font-medium text-ink-2">Distribuição e atendimento</legend>
-            <label className="flex items-start gap-2 text-[13px] text-ink-2">
-              <input type="checkbox" className="mt-0.5" checked={roleta.participaRoleta} disabled={roleta.contaServico}
-                onChange={e => setRoleta(r => ({ ...r, participaRoleta: e.target.checked }))} />
-              <span>Recebe leads e acompanhamentos pela roleta
-                <span className="block text-[11.5px] text-ink-3">Desligado, continua com os próprios clientes e pega leads da esteira à mão.</span></span>
-            </label>
+            {/* 5b (26/11/2026): quem recebe pela roleta é escolhido por loja em Configurações › Distribuição. */}
+            <p className="text-[12px] text-ink-3">
+              Roleta, liberação diária e reserva do pós-venda: <a href="/configuracoes/distribuicao" className="text-accent underline-offset-2 hover:underline">Configurações › Distribuição</a>, loja por loja.
+            </p>
             <label className="flex items-start gap-2 text-[13px] text-ink-2">
               <input type="checkbox" className="mt-0.5" checked={roleta.contaServico}
                 onChange={e => setRoleta(r => ({ ...r, contaServico: e.target.checked }))} />
@@ -371,14 +392,14 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
 
 const supabase = createClient()
 
-function MetasTab({ usuarios }: { usuarios: Usuario[] }) {
+function MetasTab({ usuarios, escopo }: { usuarios: Usuario[]; escopo?: EscopoLoja }) {
   const fuso = useFuso()
   // O mês da loja, não o do UTC (que vira às 21h do último dia em Brasília).
   const [mes, setMes] = useState(() => mesNoFuso(undefined, fuso))
   const [metas, setMetas] = useState<Record<string, Meta & { _dirty?: boolean }>>({})
   const [saving, setSaving] = useState<string | null>(null)
 
-  const vendedores = usuarios.filter(u => ['vendedor', 'admin', 'owner'].includes(u.role ?? ''))
+  const vendedores = usuarios.filter(u => ['vendedor', 'admin', 'owner'].includes(u.role ?? '') && naLojaDoTopo(u, escopo))
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('metas_comissoes').select('*').eq('mes_ano', mes)
@@ -435,7 +456,7 @@ function MetasTab({ usuarios }: { usuarios: Usuario[] }) {
           <Avatar nome={u.nome} />
           <div className="min-w-0">
             <div className="truncate text-[13px] font-semibold text-ink">{u.nome}</div>
-            <div className="text-[11px] text-ink-3">{ROLES.find(r => r.value === u.role)?.label ?? u.role}</div>
+            <div className="text-[11px] text-ink-3">{ROLES.find(r => r.value === u.role)?.label ?? u.role}{rotuloLojaComissao(u, escopo)}</div>
           </div>
         </div>
       ),
@@ -494,7 +515,7 @@ function MetasTab({ usuarios }: { usuarios: Usuario[] }) {
 
 // ─── Aba Comissões ────────────────────────────────────────────────────────────
 
-function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
+function ComissoesTab({ usuarios, escopo }: { usuarios: Usuario[]; escopo?: EscopoLoja }) {
   const fuso = useFuso()
   const [mes, setMes] = useState(() => mesNoFuso(undefined, fuso))
   const [vendas, setVendas] = useState<VendaResumo[]>([])
@@ -504,7 +525,7 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
   /** Fechamentos com aparelho de troca ainda não recebido — comissão retida. */
   const [gruposRetidos, setGruposRetidos] = useState<Set<string>>(new Set())
 
-  const vendedores = usuarios.filter(u => ['vendedor', 'admin', 'owner'].includes(u.role ?? ''))
+  const vendedores = usuarios.filter(u => ['vendedor', 'admin', 'owner'].includes(u.role ?? '') && naLojaDoTopo(u, escopo))
 
   const load = useCallback(async () => {
     // Janela pela função única. O cálculo que estava aqui produzia 3 HORAS em vez
@@ -598,7 +619,9 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
             <Avatar nome={u.nome} />
             <div className="min-w-0">
               <div className="truncate text-[13px] font-semibold text-ink">{u.nome}</div>
-              {pctMeta !== null && <div className="text-[11px] text-ink-3">meta {pctMeta}%</div>}
+              {(pctMeta !== null || rotuloLojaComissao(u, escopo)) && (
+                <div className="text-[11px] text-ink-3">{pctMeta !== null ? `meta ${pctMeta}%` : ''}{pctMeta !== null ? rotuloLojaComissao(u, escopo) : rotuloLojaComissao(u, escopo).replace(/^ · /, '')}</div>
+              )}
             </div>
           </div>
         )
@@ -715,7 +738,7 @@ function ComissoesTab({ usuarios }: { usuarios: Usuario[] }) {
 
 // ─── View principal ───────────────────────────────────────────────────────────
 
-export default function EquipeView({ usuarios, uso, filiais = [], sinaisIniciais = {} }: Props) {
+export default function EquipeView({ usuarios, uso, filiais = [], sinaisIniciais = {}, lojaTopo = null }: Props) {
   const router = useRouter()
   const fuso = useFuso()
 
@@ -857,7 +880,6 @@ export default function EquipeView({ usuarios, uso, filiais = [], sinaisIniciais
           <div className="flex flex-wrap items-center gap-1">
             <Badge tone={rb?.tone ?? 'neutro'}>{rb?.label ?? u.role ?? '—'}</Badge>
             {u.conta_servico && <Badge tone="neutro">Conta de serviço</Badge>}
-            {!u.conta_servico && u.participa_roleta === false && <Badge tone="neutro">Fora da roleta</Badge>}
             {u.atende_clientes === false && <Badge tone="neutro">Não atende clientes</Badge>}
           </div>
         )
@@ -940,8 +962,8 @@ export default function EquipeView({ usuarios, uso, filiais = [], sinaisIniciais
             />
           </Card>
         )}
-        {tab === 'metas' && <MetasTab usuarios={usuarios} />}
-        {tab === 'comissoes' && <ComissoesTab usuarios={usuarios} />}
+        {tab === 'metas' && <MetasTab usuarios={usuarios} escopo={{ filiais, lojaTopo: lojaTopo ?? null }} />}
+        {tab === 'comissoes' && <ComissoesTab usuarios={usuarios} escopo={{ filiais, lojaTopo: lojaTopo ?? null }} />}
         {tab === 'uso' && uso}
       </div>
 

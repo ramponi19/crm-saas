@@ -33,7 +33,7 @@ export default async function AdminEquipePage({ searchParams }: { searchParams: 
   const inicioMes = janela.de.toISOString()
   const fimMes = janela.ate.toISOString()
 
-  const [{ data: usuarios }, { data: metas }, { data: vendasMes }, { data: comissoesMes }, { data: filiais }, { data: listas }, { data: cargos }, { data: cargosRede }] = await Promise.all([
+  const [{ data: usuarios }, { data: metas }, { data: vendasMes }, { data: comissoesMes }, { data: filiais }, { data: listas }, { data: cargos }, { data: cargosRede }, { data: comissoes }, { data: ctx }] = await Promise.all([
     supabase
       .from('empresa_usuarios')
       .select('role, ativo, filial_id, cargo_id, conta_servico, participa_roleta, atende_clientes, usuarios!empresa_usuarios_usuario_public_fkey(*)')
@@ -68,7 +68,12 @@ export default async function AdminEquipePage({ searchParams }: { searchParams: 
     supabase.from('empresa_usuario_lojas' as never).select('usuario_id, filial_id').eq('empresa_id', empresaId),
     supabase.from('empresa_cargos' as never).select('id, sistema').eq('empresa_id', empresaId),
     supabase.from('empresa_cargo_permissoes' as never).select('cargo_id').eq('empresa_id', empresaId).eq('permissao', 'lojas.ver_rede'),
+    // 5b: loja da comissão de cada pessoa e a loja do topo (Metas e Comissões mostram as pessoas dessa loja).
+    supabase.from('empresa_usuario_comissao' as never).select('usuario_id, filial_id').eq('empresa_id', empresaId),
+    supabase.rpc('sessao_contexto' as never),
   ])
+  const comissaoPorPessoa = new Map(((comissoes ?? []) as unknown as { usuario_id: string; filial_id: number }[]).map((c) => [c.usuario_id, Number(c.filial_id)]))
+  const lojaTopo = (ctx as unknown as { filial_atual: number | null } | null)?.filial_atual ?? null
   const lojasPorPessoa = new Map<string, number[]>()
   for (const l of (listas ?? []) as unknown as { usuario_id: string; filial_id: number }[]) {
     lojasPorPessoa.set(l.usuario_id, [...(lojasPorPessoa.get(l.usuario_id) ?? []), Number(l.filial_id)])
@@ -85,6 +90,7 @@ export default async function AdminEquipePage({ searchParams }: { searchParams: 
       return u ? {
         ...u, role: eu.role, filial_id: eu.filial_id, conta_servico: eu.conta_servico, participa_roleta: eu.participa_roleta, atende_clientes: eu.atende_clientes,
         lojas: lojasPorPessoa.get(u.id) ?? [],
+        loja_comissao: comissaoPorPessoa.get(u.id) ?? null,
         // Pelo CARGO (1.1b): cargo de sistema (Dono) ou com `lojas.ver_rede` (Administrador e Consulta, de fábrica).
         ve_rede: eu.cargo_id != null && cargosDaRede.has(Number(eu.cargo_id)),
       } : null
@@ -109,6 +115,7 @@ export default async function AdminEquipePage({ searchParams }: { searchParams: 
       mesAtual={mesAtual}
       uso={<UsoEquipe sessoes={uso.sessoes} resumo={uso.resumo} dias={dias} />}
       filiais={(filiais ?? []) as { id: number; nome: string; cidade: string | null }[]}
+      lojaTopo={lojaTopo}
     />
   )
 }

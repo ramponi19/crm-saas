@@ -156,6 +156,7 @@ export async function POST(req: NextRequest) {
     // Nome pode ter mudado; a senha NÃO é redefinida aqui — quem volta entra com
     // a que já tinha, e "esqueci a senha" resolve o resto.
     await service.from('usuarios').update({ nome }).eq('id', existente.id)
+    await incluirNaDistribuicao(service, empresaId, existente.id)
 
     return NextResponse.json({ ok: true, id: existente.id, readmitido: true })
   }
@@ -216,6 +217,7 @@ export async function POST(req: NextRequest) {
     await service.auth.admin.deleteUser(userId)
     return NextResponse.json({ error: vErr.message }, { status: 400 })
   }
+  await incluirNaDistribuicao(service, empresaId, userId)
 
   if (convite && linkConvite) {
     const { data: emp } = await service.from('empresas').select('nome').eq('id', empresaId).maybeSingle()
@@ -248,4 +250,16 @@ async function linkDeAcesso(service: any, baseUrl: string, email: string, tipo: 
   const hash = data?.properties?.hashed_token as string | undefined
   if (error || !data?.user || !hash) return { error: error?.message ?? 'Não foi possível gerar o link de acesso' }
   return { userId: data.user.id as string, link: `${baseUrl}/reset-senha?token_hash=${encodeURIComponent(hash)}&type=${tipo}` }
+}
+
+/**
+ * 5b (26/11/2026): pessoa nova ou readmitida entra na roleta e na liberação diária da loja principal, nas lojas em que
+ * essas listas estão configuradas (Configurações › Distribuição) — o mesmo que acontecia antes das listas, quando todo
+ * vínculo novo "participava da roleta". Falha aqui não desfaz o cadastro: o dono ajusta pela tela.
+ */
+async function incluirNaDistribuicao(service: ReturnType<typeof createServiceClient>, empresaId: number | null, usuarioId: string) {
+  if (!empresaId) return
+  const { error } = await (service as unknown as { rpc: (f: string, a: object) => Promise<{ error: { message: string } | null }> })
+    .rpc('distribuicao_incluir_pessoa', { p_empresa: empresaId, p_usuario: usuarioId })
+  if (error) console.error('[criar-usuario] distribuicao_incluir_pessoa:', error.message)
 }

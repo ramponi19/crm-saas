@@ -25,43 +25,21 @@ export async function membrosElegiveis(
   empresaId: number,
   filialId: number | null | undefined,
 ): Promise<{ ids: string[]; loja: number | null }> {
-  // `ausente` fora da roleta: quem está no almoço acabou de LIBERAR os leads
-  // dele. Entregar um novo no mesmo instante desfaria o pedido e deixaria o
-  // cliente esperando exatamente quem não está.
-  const [{ data: membros }, { data: lojas }] = await Promise.all([
-    svc.from('empresa_usuarios')
-      .select('usuario_id, filial_id')
-      .eq('empresa_id', empresaId)
-      .eq('ativo', true)
-      .eq('ausente', false)
-      // Conta de serviço (não é uma pessoa) e quem está fora da distribuição automática
-      // (`participa_roleta = false`) não recebem lead (24/11/2026; migração 20261124001000).
-      .eq('conta_servico', false)
-      .eq('participa_roleta', true)
-      .order('usuario_id', { ascending: true }),
-    svc.from('filiais')
-      .select('id, matriz')
-      .eq('empresa_id', empresaId)
-      .eq('ativo', true),
-  ])
-
-  const todos = (membros ?? []) as Array<{ usuario_id: string | null; filial_id: number | null }>
-  const ativos = todos.filter(m => m.usuario_id)
-
+  /**
+   * 5b (26/11/2026): a regra mora no banco (`core_roleta_elegiveis`): a lista "Roleta" da loja em Configurações ›
+   * Distribuição, ou, na loja sem lista, a regra antiga (vínculo + "participa da roleta"). Ausente e conta de serviço
+   * ficam fora na hora. Uma fonte só para o app e para o banco (liberação, pós-venda, core_roleta_leads_proximo).
+   */
+  const { data: lojas } = await svc.from('filiais').select('id, matriz').eq('empresa_id', empresaId).eq('ativo', true)
   const filiais = (lojas ?? []) as Array<{ id: number; matriz: boolean }>
-  if (filiais.length < 2) {
-    return { ids: ativos.map(m => m.usuario_id as string), loja: null }
-  }
-
   const matriz = filiais.find(f => f.matriz)?.id ?? null
-  const alvo = filialId ?? matriz
-  if (alvo == null) return { ids: [], loja: null }
-
-  const ids = ativos
-    .filter(m => m.filial_id === alvo || (m.filial_id == null && alvo === matriz))
-    .map(m => m.usuario_id as string)
-
-  return { ids, loja: alvo }
+  const loja = filiais.length < 2 ? null : (filialId ?? matriz)
+  if (filiais.length >= 2 && loja == null) return { ids: [], loja: null }
+  const { data, error } = await (svc as unknown as { rpc: (f: string, a: object) => Promise<{ data: unknown; error: { message: string } | null }> })
+    .rpc('core_roleta_elegiveis', { p_empresa: empresaId, p_filial: loja ?? filialId ?? null })
+  if (error) throw new Error(`roleta: ${error.message}`)
+  const ids = (Array.isArray(data) ? data : []).map(String).sort()
+  return { ids, loja }
 }
 
 /**

@@ -115,6 +115,10 @@ export function DistribuicaoView({ regrasIniciais, membros, semDono }: { regrasI
             <p className="mt-0.5 max-w-[560px] text-[13px] text-ink-3">
               Regras que entregam o lead novo ao vendedor certo na hora. Avaliadas de cima para baixo — a primeira que combinar distribui em rodízio entre os escolhidos. Sem regra ativa, mantém o rodízio geral atual.
             </p>
+            <p className="mt-1 max-w-[560px] text-[12.5px] text-ink-3">
+              Quem entra no rodízio de cada loja, a liberação diária e a reserva do pós-venda:{' '}
+              <a href="/configuracoes/distribuicao" className="text-accent underline-offset-2 hover:underline">Configurações › Distribuição</a>.
+            </p>
           </div>
           <Button icon={<Plus size={15} strokeWidth={1.8} />} onClick={nova} className="shrink-0">Nova regra</Button>
         </div>

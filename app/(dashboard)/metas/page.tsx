@@ -33,16 +33,26 @@ export default async function MetasPage() {
   const inicio = limites.de.toISOString()
   const fim = limites.ate.toISOString()
 
-  const [{ data: prefRow }, { data: membrosRaw }, { data: metasRaw }, { data: vendasRaw }, { data: etapasRaw }, { data: leadsRaw }] = await Promise.all([
+  const [{ data: prefRow }, { data: membrosRaw }, { data: metasRaw }, { data: vendasRaw }, { data: etapasRaw }, { data: leadsRaw }, { data: comissoes }, { data: lojas }, { data: ctx }] = await Promise.all([
     supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'preferencias').maybeSingle(),
-    supabase.from('empresa_usuarios').select('usuario_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
+    supabase.from('empresa_usuarios').select('usuario_id, filial_id, usuarios!empresa_usuarios_usuario_public_fkey(nome)').eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('metas_comissoes').select('usuario_id, meta_vendas_valor').eq('empresa_id', empresaId).eq('mes_ano', mesAno),
     // Realizado pelo mês da CONCLUSÃO (lib/vendas-mes) — o mesmo da comissão.
     supabase.from('vendas_vendas').select('vendedor_id, valor_venda, data_venda, status').eq('empresa_id', empresaId).or(filtroConcluidaNoPeriodo(inicio, fim)),
     supabase.from('funil_etapas').select('funil_id, slug, tipo, probabilidade').eq('empresa_id', empresaId),
     // Lead = negócio ativo; a etapa é o slug (sem etapa, o legado em dados._lead, como a view).
     supabase.from('negocios').select(SELECT_PIPELINE).eq('empresa_id', empresaId).eq('ativo', true),
+    // 5b (26/11/2026): cada pessoa aparece na LOJA DA COMISSÃO; com uma loja escolhida no topo, só as pessoas dela.
+    supabase.from('empresa_usuario_comissao' as never).select('usuario_id, filial_id').eq('empresa_id', empresaId),
+    supabase.from('filiais').select('id, matriz').eq('empresa_id', empresaId).eq('ativo', true),
+    supabase.rpc('sessao_contexto' as never),
   ])
+  const comissaoPorPessoa = new Map(((comissoes ?? []) as unknown as { usuario_id: string; filial_id: number }[]).map((c) => [c.usuario_id, Number(c.filial_id)]))
+  const lojasAtivas = (lojas ?? []) as { id: number; matriz: boolean }[]
+  const matriz = lojasAtivas.find((l) => l.matriz)?.id ?? lojasAtivas[0]?.id ?? null
+  const lojaTopo = (ctx as unknown as { filial_atual: number | null } | null)?.filial_atual ?? null
+  const naLojaDoTopo = (m: { usuario_id: string; filial_id: number | null }) =>
+    lojasAtivas.length < 2 || lojaTopo == null || (comissaoPorPessoa.get(m.usuario_id) ?? m.filial_id ?? matriz) === lojaTopo
 
   const metaEmpresa = Number((prefRow?.valor as { meta_vendas_mes?: number } | null)?.meta_vendas_mes ?? 0)
 
@@ -74,7 +84,8 @@ export default async function MetasPage() {
     metaPorVend.set(m.usuario_id, Number(m.meta_vendas_valor ?? 0))
   }
 
-  const vendedores: MetaVendedor[] = ((membrosRaw ?? []) as Array<{ usuario_id: string; usuarios: Embed<{ nome: string | null }> }>)
+  const vendedores: MetaVendedor[] = ((membrosRaw ?? []) as unknown as Array<{ usuario_id: string; filial_id: number | null; usuarios: Embed<{ nome: string | null }> }>)
+    .filter(naLojaDoTopo)
     .map(m => ({
       usuarioId: m.usuario_id,
       nome: one(m.usuarios)?.nome ?? '—',

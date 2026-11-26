@@ -102,3 +102,47 @@ impersonando, e só os nomes dos campos).
 3. A reserva do pós-venda por loja substitui os administradores ou fica antes deles (proposta: antes, com eles como
    última reserva)?
 4. Quem enxerga 2+ lojas sem a rede: o seletor oferece "Todas as minhas lojas" (proposta) ou só uma por vez?
+
+## 4. Respostas do Lucas (26/11) e o que foi feito
+
+Respostas às 4 perguntas: (1) a loja da comissão muda só onde a pessoa aparece em Metas e Comissões; a venda fica com a
+loja em que foi feita. (2) Liberação diária com lista própria, começando igual à roleta. (3) Reserva do pós-venda por loja
+ANTES dos administradores e Donos (eles ficam como última reserva), pulando ausentes (resolve a P1). (4) "Todas as minhas
+lojas" no seletor só para VER; gravar é sempre numa loja específica.
+
+### 4.1 Correção de segurança (em produção em 26/11, 18:16 UTC banco; app 5179ee9f às 18:19)
+
+- Migrações 0900 (funções `filiais_atuacao_de`/`filiais_atuacao`, `filial_atual` só aceita loja de atuação, gatilho
+  `zy_loja_atuacao_confere` em 9 tabelas) e 0910 (loja do topo em `usuarios` só de atuação), separadas.
+- Servidor: `exigirLojaDeAtuacao` (lib/sessao) em /api/clientes (o furo real: `filial_id` do corpo gravado com a chave de
+  serviço por qualquer papel), estoque/transferir, canais/[id] e filial/selecionar. Seletor lista `filiais_atuacao()`.
+- Levantamento de 30 dias antes: só a Milena aparece gravando na loja 3 até 25/11 — o vínculo dela era nulo (= matriz) e
+  foi trocado para a loja 6 em 26/11 (sem auditoria). Nenhuma gravação fora da loja de atuação.
+- Prova: matriz de acesso dos 15 vínculos da JM (8 ativos) com visão e loja de gravação idênticas antes e depois
+  (conciliacao-pedidos/etapa-5a-20261126/, fora do git); smoke na Demonstração (403 para loja de outra empresa, grava na
+  dela); logs de 15 min limpos (nenhum erro do app, nenhum 5xx, nenhuma recusa de usuário real).
+- Descoberto: o navegador não tem UPDATE em `usuarios` (só a rota grava a loja do topo); o gatilho da 0910 protege o
+  caminho da rota e de scripts.
+
+### 4.2 5a — Lojas que enxerga (migrações 1000/1010)
+
+Como no desenho §2, com: a principal sempre conta entre as que enxerga; a semente só cria lista para vínculo ativo sem a
+rede em empresa de 2+ lojas; "vê a rede" na tela vem do CARGO (sistema ou `lojas.ver_rede`), sem checagem de papel nova.
+Voltas: supabase/scripts/volta/volta-lojas-que-enxerga.sql.
+
+### 4.3 5b — Distribuição por loja (migrações 1100/1110)
+
+- Configurações › Vendas e atendimento › Distribuição (`/configuracoes/distribuicao`): uma aba por loja com Roleta,
+  Liberação diária (ligar, negócios por pessoa, dias de conversa, pular o 1º dia, quem recebe), Reserva do pós-venda
+  (ordenada) e Loja da comissão. Link de/para Automações › Distribuição (regras por origem).
+- Banco: `distribuicao_listas` (cabeçalho = lista configurada) + `distribuicao_participantes` + `empresa_usuario_comissao`.
+  `core_roleta_elegiveis`, `core_roleta_leads_proximo`, `core_liberacao_elegiveis` (nova), `core_liberar_lote_esteira`,
+  `posvenda_vendedores_da_loja` e `posvenda_resolver_responsavel` leem a lista; sem cabeçalho, a regra antiga.
+  `lib/roleta.ts` passou a ler `core_roleta_elegiveis` (uma regra só para o app e o banco).
+- Reserva: pula excluído, ausente (hoje) e quem está no teto do dia; origem nova `reserva_loja` no acompanhamento.
+- **Diferença do desenho:** a reserva começa VAZIA (e não com os administradores): a reserva é por prioridade e os
+  administradores são por rodízio; semear com eles mudaria o comportamento em empresa com 2+ administradores. Vazia =
+  vai direto aos administradores e Donos, exatamente como antes.
+- Pessoa nova ou readmitida entra na roleta e na liberação da loja principal (`distribuicao_incluir_pessoa`), como
+  acontecia antes. A marca "Recebe leads pela roleta" saiu da tela de Usuários (vale só em loja sem lista).
+- Volta: supabase/scripts/volta/volta-distribuicao-por-loja.sql (listas viram "não configuradas"; nada é apagado).

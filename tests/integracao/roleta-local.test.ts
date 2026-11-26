@@ -41,9 +41,19 @@ describe('roleta de vendas respeita conta de serviço e participa_roleta', () =>
     assert.ok(!ids.includes(SL))
     for (let i = 0; i < ids.length * 2; i++) assert.notEqual(await proximoResponsavel(svc as never, EMPRESA, MATRIZ), SL)
   })
-  test('participa_roleta desligado tira a pessoa da distribuição', async () => {
+  test('participa_roleta desligado tira a pessoa da distribuição (loja SEM lista; com lista, vale a lista — 5b)', async () => {
+    // 5b (26/11/2026): a loja com a lista "Roleta" configurada (Configurações › Distribuição) segue a lista; a marca só
+    // vale na loja sem lista (a regra antiga). Aqui a lista da matriz é tirada por um instante e devolvida.
+    const { data: cab } = await svc.from('distribuicao_listas' as never).select('*').eq('empresa_id', EMPRESA).eq('filial_id', MATRIZ).eq('lista', 'roleta')
+    const { data: parts } = await svc.from('distribuicao_participantes' as never).select('*').eq('empresa_id', EMPRESA).eq('filial_id', MATRIZ).eq('lista', 'roleta')
     await marcar(M1, { participa_roleta: false })
-    const { ids } = await membrosElegiveis(svc as never, EMPRESA, MATRIZ)
-    assert.ok(!ids.includes(M1))
+    try {
+      assert.ok((await membrosElegiveis(svc as never, EMPRESA, MATRIZ)).ids.includes(M1), 'com lista, a marca não tira')
+      await svc.from('distribuicao_listas' as never).delete().eq('empresa_id', EMPRESA).eq('filial_id', MATRIZ).eq('lista', 'roleta')
+      assert.ok(!(await membrosElegiveis(svc as never, EMPRESA, MATRIZ)).ids.includes(M1), 'sem lista, a marca tira')
+    } finally {
+      if (cab?.length) await svc.from('distribuicao_listas' as never).insert(cab as never)
+      if (parts?.length) await svc.from('distribuicao_participantes' as never).insert(parts as never)
+    }
   })
 })
