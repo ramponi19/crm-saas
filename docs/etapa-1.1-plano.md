@@ -569,6 +569,27 @@ Sem migração. O app para de ler e de gravar as colunas antigas.
 
 A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas dos satélites iguais nos três estados e a coluna antiga cheia de novo depois da volta (§4.5.2).
 
+### 4.5.2 Estado da 1.1e + 1.1f em 26/11/2026: prontas no local (commit `1f6bfb46`, build igual ao da Vercel verde), PARADAS antes do deploy
+
+- **Ritual do zero com a 0400:** verde (testes de migração, inclusive o `teste-custo-satelites` no estado final: porta de entrada do vendedor ignorada, do dono e da chave de serviço indo ao satélite, colunas antigas vazias, satélites completos; 63/63 de integração).
+- **Vendedor lendo custo pela API (`custo-local`, sessão real):** tempo 2 (sem a 0400) 13/13, com a coluna antiga ainda respondendo como hoje; tempo 3 (com a 0400) 13/13, com a coluna antiga **nula** para Vendedor e Consulta. Nos dois: satélites 0 linhas, junção nula, funções `SEM_PERMISSAO`; Dono lê.
+- **Ida, volta e ida com dados** (banco local, custo em unidade, venda de unidade, venda avulsa, compra): 
+  - tempo 2: coluna `2/1777.77/50 · 2/1120/680 · 1/2468` = satélite;
+  - depois da 0400: coluna `0/0/0 · 0/0/0 · 0/0`, satélite igual ao de antes;
+  - depois da volta: coluna de novo igual ao satélite; 0400 de novo: igual ao segundo estado.
+- **Varredor `custo-oculto-e2e`** (Dashboard, Histórico, Estoque, PDV, Relatórios, Catálogo, Compras; HTML e toda resposta recebida pelo navegador): **Vendedor e Consulta zero** ocorrência, com a venda de teste visível no Histórico deles (prova de que o zero vale); Dono com o custo no Estoque, Histórico, Catálogo, Relatórios e Compras. Entrada pelo Vendedor: sem o campo de custo, com a nota; a unidade nasce pendente. Dono: aba "Custo pendente", informa 1.500, a unidade sai da lista, satélite com origem `informado`. 28/28.
+- **Conferência visual** (fotos do varredor, as três pessoas): Estoque (coluna Custo, "pendente", "—" para 0, aba só do Dono), Histórico (lucro só do Dono), Relatórios (Consulta sem lucro), Catálogo, PDV, Compras, Dashboard.
+- **`npm run check`** verde (inclui `check:custo`, que agora também olha arquivo novo e junção com `*`); `npm test` 655/655; `tsc` limpo.
+- **Revisão independente do diff:** nenhum vazamento e nenhuma gravação perdida. Corrigido a partir dela: troca com uma linha de pagamento **por aparelho** (o termo e a lista de encomendas mostram o valor de cada um; antes da correção, vários aparelhos saíam rateados); custo 0 antigo como "—" (não "R$ 0,00"); aviso no modal quando o reparo muda sem custo; custo 0 informado não vira "pendente" na linha nova; a 0400 trata escrita sem usuário (chave de serviço, script) como do servidor (senão o custo sumia).
+- **Pendências registradas (não bloqueiam; decisão ou próximo passo):**
+  - **16 unidades da JM com custo 0 copiado** (15 vendidas, 1 reservada): aparecem como "—" e não entram em "Custo pendente". Transformar em pendente (nulo) mexe em dado: decisão do Lucas.
+  - **Vendas antigas com vários aparelhos numa linha só de troca:** o termo reparte o total por igual (o valor de cada aparelho só existia no custo). Vendas novas já gravam uma linha por aparelho.
+  - **Downgrade por orçamento:** o pagamento em troca é `min(valor de entrada, valor da venda)`; o termo mostra esse valor, não o combinado.
+  - **Exportação LGPD** sem os satélites de custo (antes levava `valor_custo` e `lucro` das vendas): incluir exige paginar por `venda_id`.
+  - **Ajuste da encomenda** grava o preço e depois o custo (`venda_custo_ajustar`): se a segunda falhar, o preço fica.
+  - Linha nova da entrada mostra a loja "—" até recarregar (já era assim).
+  - `lote2-e2e` desatualizado (views removidas).
+
 ### 4.6 Tempo 4 (entrega 1.1g): remover as colunas antigas
 
 **Só roda quando, nesta ordem:**
