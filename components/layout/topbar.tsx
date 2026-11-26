@@ -1,6 +1,6 @@
 'use client'
 
-import { Bell, MessageSquare, Search } from 'lucide-react'
+import { Bell, MessageSquare, Search, ShieldAlert } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -9,6 +9,7 @@ import { useTempoReal } from './tempo-real-empresa'
 import { CommandPalette } from './command-palette'
 import { SeletorFilial } from './seletor-filial'
 import { useRotuloDaRota } from './rotulos-context'
+import { useAvisos } from './use-avisos'
 
 interface TopbarProps {
   eyebrow?: string
@@ -86,6 +87,8 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
   }, [])
 
   const totalNaoLidas = naoLidas.reduce((s, n) => s + n.nao_lidas, 0)
+  // avisos do sistema para a pessoa (P2 da 1.1): ficam no topo do sino até "Entendi"
+  const { avisos, marcarLido } = useAvisos(notifOpen)
   const conversasNaoLidas = naoLidas.length
 
   /**
@@ -147,7 +150,7 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
           className="relative grid h-8 w-8 place-items-center rounded-control border border-line bg-card text-ink-2 transition-colors hover:bg-bg"
         >
           <Bell size={16} strokeWidth={1.7} />
-          {totalNaoLidas > 0 && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full border-2 border-card bg-accent" />}
+          {(totalNaoLidas > 0 || avisos.length > 0) && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full border-2 border-card bg-accent" />}
         </button>
 
         {notifOpen && (
@@ -161,8 +164,18 @@ export function Topbar({ title = '', showPeriods = false, activePeriod = 'mes', 
               )}
             </div>
             <div className="max-h-[320px] overflow-y-auto scrollbar-thin">
+              {avisos.map((a) => (
+                <div key={`aviso-${a.id}`} className="flex items-start gap-3 border-b border-line-soft bg-warn-soft/40 px-4 py-3">
+                  <span className="grid h-8 w-8 flex-none place-items-center rounded-control bg-warn-soft text-warn"><ShieldAlert size={15} strokeWidth={1.7} /></span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-semibold text-ink">{a.titulo}</div>
+                    {a.texto && <div className="text-[11.5px] text-ink-2">{a.texto}</div>}
+                  </div>
+                  <button onClick={() => void marcarLido(a.id)} className="flex-none text-[11.5px] font-semibold text-accent hover:underline">Entendi</button>
+                </div>
+              ))}
               {visiveis.length === 0 ? (
-                <div className="px-6 py-8 text-center text-[13px] text-ink-3">Tudo em dia.</div>
+                avisos.length === 0 && <div className="px-6 py-8 text-center text-[13px] text-ink-3">Tudo em dia.</div>
               ) : visiveis.map((n) => {
                 const c = n.contato_id != null ? contatos[n.contato_id] : undefined
                 const nome = c?.nome || c?.telefone || (c?.instagram ? '@' + c.instagram : null)

@@ -1,0 +1,12 @@
+{
+  "1_diferencas_horario": 0,
+  "1_exemplos": null,
+  "1_loja6_proprio": true,
+  "1_loja3_herda_empresa": true,
+  "1_empresa5_formato_antigo": "07:30",
+  "1_casos": 5,
+  "2_invalido_igual": true,
+  "2_invalido_cai_na_empresa": true,
+  "3_empresas_liberacao_iguais": true,
+  "3_roda": "object"
+}

@@ -1,0 +1,19 @@
+{
+  "1_admin_em_dono": "SO_DONO",
+  "1_avisos": 0,
+  "2_dono_rebaixa_dono": {
+    "afetado": 1,
+    "autor": 0,
+    "aviso": ["cargo_dono_trocado", "Seu cargo foi alterado", "Dono JM de teste mudou o seu cargo de Dono para Administrador.", 1, true, true, true],
+    "auditoria": 1
+  },
+  "3_nao_dono_sem_aviso": 0,
+  "4_dono_ve": 0,
+  "4_afetado_ve": 1,
+  "4_marcou_lido": 1,
+  "4_mudar_texto": "42501",
+  "4_criar_pela_api": "42501",
+  "4_outro_ve": 0,
+  "5_resumo": {"total": 3, "por_loja": {"3": 2, "6": 1}},
+  "5_lista": 3
+}
