@@ -581,11 +581,11 @@ A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas 
 - **Conferência visual** (fotos do varredor, as três pessoas): Estoque (coluna Custo, "pendente", "—" para 0, aba só do Dono), Histórico (lucro só do Dono), Relatórios (Consulta sem lucro), Catálogo, PDV, Compras, Dashboard.
 - **`npm run check`** verde (inclui `check:custo`, que agora também olha arquivo novo e junção com `*`); `npm test` 655/655; `tsc` limpo.
 - **Revisão independente do diff:** nenhum vazamento e nenhuma gravação perdida. Corrigido a partir dela: troca com uma linha de pagamento **por aparelho** (o termo e a lista de encomendas mostram o valor de cada um; antes da correção, vários aparelhos saíam rateados); custo 0 antigo como "—" (não "R$ 0,00"); aviso no modal quando o reparo muda sem custo; custo 0 informado não vira "pendente" na linha nova; a 0400 trata escrita sem usuário (chave de serviço, script) como do servidor (senão o custo sumia).
-- **Pendências registradas (não bloqueiam; decisão ou próximo passo):**
-  - **16 unidades da JM com custo 0 copiado** (15 vendidas, 1 reservada): aparecem como "—" e não entram em "Custo pendente". Transformar em pendente (nulo) mexe em dado: decisão do Lucas.
-  - **Vendas antigas com vários aparelhos numa linha só de troca:** o termo reparte o total por igual (o valor de cada aparelho só existia no custo). Vendas novas já gravam uma linha por aparelho.
-  - **Downgrade por orçamento:** o pagamento em troca é `min(valor de entrada, valor da venda)`; o termo mostra esse valor, não o combinado.
-  - **Exportação LGPD** sem os satélites de custo (antes levava `valor_custo` e `lucro` das vendas): incluir exige paginar por `venda_id`.
+- **Pendências do §4.5.2: decisões do Lucas (26/11/2026):**
+  - **16 unidades da JM com custo 0 copiado** (46, 47, 48, 54, 55, 56, 57, 59, 61, 62, 64, 65, 67, 69 e 73 vendidas; 75 reservada para a encomenda 121): **passam a "custo pendente"** com auditoria (`script 1.1f`) e entram na aba "Custo pendente". Feito junto com o deploy, por `conciliacao-pedidos/etapa-1.1ef-20261126/custo-zero-pendente.sql` (simulação, backup `_backup_custo_zero_pendente_20261126`, volta `custo-zero-pendente-volta.sql`). **Só a unidade muda:** as 16 vendas delas continuam com custo 0. `estoque_custo_informar` só preenche venda com custo nulo, então informar o custo dessas unidades **não chega à venda** (o lucro dessas vendas continua "sem custo"). Para chegar, as 16 vendas teriam de ficar pendentes também (mexe em venda concluída, com a marca de script): **decisão do Lucas, não feita**.
+  - **Vendas antigas com troca rateada** (vários aparelhos numa linha só de pagamento): **ficam como estão (legado)**. O termo dessas vendas reparte o total por igual; as vendas novas gravam uma linha por aparelho.
+  - **Termo no rebaixamento por orçamento** mostrando o valor pago (`min(valor de entrada, valor da venda)`) em vez do combinado: **defeito registrado, corrigir junto da fase 2 (impressão)**.
+  - **Exportação LGPD sem os satélites de custo: não se aplica.** Custo é dado interno da loja (quanto ela pagou), não dado pessoal do cliente; a exportação LGPD é dos dados pessoais. Os satélites ficam fora de propósito.
   - **Ajuste da encomenda** grava o preço e depois o custo (`venda_custo_ajustar`): se a segunda falhar, o preço fica.
   - Linha nova da entrada mostra a loja "—" até recarregar (já era assim).
   - `lote2-e2e` desatualizado (views removidas).
@@ -626,6 +626,57 @@ A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas 
 - `/api/permissoes` e a página antiga são apagadas no app do mesmo pacote (deploy do app **antes** da migração).
 
 **Aceite:** `config_valor_emp` igual antes e depois para todas as chaves; o teste `teste-config-provisoria.sql` substituído pelo `teste-empresa-config.sql`; nenhuma rota responde pela tela antiga; Cargos sem mudança para nenhum usuário.
+
+### 5.1 Leitura protegida de chaves de configuração (vindo da precificação §8.3; entra na 1.1h)
+
+**Por quê:** a margem da precificação somada ao preço de venda revela o custo de mercado (preço − margem). Então as chaves `precificacao.*` e as linhas de Auditoria delas só podem ser lidas por quem tem `estoque.ver_custo`. Hoje qualquer pessoa da empresa lê `empresa_config` (pela RLS e por `config_valor`) e a Auditoria de configuração.
+
+**Por que na 1.1h:** é a entrega que já mexe na regra de leitura da configuração (sai o envelope antigo, `config_valor` fica só na tabela nova). Mudar a leitura antes disso obrigaria a proteger também o envelope. **Condição de calendário:** a 1.1h tem de estar em produção **antes da primeira entrega da precificação (P1a)**. Se a precificação ficar pronta antes, esta parte sai sozinha, antes da P1a, como migração própria.
+
+**Como (genérico, não só precificação):**
+- o catálogo `lib/config.ts` ganha, por chave, `leitura: 'estoque.ver_custo'` (ou outra permissão); as chaves `precificacao.*` nascem com essa marca;
+- o espelho no banco: tabela `config_chave_leitura(chave_prefixo, permissao)`, gerada do catálogo (pelo gerador da 1.1i, ou à mão até lá);
+- `empresa_config`: a política de SELECT passa a exigir `tem_permissao(<permissão da chave>)` quando a chave tem marca; `config_valor`/`config_valor_emp` devolvem nulo (ou `SEM_PERMISSAO`, a decidir no teste) para quem não tem;
+- `auditoria_eventos`: as linhas com `entidade = 'config'` e chave marcada só aparecem com a permissão (política de SELECT + filtro na tela Auditoria);
+- `config_salvar` continua exigindo a permissão de **edição** da chave (`estoque.preco_variante` para precificação).
+
+**Teste:** Vendedor e Consulta não leem `precificacao.margem_padrao` por `empresa_config`, `config_valor`, Auditoria nem tela; o Dono lê; chave sem marca continua legível como hoje.
+
+### 5.2 O restante da 1.1: ordem e critérios (planejado em 26/11/2026, depois do deploy da 1.1e + 1.1f)
+
+| Ordem | Entrega | Começa quando | Critério de pronto |
+|---|---|---|---|
+| 1 | **Aviso ao Dono afetado (P2)** | já (pequena, só app + uma função) | o Dono que tem o cargo trocado por outro Dono recebe aviso |
+| 2 | **1.1g** remover as colunas antigas de custo | 1.1f com **um dia inteiro de loja aberta** sem leitor | os 4 critérios do §4.6 |
+| 3 | **1.1h** contração da configuração e das permissões + leitura protegida (§5.1) | P0 abaixo resolvido | aceite do §5 e teste do §5.1; **antes da P1a da precificação** |
+| 4 | **1.1i** gerador de valores padrão | 1.1h em produção (o gerador escreve só na tabela nova) | **antes de qualquer cliente novo e antes de a Aletrini ligar módulo com configuração** |
+
+**1. Aviso ao Dono afetado (P2):**
+- **o quê:** quando `usuario_cargo_trocar` muda o cargo de alguém que era Dono, e quem mudou é outro Dono, nasce uma notificação para o afetado ("<nome> mudou seu cargo de Dono para <cargo> em <data>"), além da linha de Auditoria que já existe;
+- **onde:** a notificação sai da própria função (mesma transação), pelo mecanismo de notificações já usado no app; e-mail fica de fora (decisão dos sócios, se quiserem);
+- **critério:** teste SQL (Dono A rebaixa Dono B → 1 notificação para B, nenhuma para A; Administrador continua recebendo `SO_DONO`); conferência na tela da Demonstração; nada muda para a JM até alguém trocar o cargo de um Dono.
+
+**2. 1.1g — remover as colunas antigas de custo** (detalhe no §4.6):
+- **antes de escrever a migração:** prova de que nada lê as colunas:
+  - `check-custo` verde no commit em produção;
+  - `pg_proc.prosrc`, `pg_views` e `pg_depend` sem citação fora dos gatilhos-ponte;
+  - logs da API (`edge_logs`) desde o deploy da 1.1f, cobrindo **pelo menos um dia de loja aberta**, sem `preco_custo`, `custo_reparo`, `valor_custo`, `lucro`, `valor_total` em `select=` ou corpo de gravação de `estoque_unidades`, `vendas_vendas`, `compras_pedidos` e `itens`;
+  - colunas ainda 100% nulas;
+- **migração:** sai o gatilho-ponte e saem as colunas; DDL **separada por tabela**, com `lock_timeout` (lição de 25/11), fora dos minutos 05–15, com 10 min sem atividade na JM;
+- **volta:** recria as colunas vazias e os gatilhos do tempo 3;
+- **critério:** somas dos satélites iguais antes e depois; ritual, build e varredor verdes; `select=preco_custo` devolve 400 para todos; smoke na Demonstração; logs de 15 min.
+
+**3. 1.1h — contração da configuração e das permissões antigas + leitura protegida:**
+- **P0, antes de tudo (pré-requisito achado no deploy da 1.1a):** `core_horario` e `core_liberar_lotes_do_dia` passam a ler `empresa_config` (hoje leem o envelope direto). Entrega curta, própria, com teste SQL e conferência da liberação diária e da rotina do pós-venda do dia seguinte (resultado, não só status do job);
+- **critério de entrada da contração:** busca sem leitor do envelope e de `empresas.permissoes` no código **e** no corpo das funções do banco (`pg_proc.prosrc`);
+- **ordem dentro da 1.1h:** app primeiro (sem leitor do envelope; página antiga de permissões apagada), depois a migração (envelope para backup, ponte e coluna `empresas.permissoes` saem), depois a leitura protegida (§5.1);
+- **critério:** `config_valor_emp` igual antes e depois para todas as chaves; Cargos igual para todo usuário; teste do §5.1; rotinas do dia seguinte ok na página Rotinas.
+
+**4. 1.1i — gerador de valores padrão:**
+- **o quê:** `scripts/gerar-config-padroes.mjs` lê `DEFINICOES_CONFIG` (`lib/config.ts`) e gera uma migração ou função de semente com todos os padrões (inclusive os que hoje estão no chamador: horário, liberação diária, sem ofertas, dias úteis; e a marca de leitura do §5.1);
+- **onde vale:** criação da empresa e instalação de módulo materializam os padrões em `empresa_config`; o chamador deixa de ter padrão próprio;
+- **trava:** `check-config-padroes` no `npm run check` (padrão no chamador reprova);
+- **critério:** empresa nova criada no local tem as mesmas chaves e valores que o catálogo diz; JM e Aletrini sem nenhuma mudança de valor efetivo (`config_valor_emp` igual antes e depois); instalar um módulo grava os padrões dele.
 
 ---
 

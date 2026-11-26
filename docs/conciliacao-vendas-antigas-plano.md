@@ -1,6 +1,6 @@
 # Conciliação de vendas antigas: plano curto (26/11/2026, sem código)
 
-Pedido do Lucas em 26/11. A implementação será liberada depois. Decisões em aberto no §7.
+Pedido do Lucas em 26/11. A implementação será liberada depois. Decisões no §7 (26/11: D1, D4 e D5 aprovadas; D2 com os sócios; D3 com a loja).
 
 ## 1. Para que serve
 
@@ -84,10 +84,45 @@ Filtro por loja e exportação da lista para quem tem `core.exportar`.
   - a soma das pendências da tela bate com as planilhas de 25/11, por loja, antes de qualquer lançamento;
   - depois de lançar a conferência, os totais de vendas (quantidade, R$ e md5 da digital) ficam **iguais**: só mudam pagamentos, unidades e lançamentos.
 
-## 7. Decisões em aberto (do Lucas e dos sócios)
+## 7. Decisões (registradas em 26/11/2026; implementação ainda não liberada)
 
-- **D1.** Pagamento antigo acima do que falta (ex.: troca valia mais): recusar ou registrar com aviso?
-- **D2.** Troca revendida fora do sistema: só registrar a revenda (proposta), ou criar a venda da revenda com data antiga, o que mexe no faturamento do mês dela?
-- **D3.** Encomenda com sinal (121 e 122) cancelada: o sinal é devolvido (lançamento de saída) ou retido (receita)?
-- **D4.** "Cliente não trouxe": o valor a cobrar entra na comissão do vendedor? Hoje a comissão olha a venda concluída.
-- **D5.** Período: só vendas anteriores ao hotfix (lançadas até 24/11/2026 22:17 UTC), ou qualquer venda concluída com falta de pagamento?
+| | Pergunta | Situação |
+|---|---|---|
+| D1 | Pagamento antigo acima do que falta | **APROVADA** |
+| D2 | Troca revendida fora do sistema | **PENDENTE dos sócios** (proposta alternativa abaixo) |
+| D3 | Sinal das encomendas 121 e 122 | **PENDENTE da resposta da loja** |
+| D4 | Valor a cobrar e comissão | **APROVADA** (estorno: sócios) |
+| D5 | Período | **APROVADA** |
+
+- **D1. Pagamento antigo acima do que falta: APROVADA (Lucas, 26/11).**
+  - `conciliacao_pagamento` registra **só até o que falta** na venda.
+  - O excedente vira um lançamento separado em `vendas_conciliacao`, tipo **`saldo_cliente`** ("saldo a favor do cliente"), preso à venda e ao cliente, com situação aberto ou devolvido/usado.
+  - A tela avisa antes de gravar: "R$ X passam do que falta; vão como saldo a favor do cliente".
+  - A venda nunca recebe mais do que vale, então os relatórios de recebido continuam batendo com as vendas.
+- **D2. Troca revendida fora do sistema: PENDENTE (decisão dos sócios).**
+  - **Recomendação original (só registrar):**
+    - a revenda fica registrada em `vendas_conciliacao` (cliente, data e valor), e a unidade vai para `vendido`;
+    - não nasce venda, e o faturamento de nenhum mês muda (o aceite "totais de vendas iguais, md5 igual" vale);
+    - o dinheiro da revenda não aparece em nenhum relatório de vendas, só na tela da Conciliação.
+  - **Proposta alternativa (Lucas, 26/11): "venda de conciliação".**
+    - nasce uma venda com a **data real** da revenda, marcada `canal_venda = 'conciliacao'`;
+    - ela entra no faturamento numa **linha separada "Conciliação"**, e fica **fora de metas, ranking e comissões**;
+    - **impacto nos meses passados:** o faturamento dos meses das revendas (setembro a novembro de 2026) **sobe** pela linha "Conciliação". Painel, Relatórios, Visão geral e assistente passam a mostrar dois números: vendas do mês (como hoje) e "com conciliação". O CSV ganha a coluna do canal;
+    - metas, ranking e comissão ficam **iguais** aos de hoje (filtram o canal);
+    - o mês já fechado e conferido pelos sócios muda no total "com conciliação", o que exige o aviso "inclui lançamentos de conciliação de DD/MM";
+    - o ZapIntel (ponte venda↔conversa) precisa ignorar esse canal, para não casar uma venda de balcão antigo com uma conversa;
+    - o aceite muda: os totais **sem** o canal ficam iguais (md5 igual); **com** ele, sobem exatamente a soma das revendas lançadas.
+  - **Comparação:**
+
+| | Só registrar | Venda de conciliação |
+|---|---|---|
+| Faturamento dos meses passados | não muda | sobe na linha "Conciliação" |
+| Metas, ranking, comissão | não mudam | não mudam (canal filtrado) |
+| O dinheiro da revenda aparece em relatório | só na Conciliação | sim, separado |
+| Trabalho a mais | nenhum | filtro do canal em painel, relatórios, metas, comissão, assistente e ZapIntel; selo "inclui conciliação" |
+| Risco | a revenda some dos números da empresa | um filtro esquecido põe a revenda em meta ou comissão |
+
+  - Decisão final: dos sócios. A implementação de D2 espera.
+- **D3. Sinal das encomendas 121 (R$ 2.000) e 122 (R$ 500): PENDENTE da resposta da loja** (o cliente desistiu? o sinal foi devolvido?). Até lá, as duas não cancelam; a tela recusa cancelar encomenda com sinal sem a decisão do sinal.
+- **D4. Valor a cobrar e comissão: APROVADA (Lucas, 26/11).** O valor a cobrar de "cliente não trouxe" **não gera comissão** enquanto não entrar. Quando a perda for definitiva, o estorno da comissão proporcional da venda original é decisão dos sócios (caso a caso ou por regra). Até essa regra existir, a tela só marca "perda definitiva", sem mexer em comissão.
+- **D5. Período: APROVADA (Lucas, 26/11).** Período **fechado**: só vendas lançadas até o hotfix, **24/11/2026 22:17 UTC**. A trava de pagamento em venda concluída (§3) continua valendo para tudo depois disso. A tela não aceita venda posterior; o caminho normal (pagamento antes de entregar) é o do hotfix.
