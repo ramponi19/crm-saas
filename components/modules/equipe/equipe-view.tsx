@@ -26,6 +26,10 @@ interface Usuario {
   participa_roleta?: boolean
   /** false = não conversa com clientes (o ZapIntel não a reconhece pelo nome). Só o /admin carrega. */
   atende_clientes?: boolean
+  /** 5a: lojas que a pessoa enxerga (vazia = só a loja principal). Só o /admin carrega. */
+  lojas?: number[]
+  /** 5a: o cargo vê a rede (dono, admin, cargo de sistema ou `lojas.ver_rede`): enxerga todas sem marcar. */
+  ve_rede?: boolean
 }
 /** Loja para escolher no cadastro. Lista vazia = empresa de uma loja só. */
 export interface LojaOpcao { id: number; nome: string; cidade: string | null }
@@ -149,8 +153,33 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
   })
   const mudouRoleta = temRoleta && (roleta.contaServico !== !!usuario?.conta_servico || roleta.participaRoleta !== (usuario?.participa_roleta !== false)
     || roleta.atendeClientes !== (usuario?.atende_clientes !== false))
+  /**
+   * 5a (26/11/2026): "Lojas que enxerga" + "Loja principal", gravadas por /api/equipe/lojas (função
+   * usuario_lojas_salvar, auditada). Só na edição pelo /admin (a tela recebe `ve_rede`), com 2+ lojas.
+   * Lista vazia no banco = só a principal; a tela mostra isso já marcado.
+   */
+  const temLojas = !isNew && escolheLoja && typeof usuario?.ve_rede === 'boolean'
+  const matrizId = filiais[0]?.id ?? null
+  const principalInicial = String(usuario?.filial_id ?? matrizId ?? '')
+  const lojasIniciais = useMemo(() => {
+    if (usuario?.ve_rede) return [] as number[]
+    const l = usuario?.lojas?.length ? usuario.lojas : (usuario?.filial_id ?? matrizId) != null ? [Number(usuario?.filial_id ?? matrizId)] : []
+    return [...new Set(l)].sort((a, b) => a - b)
+  }, [usuario, matrizId])
+  const [lojasSel, setLojasSel] = useState<number[]>(lojasIniciais)
+  const [principal, setPrincipal] = useState(principalInicial)
+  const mudouLojas = temLojas && (principal !== principalInicial
+    || [...lojasSel].sort((a, b) => a - b).join(',') !== lojasIniciais.join(','))
+  function marcarLoja(id: number, marcado: boolean) {
+    setLojasSel(atual => {
+      const nova = marcado ? [...new Set([...atual, id])] : atual.filter(x => x !== id)
+      // A principal precisa estar entre as marcadas: desmarcou a principal, ela passa para a primeira marcada.
+      if (!nova.includes(Number(principal))) setPrincipal(nova.length ? String(filiais.find(f => nova.includes(f.id))?.id ?? nova[0]) : '')
+      return nova
+    })
+  }
   const mudouCadastro = !isNew && (form.nome !== (usuario?.nome ?? '') || form.role !== (usuario?.role ?? 'vendedor')
-    || form.filialId !== (usuario?.filial_id != null ? String(usuario.filial_id) : ''))
+    || (!temLojas && form.filialId !== (usuario?.filial_id != null ? String(usuario.filial_id) : '')))
   const [saving, setSaving] = useState(false)
   // Convite por e-mail (17/11/2026): a pessoa cria a própria senha pelo link. Sem provedor de e-mail
   // configurado, o link aparece aqui para o dono repassar.
@@ -194,6 +223,16 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
           })
           if (r.sessaoExpirada) return
           if (!r.ok) { notify.bad(r.json.error ?? 'Erro ao salvar a distribuição'); return }
+          if (!mudouCadastro && !mudouLojas) { notify.ok('Salvo!'); onSaved(); return }
+        }
+        if (mudouLojas) {
+          if (!usuario!.ve_rede && !lojasSel.length) { notify.warn('Marque ao menos uma loja'); return }
+          const r = await apiFetch<{ error?: string }>('/api/equipe/lojas', {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: usuario!.id, lojas: usuario!.ve_rede ? [] : lojasSel, principal: principal ? Number(principal) : null }),
+          })
+          if (r.sessaoExpirada) return
+          if (!r.ok) { notify.bad(r.json.error ?? 'Erro ao salvar as lojas'); return }
           if (!mudouCadastro) { notify.ok('Salvo!'); onSaved(); return }
         }
         const { ok, json, sessaoExpirada } = await apiFetch<{ error?: string }>('/api/equipe/atualizar-usuario', {
@@ -202,7 +241,8 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
             id: usuario!.id, nome: form.nome, role: form.role,
             // Só manda quando a tela tem o campo: sem isto, salvar pelo CRM apagaria
             // a loja que o dono definiu no /admin.
-            ...(escolheLoja ? { filialId: form.filialId ? Number(form.filialId) : null } : {}),
+            // Com o bloco de lojas (5a), a loja principal vai por /api/equipe/lojas, não por aqui.
+            ...(escolheLoja && !temLojas ? { filialId: form.filialId ? Number(form.filialId) : null } : {}),
           }),
         })
         if (sessaoExpirada) return
@@ -261,7 +301,31 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
             <option key={r.value} value={r.value}>{r.label}</option>
           ))}
         </Select>
-        {escolheLoja && (
+        {temLojas && (
+          <fieldset className="grid gap-2 rounded-control border border-line px-3 py-2.5">
+            <legend className="px-1 text-[12px] font-medium text-ink-2">Lojas que enxerga</legend>
+            {usuario?.ve_rede ? (
+              <p className="text-[12.5px] text-ink-2">Todas as lojas <span className="text-ink-3">(o cargo vê a rede)</span></p>
+            ) : (
+              <div className="grid gap-1.5">
+                {filiais.map(f => (
+                  <label key={f.id} className="flex items-center gap-2 text-[13px] text-ink-2">
+                    <input type="checkbox" checked={lojasSel.includes(f.id)} onChange={e => marcarLoja(f.id, e.target.checked)} />
+                    {f.cidade ? f.nome + ' · ' + f.cidade : f.nome}
+                  </label>
+                ))}
+                <span className="text-[11.5px] text-ink-3">Vê os clientes, vendas e conversas destas lojas. Com mais de uma, escolhe no topo qual ver (ou todas).</span>
+              </div>
+            )}
+            <Select label="Loja principal" value={principal} onChange={e => setPrincipal(e.target.value)}
+              hint="Onde grava quando o topo está em todas as lojas.">
+              {filiais.filter(f => usuario?.ve_rede || lojasSel.includes(f.id)).map(f => (
+                <option key={f.id} value={f.id}>{f.cidade ? f.nome + ' · ' + f.cidade : f.nome}</option>
+              ))}
+            </Select>
+          </fieldset>
+        )}
+        {escolheLoja && !temLojas && (
           <Select label="Loja onde trabalha" value={form.filialId} onChange={e => set('filialId', e.target.value)}
             hint="Sem loja definida, a pessoa fica na loja principal.">
             <option value="">Sem loja definida</option>
@@ -803,9 +867,15 @@ export default function EquipeView({ usuarios, uso, filiais = [], sinaisIniciais
       key: 'loja', header: 'Loja', hideOnMobile: true,
       render: (u: Usuario) => {
         const f = filiais.find(x => x.id === u.filial_id)
-        return f
-          ? <span className="text-ink-2">{f.nome}</span>
-          : <span className="text-ink-3">principal (não definida)</span>
+        // 5a: além da principal, as outras lojas que a pessoa enxerga (ou "todas", para quem vê a rede).
+        const outras = u.ve_rede ? null : filiais.filter(x => x.id !== u.filial_id && (u.lojas ?? []).includes(x.id))
+        return (
+          <span className="text-ink-2">
+            {f ? f.nome : <span className="text-ink-3">principal (não definida)</span>}
+            {u.ve_rede && <span className="text-ink-3"> · vê todas</span>}
+            {outras && outras.length > 0 && <span className="text-ink-3"> + {outras.map(x => x.nome).join(', ')}</span>}
+          </span>
+        )
       },
     } as Column<Usuario>] : []),
     {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { exigirLojaDeAtuacao, exigirPermissaoApi } from '@/lib/sessao'
+import { contextoDaSessao, exigirLojaDeAtuacao, lojasDeAtuacao, temPermissao } from '@/lib/sessao'
 import { filialEscolhida } from '@/lib/filial-escolha'
 
 /**
@@ -14,16 +14,20 @@ import { filialEscolhida } from '@/lib/filial-escolha'
  *
  * `filialId: null` significa "Rede (todas as lojas)".
  *
- * SÓ QUEM VÊ A REDE (permissão lojas.ver_rede: Dono, Administrador e Consulta, de fábrica; etapa 1.1b). Para o vendedor a função `filiais_visiveis()` ignora esta
- * seleção e devolve a loja dele — então mesmo que ele grave o campo por outro
- * caminho, não vê nada além da própria loja. A checagem aqui é a primeira porta,
- * não a única.
+ * QUEM ESCOLHE: quem vê a rede (permissão lojas.ver_rede: Dono, Administrador e Consulta, de fábrica; etapa 1.1b)
+ * ou quem enxerga 2+ lojas (5a, 26/11/2026: lista "lojas que enxerga"); `null` aí é "Todas as minhas lojas", só
+ * para ver (gravar é sempre numa loja específica: a do topo ou a principal). Só aceita loja em que a pessoa pode
+ * atuar; o banco confere de novo (gatilho usuarios_loja_topo_confere, 0910) e `filiais_visiveis()` ignora o resto.
  */
 export async function POST(req: Request) {
-  const auth = await exigirPermissaoApi('lojas.ver_rede')
-  if (auth.erro) return auth.erro
-  const userId = auth.ctx.usuario_id
-  const empresaId = auth.ctx.empresa_id!
+  const ctx = await contextoDaSessao()
+  if (!ctx) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  if (!ctx.empresa_id) return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
+  if (!ctx.superadmin && !temPermissao(ctx, 'lojas.ver_rede') && (await lojasDeAtuacao()).length < 2) {
+    return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
+  }
+  const userId = ctx.usuario_id
+  const empresaId = ctx.empresa_id
 
   // Corpo mal formado é 400, não 500 (lib/filial-escolha.ts).
   const filialId = filialEscolhida(await req.json().catch(() => undefined))

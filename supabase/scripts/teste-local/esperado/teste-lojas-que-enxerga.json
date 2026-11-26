@@ -1,0 +1,17 @@
+{
+  "1_matriz_igual": true,
+  "1_vinculos": 8,
+  "1_com_lista": 5,
+  "2_salvo": {"lojas": [3, 6], "principal": 3},
+  "2_auditado": 1,
+  "2_auditoria": {"antes": {"lojas": [3], "principal": 3}, "depois": {"lojas": [3, 6], "principal": 3}, "usuario": true},
+  "2_m1_todas": {"ve": [3, 6], "atua": [3, 6], "grava": 3},
+  "2_m1_topo_6": {"ve": [6], "grava": 6},
+  "2_m1_grava_na_6": "passou",
+  "3_vendedor_salva": "SEM_PERMISSAO",
+  "3_admin_mexe_no_dono": "SEM_PERMISSAO",
+  "3_loja_de_outra_empresa": "LOJA_INVALIDA",
+  "3_principal_fora": "PRINCIPAL_FORA_DA_LISTA",
+  "4_so_a_6": {"lojas": [6], "principal": 6},
+  "4_sem_lista": {"ve": [3], "atua": [3], "salvo": {"lojas": [], "principal": 3}}
+}

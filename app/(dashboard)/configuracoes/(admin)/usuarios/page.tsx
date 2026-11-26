@@ -33,10 +33,10 @@ export default async function AdminEquipePage({ searchParams }: { searchParams: 
   const inicioMes = janela.de.toISOString()
   const fimMes = janela.ate.toISOString()
 
-  const [{ data: usuarios }, { data: metas }, { data: vendasMes }, { data: comissoesMes }, { data: filiais }] = await Promise.all([
+  const [{ data: usuarios }, { data: metas }, { data: vendasMes }, { data: comissoesMes }, { data: filiais }, { data: listas }, { data: cargos }, { data: cargosRede }] = await Promise.all([
     supabase
       .from('empresa_usuarios')
-      .select('role, ativo, filial_id, conta_servico, participa_roleta, atende_clientes, usuarios!empresa_usuarios_usuario_public_fkey(*)')
+      .select('role, ativo, filial_id, cargo_id, conta_servico, participa_roleta, atende_clientes, usuarios!empresa_usuarios_usuario_public_fkey(*)')
       .eq('empresa_id', empresaId)
       .eq('ativo', true)
       .order('usuario_id'),
@@ -63,13 +63,31 @@ export default async function AdminEquipePage({ searchParams }: { searchParams: 
     supabase.from('filiais').select('id, nome, cidade')
       .eq('empresa_id', empresaId).eq('ativo', true)
       .order('matriz', { ascending: false }).order('nome'),
+    // 5a (26/11/2026): "lojas que enxerga" de cada pessoa e quem vê a rede (cargo de sistema, dono/admin ou
+    // `lojas.ver_rede`), para a tela mostrar "Todas (vê a rede)" sem marcar.
+    supabase.from('empresa_usuario_lojas' as never).select('usuario_id, filial_id').eq('empresa_id', empresaId),
+    supabase.from('empresa_cargos' as never).select('id, sistema').eq('empresa_id', empresaId),
+    supabase.from('empresa_cargo_permissoes' as never).select('cargo_id').eq('empresa_id', empresaId).eq('permissao', 'lojas.ver_rede'),
+  ])
+  const lojasPorPessoa = new Map<string, number[]>()
+  for (const l of (listas ?? []) as unknown as { usuario_id: string; filial_id: number }[]) {
+    lojasPorPessoa.set(l.usuario_id, [...(lojasPorPessoa.get(l.usuario_id) ?? []), Number(l.filial_id)])
+  }
+  const cargosDaRede = new Set<number>([
+    ...((cargos ?? []) as unknown as { id: number; sistema: boolean }[]).filter((c) => c.sistema).map((c) => Number(c.id)),
+    ...((cargosRede ?? []) as unknown as { cargo_id: number }[]).map((c) => Number(c.cargo_id)),
   ])
 
-  type VinculoRow = { role: string | null; ativo: boolean | null; filial_id: number | null; conta_servico: boolean; participa_roleta: boolean; atende_clientes: boolean; usuarios: Embed<Tables<'usuarios'>> }
+  type VinculoRow = { role: string | null; ativo: boolean | null; filial_id: number | null; cargo_id: number | null; conta_servico: boolean; participa_roleta: boolean; atende_clientes: boolean; usuarios: Embed<Tables<'usuarios'>> }
   const usuariosMapped = ((usuarios ?? []) as unknown as VinculoRow[])
     .map(eu => {
       const u = one(eu.usuarios)
-      return u ? { ...u, role: eu.role, filial_id: eu.filial_id, conta_servico: eu.conta_servico, participa_roleta: eu.participa_roleta, atende_clientes: eu.atende_clientes } : null
+      return u ? {
+        ...u, role: eu.role, filial_id: eu.filial_id, conta_servico: eu.conta_servico, participa_roleta: eu.participa_roleta, atende_clientes: eu.atende_clientes,
+        lojas: lojasPorPessoa.get(u.id) ?? [],
+        // Pelo CARGO (1.1b): cargo de sistema (Dono) ou com `lojas.ver_rede` (Administrador e Consulta, de fábrica).
+        ve_rede: eu.cargo_id != null && cargosDaRede.has(Number(eu.cargo_id)),
+      } : null
     })
     .filter((u): u is NonNullable<typeof u> => u !== null)
 

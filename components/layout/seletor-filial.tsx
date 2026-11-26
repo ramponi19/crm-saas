@@ -27,6 +27,7 @@ export function SeletorFilial() {
   const [selecionada, setSelecionada] = useState<Escolha>(null)
   const [minhaLoja, setMinhaLoja] = useState<number | null>(null)
   const [podeTrocar, setPodeTrocar] = useState(false)
+  const [veRede, setVeRede] = useState(false)
   const [aberto, setAberto] = useState(false)
   const [trocando, setTrocando] = useState(false)
 
@@ -57,7 +58,10 @@ export function SeletorFilial() {
       setOferecidas(podeAtuar ? todas.filter((f) => podeAtuar.has(Number(f.id))) : [])
       setMinhaLoja(c?.loja_da_pessoa ?? null)
       setSelecionada(c?.filial_atual ?? null)
-      setPodeTrocar(!!c && (c.superadmin || c.permissoes.includes('lojas.ver_rede')))
+      // 5a: quem vê a rede, ou quem enxerga 2+ lojas (lista "lojas que enxerga"), escolhe no topo.
+      const rede = !!c && (c.superadmin || c.permissoes.includes('lojas.ver_rede'))
+      setVeRede(rede)
+      setPodeTrocar(rede || (podeAtuar?.size ?? 0) >= 2)
     })()
 
     return () => { vivo = false }
@@ -113,7 +117,7 @@ export function SeletorFilial() {
           ? <Store size={14} strokeWidth={1.7} className="text-ink-3" />
           : <Network size={14} strokeWidth={1.7} />}
         <span className="max-w-[160px] truncate font-medium">
-          {atual ? rotuloDaFilial(atual) : 'Rede (todas)'}
+          {atual ? rotuloDaFilial(atual) : veRede ? 'Rede (todas)' : 'Todas as minhas lojas'}
         </span>
         <ChevronDown size={13} strokeWidth={2} className="text-ink-3" />
       </button>
@@ -127,7 +131,7 @@ export function SeletorFilial() {
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] text-ink-2 transition-colors hover:bg-bg"
             >
               <Network size={14} strokeWidth={1.7} className="text-accent" />
-              <span className="flex-1">Rede (todas as lojas)</span>
+              <span className="flex-1">{veRede ? 'Rede (todas as lojas)' : 'Todas as minhas lojas'}</span>
               {selecionada === null && <Check size={14} strokeWidth={2} className="text-accent" />}
             </button>
             <div className="my-1 h-px bg-line-soft" />
@@ -143,8 +147,9 @@ export function SeletorFilial() {
               </button>
             ))}
             <div className="border-t border-line-soft px-3 py-2 text-[11px] leading-snug text-ink-3">
-              Em <strong>Rede</strong> você vê o consolidado. Ao escolher uma loja, o CRM
-              inteiro passa a mostrar só ela.
+              {veRede
+                ? <>Em <strong>Rede</strong> você vê o consolidado. Ao escolher uma loja, o CRM inteiro passa a mostrar só ela.</>
+                : <>Em <strong>todas</strong> você vê as suas lojas juntas; o que você cria vai para a sua loja principal. Ao escolher uma loja, o CRM passa a mostrar e gravar só nela.</>}
             </div>
           </div>
         </>
