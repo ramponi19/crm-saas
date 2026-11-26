@@ -482,13 +482,15 @@ create or replace function public.compras_pedido_salvar(p jsonb)
 returns bigint language plpgsql security invoker set search_path to 'public', 'pg_temp' as $$
 declare v_emp bigint := public.get_empresa_id(); v_id bigint := nullif(p ->> 'id', '')::bigint;
   v_ve boolean := coalesce(public.tem_permissao('estoque.ver_custo'), false);
+  v_hoje date;
 begin
   if v_emp is null then raise exception 'SEM_EMPRESA' using errcode = '42501'; end if;
+  v_hoje := (now() at time zone coalesce(public.empresa_fuso(v_emp), 'America/Sao_Paulo'))::date;   -- o dia da loja
   if v_id is null then
     insert into public.compras_pedidos (empresa_id, filial_id, fornecedor_id, descricao, valor_total, status, observacoes, usuario_id, data_pedido)
     values (v_emp, nullif(p ->> 'filial_id', '')::bigint, nullif(p ->> 'fornecedor_id', '')::bigint, p ->> 'descricao',
             case when v_ve then nullif(p ->> 'valor_total', '')::numeric end, coalesce(p ->> 'status', 'pendente'), p ->> 'observacoes',
-            auth.uid(), coalesce(nullif(p ->> 'data_pedido', '')::date, current_date))
+            auth.uid(), coalesce(to_date(nullif(p ->> 'data_pedido', ''), 'YYYY-MM-DD'), v_hoje))
     returning id into v_id;
   else
     update public.compras_pedidos
