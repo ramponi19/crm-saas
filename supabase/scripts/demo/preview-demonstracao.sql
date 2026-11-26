@@ -9,6 +9,9 @@
 --
 -- Telefones na faixa 55 11 90000-xxxx e canais de demonstração sem token, via "pagina" (fora da renovação de token do Instagram) e external_id "demo-…": nada sai daqui
 -- para a Meta. Rodar com o service role (execute_sql); não roda em empresa que não seja a Preview.
+-- As empresas daqui imitam as da produção, nascidas ANTES da 1.1i: sem os padrões de configuração gravados
+-- (config_semear respeita esta marca; ver 20261126000700_config_padroes_semente).
+set nexus.semente_legado = '1';
 do $$
 declare
   v_emp bigint;

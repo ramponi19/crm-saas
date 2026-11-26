@@ -10,6 +10,9 @@
 --   f47a8e4f… dono da Nexus Demonstração  96867cc0… admin da Nexus Demonstração
 --   0e5e0000…0001 vendedor da Nexus Demonstração (loja 1)
 -- Recusa rodar fora do 127.0.0.1 (o script confere a conexão antes).
+-- As empresas daqui imitam as da produção, nascidas ANTES da 1.1i: sem os padrões de configuração gravados
+-- (config_semear respeita esta marca; ver 20261126000700_config_padroes_semente).
+set nexus.semente_legado = '1';
 
 do $$ begin
   if exists (select 1 from empresas where slug = 'jm-store') then

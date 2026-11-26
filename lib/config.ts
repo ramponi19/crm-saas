@@ -10,11 +10,17 @@
  *
  * O catálogo (`DEFINICOES_CONFIG`) lista toda chave que existe, com o padrão quando ele é um valor simples.
  * Chave nova: entra no catálogo no mesmo commit (o teste tests/config.test.ts confere contra o código e as
- * migrações). Padrões que ainda moram no chamador (horário, liberação diária, sem ofertas) ficam marcados
- * `padraoNoChamador` até o módulo ser tocado.
+ * migrações).
+ *
+ * PADRÕES EXPLÍCITOS (etapa 1.1i, 26/11/2026): toda chave tem o seu padrão aqui, com o MESMO valor que as funções do
+ * banco e as telas calculam quando a empresa não gravou nada (conferido no teste). Esta lista é a fonte do gerador
+ * `scripts/gerar-config-padroes.mts`, que escreve os padrões no banco (`config_padroes()`); a empresa nasce com eles
+ * gravados em `empresa_config` (gatilho em `empresas`) e cada módulo grava os seus ao ser instalado (gatilho em
+ * `empresa_modulos`). Padrão nulo não é gravado (a tabela não aceita valor nulo): a chave fica "sem valor" de propósito.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { PARAMETROS as PARAMETROS_POSVENDA } from '@/lib/posvenda/config'
+import { PARAMETROS as PARAMETROS_POSVENDA, BOTAO_SEM_OFERTAS_PADRAO, CONFIRMACAO_SEM_OFERTAS_PADRAO } from '@/lib/posvenda/config'
+import { HORARIO_PADRAO } from '@/lib/horario'
 
 export type EscopoConfig = 'empresa' | 'empresa_ou_loja'
 
@@ -24,26 +30,40 @@ export interface DefinicaoConfig {
   escopo: EscopoConfig
   /** Valor de fábrica quando a empresa não gravou nada. */
   padrao: unknown
-  /** O padrão é calculado por quem lê (função do banco ou tela), não é um valor simples. */
-  padraoNoChamador?: string
   rotulo: string
+  /** Chave que ninguém mais lê: fica no catálogo (migrações antigas a citam) mas não é gravada na empresa nova. */
+  obsoleta?: string
+  /** Módulo do manifesto que precisa estar instalado para a chave ser gravada (nulo: nasce com a empresa). */
+  modulo_requerido?: string
 }
 
 const CORE: DefinicaoConfig[] = [
-  { modulo: 'core', chave: 'condicao_venda', escopo: 'empresa', padrao: null, rotulo: 'Condição do produto obrigatória na venda' },
-  { modulo: 'core', chave: 'horario', escopo: 'empresa_ou_loja', padrao: null,
-    padraoNoChamador: 'core_horario (seg–sex, sábado fechado)', rotulo: 'Horário de funcionamento' },
-  { modulo: 'core', chave: 'sem_ofertas', escopo: 'empresa', padrao: null,
-    padraoNoChamador: 'core_sem_ofertas_* (botões e confirmação padrão)', rotulo: '"Não quero receber ofertas"' },
-  { modulo: 'calendario', chave: 'dias_semana_uteis', escopo: 'empresa_ou_loja', padrao: null,
-    padraoNoChamador: 'posvenda_responsavel (segunda a sexta)', rotulo: 'Dias da semana úteis' },
+  // 'exigida' é o que lib/venda-ganho.ts (modoCondicao) aplica a qualquer valor que não seja 'opcional'/'nao_usa'
+  { modulo: 'core', chave: 'condicao_venda', escopo: 'empresa', padrao: 'exigida', rotulo: 'Condição do produto obrigatória na venda' },
+  // seg–sex 09–18, sábado e domingo fechados: core_horario (banco) e HORARIO_PADRAO (lib/horario) — o mesmo objeto
+  { modulo: 'core', chave: 'horario', escopo: 'empresa_ou_loja', padrao: HORARIO_PADRAO, rotulo: 'Horário de funcionamento' },
+  // core_sem_ofertas_pelo_botao e core_sem_ofertas_confirmacao_padrao (banco) = constantes de lib/posvenda/config
+  { modulo: 'core', chave: 'sem_ofertas', escopo: 'empresa',
+    padrao: { botoes: [BOTAO_SEM_OFERTAS_PADRAO], confirmacao: CONFIRMACAO_SEM_OFERTAS_PADRAO }, rotulo: '"Não quero receber ofertas"' },
+  { modulo: 'calendario', chave: 'dias_semana_uteis', escopo: 'empresa_ou_loja', padrao: [1, 2, 3, 4, 5],
+    obsoleta: 'desde 24/11 (20261124001200) o pós-venda usa core_proximo_dia_aberto (horário); ninguém lê esta chave',
+    rotulo: 'Dias da semana úteis' },
+  // core_sem_dono_modo: tudo que não for 'roleta' é 'esteira'
   { modulo: 'distribuicao', chave: 'sem_dono', escopo: 'empresa_ou_loja', padrao: 'esteira', rotulo: 'Negócio sem responsável' },
-  { modulo: 'distribuicao', chave: 'liberacao_diaria', escopo: 'empresa_ou_loja', padrao: null,
-    padraoNoChamador: 'liberacao_diaria (desligada)', rotulo: 'Liberação diária da esteira' },
+  // core_liberar_lote_esteira: sem configuração ou sem ativo=true → "desligado"
+  { modulo: 'distribuicao', chave: 'liberacao_diaria', escopo: 'empresa_ou_loja', padrao: { ativo: false }, rotulo: 'Liberação diária da esteira' },
 ]
 
 const POSVENDA: DefinicaoConfig[] = (Object.entries(PARAMETROS_POSVENDA) as [string, { porLoja: boolean; padrao: unknown }][])
-  .map(([chave, d]) => ({ modulo: 'posvenda', chave, escopo: d.porLoja ? 'empresa_ou_loja' : 'empresa', padrao: d.padrao, rotulo: chave }))
+  .map(([chave, d]) => ({ modulo: 'posvenda', chave, escopo: d.porLoja ? 'empresa_ou_loja' : 'empresa', padrao: d.padrao, rotulo: chave,
+    modulo_requerido: 'posvenda' }))
+
+/** O que a empresa grava ao nascer (sem `modulo_requerido`) ou ao instalar o módulo: padrão não nulo e chave viva. */
+export function padroesParaSemear(): { modulo: string; chave: string; valor: unknown; modulo_requerido: string | null }[] {
+  return DEFINICOES_CONFIG
+    .filter((d) => d.padrao !== null && d.padrao !== undefined && !d.obsoleta)
+    .map((d) => ({ modulo: d.modulo, chave: d.chave, valor: d.padrao, modulo_requerido: d.modulo_requerido ?? null }))
+}
 
 export const DEFINICOES_CONFIG: DefinicaoConfig[] = [...CORE, ...POSVENDA]
 

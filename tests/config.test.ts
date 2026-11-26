@@ -2,7 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { DEFINICOES_CONFIG, definicaoConfig, montarEnvelopes, resolverConfig } from '@/lib/config'
+import { DEFINICOES_CONFIG, definicaoConfig, montarEnvelopes, resolverConfig, padroesParaSemear } from '@/lib/config'
+import { HORARIO_PADRAO } from '@/lib/horario'
+import { modoCondicao } from '@/lib/venda-ganho'
 
 // Etapa 1.1a (25/11/2026): motor de configuração em empresa_config. Regras puras de lib/config.ts.
 
@@ -58,4 +60,28 @@ test('catálogo cobre toda chave usada no código e nas migrações', () => {
   const faltam = [...usadas].filter((k) => !catalogo.has(k) && !k.startsWith('core.teste'))
   assert.deepEqual(faltam, [])
   assert.ok(usadas.size >= 10, `achou só ${usadas.size} chaves; a busca quebrou?`)
+})
+
+// Etapa 1.1i (26/11/2026): padrões explícitos, iguais aos que o app aplica sem configuração.
+test('1.1i: toda chave viva tem padrão explícito (só os textos opcionais do pós-venda ficam sem valor)', () => {
+  const semPadrao = DEFINICOES_CONFIG.filter((d) => (d.padrao === null || d.padrao === undefined) && !d.obsoleta).map((d) => `${d.modulo}.${d.chave}`)
+  assert.deepEqual(semPadrao.sort(), ['posvenda.link_avaliacao', 'posvenda.mensagem_neutro', 'posvenda.mensagem_promotor', 'posvenda.responsavel_padrao'])
+})
+
+test('1.1i: os padrões são os mesmos que as telas e regras do app usam', () => {
+  assert.deepEqual(definicaoConfig('core', 'horario')?.padrao, HORARIO_PADRAO)
+  assert.equal(definicaoConfig('core', 'condicao_venda')?.padrao, modoCondicao(undefined))
+  assert.equal(definicaoConfig('distribuicao', 'sem_dono')?.padrao, 'esteira')
+  assert.deepEqual(definicaoConfig('distribuicao', 'liberacao_diaria')?.padrao, { ativo: false })
+  const so = definicaoConfig('core', 'sem_ofertas')?.padrao as { botoes: string[]; confirmacao: string }
+  assert.deepEqual(so.botoes, ['Não quero receber ofertas'])
+  assert.match(so.confirmacao, /\{\{nome\}\}/)
+})
+
+test('1.1i: o que se grava ao nascer e ao instalar o pós-venda', () => {
+  const p = padroesParaSemear()
+  assert.deepEqual(p.filter((x) => !x.modulo_requerido).map((x) => `${x.modulo}.${x.chave}`).sort(),
+    ['core.condicao_venda', 'core.horario', 'core.sem_ofertas', 'distribuicao.liberacao_diaria', 'distribuicao.sem_dono'])
+  assert.equal(p.filter((x) => x.modulo_requerido === 'posvenda').length, 7)
+  assert.ok(!p.some((x) => x.chave === 'dias_semana_uteis'), 'chave obsoleta não é gravada')
 })

@@ -1,0 +1,36 @@
+{
+  "1_chaves_ao_nascer": [
+    "core.condicao_venda",
+    "core.horario",
+    "core.sem_ofertas",
+    "distribuicao.liberacao_diaria",
+    "distribuicao.sem_dono"
+  ],
+  "1_sem_posvenda": true,
+  "1_iguais_ao_catalogo": true,
+  "2_horario_igual": true,
+  "2_sem_dono_igual": true,
+  "2_sem_ofertas_confirmacao_igual": true,
+  "2_liberacao_sem_config": "desligado",
+  "2_liberacao_com_padrao_igual": true,
+  "2_horario_com_padrao_igual": true,
+  "3_posvenda": {
+    "sla_horas": "loja_aberta",
+    "teto_diario": 30,
+    "categorias_fonte": "estoque",
+    "categorias_modelo": [
+      "UTILITY"
+    ],
+    "nps_limite_chamado": 6,
+    "sla_pausa_terceiro": false,
+    "janela_acompanhamento_dias": 3
+  },
+  "3_reinstalar": [
+    12,
+    45
+  ],
+  "3_semear_de_novo": 0,
+  "4_jm_igual": true,
+  "4_demo_igual": true,
+  "4_marca_legado": 0
+}
