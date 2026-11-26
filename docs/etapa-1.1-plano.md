@@ -759,6 +759,10 @@ A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas 
 
 **Mudança de comportamento a decidir antes do passo 1 (só a JM tem sábado reduzido):** a devolução de 30 min da esteira usava o formato antigo `horario` (9h–18h de segunda a SÁBADO). Com o horário por dia, sábado conta só das 9h às 12h: um lead sem resposta no sábado às 11h50 deixa de ser devolvido às 12h20 e passa a ser na segunda às 9h20. É o horário que a JM configurou (correção), mas muda o que acontece hoje.
 
+**Build:** `606b1b86` compila (checkout principal, 26/11 ~19:50 UTC). Atenção: com a `/api/permissoes` removida, o build local
+falha enquanto existir o cache gerado `.next/dev/types` antigo (aponta para a rota); apagar `.next/dev/types` e
+`.next/types` antes (a Vercel compila do zero e não é afetada).
+
 **Roteiro de deploy (cada passo com IOwait, 10 min sem ação humana na JM, fora dos minutos 05–15, registro de sessões):**
 1. Passo 1 (app): build igual ao da Vercel; push ff; smoke na Demonstração (Configurações › Horário salva e relê; SLA mostra o horário por dia; painel com o cartão de começo); logs 15 min; rodadas seguintes (liberação, pós-venda, automações) na página Rotinas.
 2. H1: digital dos efetivos antes; aplicar; digital depois **igual** (senão volta); conferir 0 linhas antigas e o backup com 5; Rotinas.
