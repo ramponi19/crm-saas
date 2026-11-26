@@ -35,7 +35,7 @@ export default async function EntrarPage() {
   }
 
   const [{ data: emp }, cfg] = await Promise.all([
-    supabase.from('empresas').select('plano, permissoes').eq('id', vinculo.empresa_id).maybeSingle(),
+    supabase.from('empresas').select('plano').eq('id', vinculo.empresa_id).maybeSingle(),
     carregarConfigEmpresa(supabase, vinculo.empresa_id),
   ])
   // Tela inicial da empresa (clínica abre a agenda, não o dashboard): gravada na

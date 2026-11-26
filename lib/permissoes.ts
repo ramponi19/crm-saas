@@ -1,6 +1,6 @@
 /**
- * Permissões por papel dentro da empresa (Fase 2.B). Persistido em
- * `empresas.permissoes jsonb`. owner é sempre total (não editável).
+ * Permissões por papel dentro da empresa (Fase 2.B) — hoje só os TIPOS: desde a 1.1b o cargo decide
+ * (lib/sessao, permsDoContexto) e `empresas.permissoes` saiu na 1.1h parte 2 (26/11/2026).
  */
 
 export type Papel = 'owner' | 'admin' | 'vendedor' | 'tecnico'

@@ -1,0 +1,16 @@
+{
+  "h1_formato_antigo": 0,
+  "h1_ponte_ligada": false,
+  "h1_coluna_permissoes": false,
+  "h1_horario_da_tabela": true,
+  "h1_salvar_envelope": "roleta",
+  "h1_salvar_sem_linha_antiga": true,
+  "h2_vendedor_tabela": 0,
+  "h2_vendedor_config_valor": null,
+  "h2_vendedor_chave_comum": "roleta",
+  "h2_vendedor_auditoria": ["core.horario"],
+  "h2_admin_tabela": 1,
+  "h2_admin_config_valor": 30,
+  "h2_admin_auditoria": ["core.horario", "precificacao.margem_padrao"],
+  "h2_interna": 30
+}

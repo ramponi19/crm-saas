@@ -13,7 +13,7 @@
     "db:sync": "npm run types:gen && npm run type-check",
     "check:nucleo": "node scripts/check-nucleo.mjs",
     "check:servico": "node scripts/check-servico.mjs",
-    "check": "npm run check:nucleo && npm run check:servico && npm run check:avisos && npm run check:views && npm run check:segmento && npm run check:segmento-modulo && npm run check:modulos && npm run check:gravacao && npm run check:datas && npm run check:papel && npm run check:custo && npm run check:config-padroes && npm run type-check && npm run check:edge",
+    "check": "npm run check:nucleo && npm run check:servico && npm run check:avisos && npm run check:views && npm run check:segmento && npm run check:segmento-modulo && npm run check:modulos && npm run check:gravacao && npm run check:datas && npm run check:papel && npm run check:custo && npm run check:config-padroes && npm run check:config-antiga && npm run type-check && npm run check:edge",
     "check:views": "node scripts/check-views.mjs",
     "check:avisos": "node scripts/check-avisos.mjs",
     "check:edge": "deno check --no-lock \"supabase/functions/*/index.ts\"",
@@ -26,6 +26,7 @@
     "check:custo": "node scripts/check-custo.mjs",
     "gerar:config-padroes": "node --import ./tests/alias.mjs --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/gerar-config-padroes.mts",
     "check:config-padroes": "node --import ./tests/alias.mjs --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/gerar-config-padroes.mts --conferir",
+    "check:config-antiga": "node scripts/check-config-antiga.mjs",
     "test:local": "node --import ./tests/alias.mjs --experimental-test-module-mocks --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --test --test-concurrency=1 tests/integracao/*.test.ts",
     "teste-local": "bash scripts/teste-local.sh"
   },

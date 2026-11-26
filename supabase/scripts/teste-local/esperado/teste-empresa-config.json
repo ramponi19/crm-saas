@@ -9,12 +9,7 @@
       "filial": 3
     }
   ],
-  "t1_envelope_tabela_antiga": {
-    "lojas": {
-      "3": "loja3"
-    },
-    "empresa": 10
-  },
+  "t1_envelope_tabela_antiga": null,
   "t1_resposta": {
     "lojas": {
       "3": "loja3"
@@ -70,19 +65,17 @@
   "t9_gatilhos_ponte": 1,
   "t9_ponte_nao_grava_envelope": true,
   "t9a_envelope_direto_depois_do_salvar": [
-    2,
-    5
+    1,
+    1
   ],
   "t9a_marca_limpa_depois_do_salvar": true,
   "t9a_salvar_de_novo": {
-    "lojas": {
-      "3": 5
-    },
+    "lojas": {},
     "empresa": 3
   },
-  "t9a_linhas": 2,
-  "t9b_final_tabela": 1100,
-  "t9b_final_envelope": 1100,
+  "t9a_linhas": 1,
+  "t9b_final_tabela": 100,
+  "t9b_final_envelope": null,
   "t9b_uma_linha": 1,
   "t9c_sem_envelope": true
 }

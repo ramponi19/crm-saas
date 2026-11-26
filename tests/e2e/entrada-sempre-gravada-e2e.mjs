@@ -137,8 +137,8 @@ try {
   } else {
     // 7. A rota do alerta: abre com o canal pendente há 40 min (horário de atendimento de teste: todo dia,
     //    o dia inteiro), avisa, e resolve quando o canal volta a gravar.
-    const horarioAntes = sql(`select coalesce(valor::text, '') from configuracoes_sistema where empresa_id = ${EMP} and chave = 'horario_comercial'`)
-    sql(`insert into configuracoes_sistema (empresa_id, chave, valor) values (${EMP}, 'horario_comercial', '{"inicio":"00:00","fim":"23:59","dias":[0,1,2,3,4,5,6]}') on conflict (empresa_id, chave) do update set valor = excluded.valor`)
+    const horarioAntes = sql(`select coalesce(valor::text, '') from empresa_config where empresa_id=${EMP} and filial_id is null and modulo='core' and chave='horario'`)
+    sql(`delete from empresa_config where empresa_id=${EMP} and filial_id is null and modulo='core' and chave='horario'; insert into empresa_config (empresa_id, filial_id, modulo, chave, valor) values (${EMP}, null, 'core', 'horario', core_horario_do_antigo('{"inicio":"00:00","fim":"23:59","dias":[0,1,2,3,4,5,6]}'::jsonb))`)
     sql(`update canais set entrada_pendente_desde = now() - interval '40 minutes' where id = ${canalId}`)
     const rota = () => fetch(APP + '/api/cron/entrada-parada', { headers: { authorization: `Bearer ${CRON_SECRET}` } }).then(async (r) => ({ s: r.status, j: await r.json().catch(() => null) }))
     const r1 = await rota()
@@ -152,8 +152,8 @@ try {
     confere(r2.j?.resolvidos >= 1 && sql(`select count(*) from alertas_entrada where canal_id = ${canalId} and tipo = 'entrada_parada' and resolvido_em is not null`) === '1', `canal gravou: alerta resolvido (${JSON.stringify(r2.j)})`)
     const naoAut = await fetch(APP + '/api/cron/entrada-parada').then((r) => r.status)
     confere(naoAut === 401, `rota sem o segredo: 401 (${naoAut})`)
-    if (horarioAntes) sql(`update configuracoes_sistema set valor = '${horarioAntes.replace(/'/g, "''")}'::jsonb where empresa_id = ${EMP} and chave = 'horario_comercial'`)
-    else sql(`delete from configuracoes_sistema where empresa_id = ${EMP} and chave = 'horario_comercial'`)
+    if (horarioAntes) sql(`update empresa_config set valor = '${horarioAntes.replace(/'/g, "''")}'::jsonb where empresa_id=${EMP} and filial_id is null and modulo='core' and chave='horario'`)
+    else sql(`delete from empresa_config where empresa_id=${EMP} and filial_id is null and modulo='core' and chave='horario'`)
 
     // 8. O aviso no card aberto: limite estourado na empresa 1, mensagem pelo canal, o dono abre o card.
     const filial1 = sql(`select id from filiais where empresa_id = 1 order by matriz desc, id limit 1`)

@@ -169,3 +169,43 @@ export function paraFormatoAntigo(h: Horario): { inicio: string; fim: string; di
   const [inicio, fim] = ([...conta.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '09:00-18:00').split('-')
   return { inicio, fim, dias, ...(h.sla_resposta_min != null ? { sla_resposta_min: h.sla_resposta_min } : {}) }
 }
+
+/**
+ * Minutos de EXPEDIENTE entre dois instantes pelo horário por dia (com pausas e sábado reduzido), no fuso da loja.
+ * 1.1h parte 2 (26/11/2026): substitui `minutosUteis` do formato antigo (lib/horario-util) na devolução da esteira —
+ * o formato antigo via o sábado reduzido como dia inteiro. Loja fechada todo dia: devolve o tempo corrido (senão o
+ * prazo nunca venceria). Varre dia a dia, no máximo 400 dias.
+ */
+export function minutosDeExpediente(de: Date, ate: Date, h: Horario, fuso: string = FUSO_PADRAO): number {
+  if (!(de instanceof Date) || !(ate instanceof Date) || ate <= de) return 0
+  if (!DIAS.some((d) => h.semana[d].length)) return Math.floor((ate.getTime() - de.getTime()) / 60000)
+  let total = 0
+  let dia = noFuso(de, fuso).hoje
+  for (let n = 0; n < 400; n++) {
+    for (const i of intervalosDoDia(h, dia)) {
+      const ini = Math.max(instanteLocal(dia, i.abre, fuso).getTime(), de.getTime())
+      const fim = Math.min(instanteLocal(dia, i.fecha, fuso).getTime(), ate.getTime())
+      if (fim > ini) total += Math.floor((fim - ini) / 60000)
+    }
+    dia = somarDias(dia, 1)
+    if (instanteLocal(dia, '00:00', fuso) >= ate) break
+  }
+  return total
+}
+
+/** Resumo legível da semana: "seg–sex 09:00–18:00 · sáb 09:00–12:00" (dias seguidos com o mesmo horário juntos). */
+export function resumoDoHorario(h: Horario): string {
+  const NOMES = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
+  const ordem = [1, 2, 3, 4, 5, 6, 0]
+  const txt = (d: number) => h.semana[String(d) as keyof Semana].map((i) => `${i.abre}–${i.fecha}`).join(', ')
+  const partes: string[] = []
+  for (let k = 0; k < ordem.length; k++) {
+    const d = ordem[k]; const t = txt(d)
+    if (!t) continue
+    let fim = k
+    while (fim + 1 < ordem.length && txt(ordem[fim + 1]) === t) fim++
+    partes.push(`${NOMES[d]}${fim > k ? '–' + NOMES[ordem[fim]] : ''} ${t}`)
+    k = fim
+  }
+  return partes.join(' · ') || 'fechado todos os dias'
+}

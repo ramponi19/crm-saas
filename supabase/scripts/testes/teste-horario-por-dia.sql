@@ -1,8 +1,12 @@
+-- 1.1h parte 2: o SLA não vem mais de horario_comercial (1_horario_unico.sla nulo sem core.horario).
 -- Teste da 20261124001200_horario_por_dia. Termina com RAISE: nada fica gravado.
 --   Empresa 5 (Nexus Demonstração): HORÁRIO ÚNICO, só o formato antigo `horario_comercial` (seg–sex 9h–18h).
 --   Empresa 1 (JM de teste): `core.horario` com seg–sex 9h–18h, SÁBADO 9h–13h, domingo fechado; a loja 6 tem horário
 --   próprio (também abre domingo 10h–14h). Matriz = loja 3, vendedor M1 (…0101).
 -- Datas fixas: 27/11/2026 sexta, 28 sábado, 29 domingo, 30 segunda.
+-- 1.1h parte 2 (26/11/2026): a H1 desligou a ponte envelope → empresa_config. Este teste carrega a configuração
+-- pelo envelope antigo (atalho de carga dos dados); a ponte é ligada SÓ dentro da transação do teste (desfeita no fim).
+alter table public.configuracoes_sistema enable trigger configuracoes_sistema_ponte;
 
 -- Cópia FIEL do dia útil de antes (C2), para provar que a empresa de horário único continua igual.
 create function pg_temp.util_antigo(p_empresa bigint, p_filial bigint, p_dia date)

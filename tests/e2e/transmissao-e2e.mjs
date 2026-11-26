@@ -120,7 +120,7 @@ sql(`insert into modelos_mensagem_wabas (modelo_id, empresa_id, waba_id, status)
 const corpoMeta = (nome, status, texto) => ({ id: `meta_${nome}`, name: nome, language: 'pt_BR', category: 'MARKETING', status, components: [{ type: 'BODY', text: texto }] })
 MODELOS_NA_META.WABA_E2E = [corpoMeta(`tx_e2e_${T}`, 'APPROVED', 'Oi {{1}}, chegou novidade na loja.'), corpoMeta(`tx_e2e_pendente_${T}`, 'PENDING', 'Oi')]
 MODELOS_NA_META.WABA_E2E_C = [corpoMeta(`tx_e2e_${T}`, 'REJECTED', 'Oi {{1}}, chegou novidade na loja.'), corpoMeta(`tx_e2e_so_c_${T}`, 'APPROVED', 'Oi da C')]
-sql(`insert into configuracoes_sistema (empresa_id, chave, valor) values (${E}, 'horario_comercial', '{"inicio":"00:00","fim":"23:59","dias":[0,1,2,3,4,5,6]}')`)
+sql(`delete from empresa_config where empresa_id=${E} and filial_id is null and modulo='core' and chave='horario'; insert into empresa_config (empresa_id, filial_id, modulo, chave, valor) values (${E}, null, 'core', 'horario', core_horario_do_antigo('{"inicio":"00:00","fim":"23:59","dias":[0,1,2,3,4,5,6]}'::jsonb))`)
 // A lista do menu que o cadastro grava (a trava de rota do proxy só barra empresa que tem uma).
 sql(`insert into empresa_menu (empresa_id, itens) values (${E}, '{"base":{"habilitados":["/dashboard","/tarefas","/comunicacao","/leads","/clientes"]}}')`)
 
@@ -377,7 +377,7 @@ try {
 
   // ── 9. Horário de atendimento e encerrar ──────────────────────────────────
   const amanha = (new Date().getUTCDay() + 2) % 7 // um dia que não é hoje no fuso da loja
-  sql(`update configuracoes_sistema set valor='{"inicio":"09:00","fim":"10:00","dias":[${amanha}]}' where empresa_id=${E} and chave='horario_comercial'`)
+  sql(`update empresa_config set valor = core_horario_do_antigo('{"inicio":"09:00","fim":"10:00","dias":[${amanha}]}'::jsonb) where empresa_id=${E} and filial_id is null and modulo='core' and chave='horario'`)
   r = await tx(dono, { op: 'criar', nome: `TX3 ${T}`, filial_id: Number(LA), modelo_id: Number(M), parametros: ['{{nome}}'], filtro: { situacoes: ['ganho'] } })
   const TX3 = String(r.j.id)
   r = await tx(dono, { op: 'disparar', id: Number(TX3) })
@@ -387,7 +387,7 @@ try {
   confere(!!r.j.form?.abreEm, `a tela diz quando volta: ${r.j.form?.abreEm}`)
   r = await tx(dono, { op: 'encerrar', id: Number(TX3) })
   confere(r.status === 200 && um(`select status || '|' || (select motivo from transmissao_envios where transmissao_id=${TX3}) from transmissoes where id=${TX3}`) === 'encerrada|transmissão encerrada antes do envio', 'encerrar: o que não saiu fica registrado como não enviado')
-  sql(`update configuracoes_sistema set valor='{"inicio":"00:00","fim":"23:59","dias":[0,1,2,3,4,5,6]}' where empresa_id=${E} and chave='horario_comercial'`)
+  sql(`update empresa_config set valor = core_horario_do_antigo('{"inicio":"00:00","fim":"23:59","dias":[0,1,2,3,4,5,6]}'::jsonb) where empresa_id=${E} and filial_id is null and modulo='core' and chave='horario'`)
 
   // ── 10. Loja sem WhatsApp não dispara; agendar ────────────────────────────
   // Rascunho direto no banco: pela rota, o criar já recusa (o modelo não está aprovado em número nenhum da Loja B).

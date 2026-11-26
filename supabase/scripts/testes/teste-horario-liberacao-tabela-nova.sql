@@ -1,7 +1,12 @@
+-- 1.1h parte 2: a H1 tirou o formato antigo de core_horario; os itens 1 e 2 passam a registrar a diferença ESPERADA
+-- entre o cálculo antigo (com horario_comercial) e o de agora (só a tabela nova).
 -- Teste da 20261126000600_horario_liberacao_tabela_nova (1.1h, primeira parte): core_horario e core_liberar_lotes_do_dia
 -- leem empresa_config. Compara a função NOVA com a ANTIGA (corpo de antes, recriado aqui como pg_temp) em todos os casos:
 -- empresa sem configuração, com horário da empresa, com horário próprio de uma loja, com o formato antigo
 -- 'horario_comercial' e com horário inválido. Termina com RAISE: nada fica gravado.
+-- 1.1h parte 2 (26/11/2026): a H1 desligou a ponte envelope → empresa_config. Este teste carrega a configuração
+-- pelo envelope antigo (atalho de carga dos dados); a ponte é ligada SÓ dentro da transação do teste (desfeita no fim).
+alter table public.configuracoes_sistema enable trigger configuracoes_sistema_ponte;
 do $teste$
 declare
   r jsonb := '{}'; dif jsonb := '[]'; e bigint; f bigint;

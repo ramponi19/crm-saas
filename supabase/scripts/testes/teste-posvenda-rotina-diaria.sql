@@ -1,4 +1,7 @@
 -- Teste da 20261124002400_posvenda_rotina_diaria. JM de teste (empresa 1, loja 3, M1/M2 vendedores, A admin). Termina com RAISE.
+-- 1.1h parte 2 (26/11/2026): a H1 desligou a ponte envelope → empresa_config. Este teste carrega a configuração
+-- pelo envelope antigo (atalho de carga dos dados); a ponte é ligada SÓ dentro da transação do teste (desfeita no fim).
+alter table public.configuracoes_sistema enable trigger configuracoes_sistema_ponte;
 do $t$
 declare
   res jsonb := '{}'; M1 uuid := '0e5e0000-0000-4000-8000-000000000101'; M2 uuid := '0e5e0000-0000-4000-8000-000000000102';

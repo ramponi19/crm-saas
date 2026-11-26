@@ -21,7 +21,7 @@
   "t8_admin_troca_outro_admin": "SO_DONO", "t8_admin_promove_a_admin": "SO_DONO", "t8_admin_troca_o_proprio": "PROPRIO_CARGO",
   "t8_admin_troca_vendedor": "tecnico",
   "t8_coord_concede_o_que_nao_tem": "SEM_PERMISSAO", "t8_coord_da_cargo_maior": "SEM_PERMISSAO",
-  "t9_ponte_vendedor_relatorios": true,
+  "t9_coluna_permissoes_saiu": true,
   "t10_admin_config": "gravou", "t10_consulta_config": "SOMENTE_LEITURA",
   "t11_consulta_le_auditoria": 0, "t11_admin_le_auditoria": true,
   "t12_superadmin_vinculo": "PLATAFORMA_SEM_VINCULO",

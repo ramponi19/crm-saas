@@ -3,6 +3,9 @@
 -- Parte A: módulo DESLIGADO → a função nova faz EXATAMENTE o que a de produção faz (cópia abaixo, pg_temp.canal_antigo),
 --          cenário por cenário, cada um numa transação desfeita.
 -- Parte B: módulo LIGADO → os 13 cenários do §2.6 e os pedidos pelo Lucas em 24/11. Termina com RAISE.
+-- 1.1h parte 2 (26/11/2026): a H1 desligou a ponte envelope → empresa_config. Este teste carrega a configuração
+-- pelo envelope antigo (atalho de carga dos dados); a ponte é ligada SÓ dentro da transação do teste (desfeita no fim).
+alter table public.configuracoes_sistema enable trigger configuracoes_sistema_ponte;
 
 -- Cópia FIEL da core_negocio_do_canal de produção antes da C5 (M1b, 23/11/2026; md5 sem \r 001edf0e…).
 create or replace function pg_temp.canal_antigo(

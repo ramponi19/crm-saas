@@ -3,9 +3,9 @@
  *
  * Funções puras (sem banco) para dar para testar sozinhas. Quem decide é o
  * executor em lib/automacoes.ts; aqui só a regra:
- *  - horário de atendimento da empresa (configuracoes_sistema `horario_comercial`;
- *    sem configuração, o padrão do app: seg–sex, 09:00–18:00) — fora dele, a ação
- *    vai para o próximo início de horário;
+ *  - horário de atendimento da loja (core.horario em empresa_config, lido por lib/horario-empresa; sem
+ *    configuração, o padrão do app: seg–sex, 09:00–18:00) — fora dele, a ação vai para o próximo início
+ *    de horário (o executor usa proximaAbertura do horário por dia desde 24/11; 1.1h parte 2: sem formato antigo);
  *  - no máximo 1 envio do MESMO modelo para o mesmo contato a cada 7 dias;
  *  - no máximo 50 envios automáticos por hora por empresa (o excedente fica na
  *    fila, não é descartado).

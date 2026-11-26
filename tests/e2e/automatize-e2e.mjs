@@ -64,8 +64,8 @@ const [etA, etB] = sql(`select string_agg(slug, ',' order by ordem) from (select
 const etapaIdA = sql(`select id from funil_etapas where empresa_id=1 and funil_id=1 and slug='${etA}'`)
 const etapaIdB = sql(`select id from funil_etapas where empresa_id=1 and funil_id=1 and slug='${etB}'`)
 console.log('etapas', etA, '→', etB)
-const horarioAntes = sql(`select coalesce(valor::text,'') from configuracoes_sistema where empresa_id=1 and chave='horario_comercial'`)
-const setHorario = (v) => sql(`insert into configuracoes_sistema (empresa_id, chave, valor) values (1, 'horario_comercial', '${JSON.stringify(v)}') on conflict (empresa_id, chave) do update set valor = excluded.valor`)
+const horarioAntes = sql(`select coalesce(valor::text, '') from empresa_config where empresa_id=1 and filial_id is null and modulo='core' and chave='horario'`)
+const setHorario = (v) => sql(`delete from empresa_config where empresa_id=1 and filial_id is null and modulo='core' and chave='horario'; insert into empresa_config (empresa_id, filial_id, modulo, chave, valor) values (1, null, 'core', 'horario', core_horario_do_antigo('${JSON.stringify(v)}'::jsonb))`)
 setHorario({ inicio: '00:00', fim: '23:59', dias: [0, 1, 2, 3, 4, 5, 6] })
 const modelo = sql(`insert into modelos_mensagem (empresa_id, nome, idioma, categoria, corpo, status) values (1, 'teste_automatize_${T}', 'pt_BR', 'MARKETING', 'Oi {{1}}, teste do Automatize', 'aprovado') returning id`).split('\n')[0]
 const novoNegocio = (n) => {
@@ -212,8 +212,8 @@ try {
   sql(`delete from canais where id in (${CANAL_A}, ${CANAL_B})`)
   edge.kill(); servidorGraph.close()
   sql(`delete from configuracoes_sistema where empresa_id=1 and chave='automacoes_pausadas'`)
-  if (horarioAntes) sql(`update configuracoes_sistema set valor='${horarioAntes}' where empresa_id=1 and chave='horario_comercial'`)
-  else sql(`delete from configuracoes_sistema where empresa_id=1 and chave='horario_comercial'`)
+  if (horarioAntes) sql(`update empresa_config set valor = '${horarioAntes}'::jsonb where empresa_id=1 and filial_id is null and modulo='core' and chave='horario'`)
+  else sql(`delete from empresa_config where empresa_id=1 and filial_id is null and modulo='core' and chave='horario'`)
   await browser.close()
 }
 console.log(falhas.length ? `\n${falhas.length} FALHA(S)` : '\nTUDO OK')

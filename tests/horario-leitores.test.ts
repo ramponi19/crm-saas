@@ -10,7 +10,7 @@ import assert from 'node:assert/strict'
 import { diasDeAgenda, horarioDaAgenda, horarioOferecido, horariosDoDia } from '@/lib/agendar-slots'
 import { entradaParada } from '@/lib/alertas-entrada'
 import { horarioDaEmpresa } from '@/lib/horario-empresa'
-import { proximaAbertura } from '@/lib/horario'
+import { minutosDeExpediente, proximaAbertura, resumoDoHorario } from '@/lib/horario'
 
 const SP = 'America/Sao_Paulo'
 const dia = (abre: string, fecha: string) => [{ abre, fecha }]
@@ -79,8 +79,29 @@ describe('automações e transmissão: próxima abertura pelo horário da loja',
     const h = await horarioDaEmpresa(bancoCom([{ chave: 'core.horario', valor: { empresa: { semana: { ...SABADO_REDUZIDO.semana, '6': [] } }, lojas: { '6': SABADO_REDUZIDO } } }]), 1, 6)
     assert.equal(proximaAbertura(new Date('2026-11-28T10:00:00-03:00'), h, SP).toISOString(), '2026-11-28T13:00:00.000Z')
   })
-  test('só o formato antigo: sábado 10h → segunda 9h (igual a hoje)', async () => {
+  test('sem core.horario (o formato antigo não é mais lido, 1.1h): vale o padrão seg–sex — sábado 10h → segunda 9h', async () => {
     const h = await horarioDaEmpresa(bancoCom([{ chave: 'horario_comercial', valor: ANTIGO }]), 1)
     assert.equal(proximaAbertura(new Date('2026-11-28T10:00:00-03:00'), h, SP).toISOString(), '2026-11-30T12:00:00.000Z')
+  })
+})
+
+describe('expediente pelo horário por dia (devolução da esteira, 1.1h parte 2)', () => {
+  const h = SABADO_REDUZIDO as never
+  test('sábado reduzido: das 12h às 18h do sábado conta só 1 hora (o formato antigo contava 6)', () => {
+    assert.equal(minutosDeExpediente(new Date('2026-11-28T12:00:00-03:00'), new Date('2026-11-28T18:00:00-03:00'), h, SP), 60)
+  })
+  test('sexta 17h30 → segunda 9h30: 30 min de sexta + 4 h de sábado + 30 min de segunda', () => {
+    assert.equal(minutosDeExpediente(new Date('2026-11-27T17:30:00-03:00'), new Date('2026-11-30T09:30:00-03:00'), h, SP), 30 + 240 + 30)
+  })
+  test('com pausa de almoço, o intervalo fechado não conta', () => {
+    const almoco = { semana: { ...SABADO_REDUZIDO.semana, '3': [{ abre: '09:00', fecha: '12:00' }, { abre: '13:00', fecha: '18:00' }] } } as never
+    assert.equal(minutosDeExpediente(new Date('2026-11-25T11:30:00-03:00'), new Date('2026-11-25T13:30:00-03:00'), almoco, SP), 60)
+  })
+  test('loja fechada todo dia: tempo corrido (o prazo não pode nunca vencer)', () => {
+    const fechada = { semana: { '0': [], '1': [], '2': [], '3': [], '4': [], '5': [], '6': [] } } as never
+    assert.equal(minutosDeExpediente(new Date('2026-11-25T10:00:00-03:00'), new Date('2026-11-25T10:45:00-03:00'), fechada, SP), 45)
+  })
+  test('resumo legível da semana', () => {
+    assert.equal(resumoDoHorario(h), 'seg–sex 09:00–18:00 · sáb 09:00–13:00')
   })
 })

@@ -2,6 +2,9 @@
 -- vendedores M1 …0101 e M2 …0102, administrador A …0201, dono a632…; empresa 5 com o dono dela. Horário padrão seg–sex.
 -- As chamadas rodam com a sessão de cada pessoa (request.jwt.claims); os privilégios de execução são conferidos à parte.
 -- Termina com RAISE: nada fica gravado.
+-- 1.1h parte 2 (26/11/2026): a H1 desligou a ponte envelope → empresa_config. Este teste carrega a configuração
+-- pelo envelope antigo (atalho de carga dos dados); a ponte é ligada SÓ dentro da transação do teste (desfeita no fim).
+alter table public.configuracoes_sistema enable trigger configuracoes_sistema_ponte;
 do $t$
 declare
   res jsonb := '{}';

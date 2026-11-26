@@ -5,6 +5,9 @@
 --   Administradores: A (…0201) e B (…0202). Dono (owner): a632… ("conta da empresa")
 -- A ordem da roleta é a ordem dos UUIDs: matriz M1, M2, SL; Jaguariúna J2, VJ; administradores A, B.
 -- Os nomes no resultado vêm da tabela _n. Termina com RAISE: nada fica gravado.
+-- 1.1h parte 2 (26/11/2026): a H1 desligou a ponte envelope → empresa_config. Este teste carrega a configuração
+-- pelo envelope antigo (atalho de carga dos dados); a ponte é ligada SÓ dentro da transação do teste (desfeita no fim).
+alter table public.configuracoes_sistema enable trigger configuracoes_sistema_ponte;
 do $t$
 declare
   res jsonb := '{}';

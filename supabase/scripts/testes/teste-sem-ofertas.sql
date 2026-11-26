@@ -1,5 +1,8 @@
 -- Teste da 20261124001900_sem_ofertas. JM de teste (empresa 1, lojas 3 e 6): vendedor M1 …0101, Administrador A …0201.
 -- Cada caso numa subtransação desfeita quando precisa. Termina com RAISE: nada fica gravado.
+-- 1.1h parte 2 (26/11/2026): a H1 desligou a ponte envelope → empresa_config. Este teste carrega a configuração
+-- pelo envelope antigo (atalho de carga dos dados); a ponte é ligada SÓ dentro da transação do teste (desfeita no fim).
+alter table public.configuracoes_sistema enable trigger configuracoes_sistema_ponte;
 do $t$
 declare
   res jsonb := '{}';

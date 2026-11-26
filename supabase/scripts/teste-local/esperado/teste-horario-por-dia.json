@@ -1,16 +1,42 @@
 {
   "1_horario_unico": {
-    "dia_util_igual_ao_antigo_21_dias": 21, "abre_sabado": false, "proximo_de_sexta": "2026-11-30",
-    "teto_sexta_25": 25, "teto_sabado_25": 0, "sla": 15, "conversao": true
+    "dia_util_igual_ao_antigo_21_dias": 21,
+    "abre_sabado": false,
+    "proximo_de_sexta": "2026-11-30",
+    "teto_sexta_25": 25,
+    "teto_sabado_25": 0,
+    "sla": null,
+    "conversao": true
   },
   "2_sabado_reduzido": {
-    "matriz_abre_sabado": true, "horas_sabado": 4, "horas_referencia": 9, "matriz_abre_domingo": false,
-    "loja6_abre_domingo": true, "proximo_de_sexta": "2026-11-28", "proximo_de_sabado": "2026-11-30",
-    "loja6_proximo_de_sabado": "2026-11-29", "teto_sabado_25": 11, "teto_sabado_30": 13, "teto_domingo": 0,
-    "hora_15h_no_sabado": "09:00:00", "hora_10h_no_sabado": "10:00:00", "sem_loja_usa_empresa": true
+    "matriz_abre_sabado": true,
+    "horas_sabado": 4,
+    "horas_referencia": 9,
+    "matriz_abre_domingo": false,
+    "loja6_abre_domingo": true,
+    "proximo_de_sexta": "2026-11-28",
+    "proximo_de_sabado": "2026-11-30",
+    "loja6_proximo_de_sabado": "2026-11-29",
+    "teto_sabado_25": 11,
+    "teto_sabado_30": 13,
+    "teto_domingo": 0,
+    "hora_15h_no_sabado": "09:00:00",
+    "hora_10h_no_sabado": "10:00:00",
+    "sem_loja_usa_empresa": true
   },
-  "3_validacao": { "invertido": false, "tudo_fechado": false, "antigo_invalido": true },
-  "4a_passo_no_domingo": { "dia": "2026-11-30", "origem": "vendedor" },
+  "3_validacao": {
+    "invertido": false,
+    "tudo_fechado": false,
+    "antigo_invalido": true
+  },
+  "4a_passo_no_domingo": {
+    "dia": "2026-11-30",
+    "origem": "vendedor"
+  },
   "4b_sabado_com_vaga": "2026-11-28",
-  "4c_sabado_cheio_com_13": { "dia": "2026-11-30", "origem": "vendedor", "teto_base": 30 }
+  "4c_sabado_cheio_com_13": {
+    "dia": "2026-11-30",
+    "origem": "vendedor",
+    "teto_base": 30
+  }
 }

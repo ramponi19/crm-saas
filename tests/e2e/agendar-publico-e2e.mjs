@@ -16,12 +16,11 @@ const confere = (c, m) => (c ? ok(m) : falha(m))
 const T = Date.now(), NOME = `TESTE AGENDAR ${T}`
 
 const agendaAntes = sql(`select coalesce((select ativo::text from empresa_modulos where empresa_id=1 and modulo='agenda'), 'nenhum')`)
-const horarioAntes = sql(`select coalesce((select valor::text from configuracoes_sistema where empresa_id=1 and chave='horario_comercial'), '')`)
+const horarioAntes = sql(`select coalesce((select valor::text from empresa_config where empresa_id=1 and filial_id is null and modulo='core' and chave='horario'), '')`)
 if (agendaAntes === 'nenhum') sql(`insert into empresa_modulos (empresa_id, modulo, origem, ativo) values (1, 'agenda', 'addon', true)`)
 else sql(`update empresa_modulos set ativo=true where empresa_id=1 and modulo='agenda'`)
 // Todos os dias, 07:00–23:00: sempre há horário livre hoje ou amanhã, a qualquer hora do teste.
-sql(`insert into configuracoes_sistema (empresa_id, chave, valor) values (1, 'horario_comercial', '{"inicio":"07:00","fim":"23:00","dias":[0,1,2,3,4,5,6]}')
-     on conflict (empresa_id, chave) do update set valor = excluded.valor`)
+sql(`delete from empresa_config where empresa_id=1 and filial_id is null and modulo='core' and chave='horario'; insert into empresa_config (empresa_id, filial_id, modulo, chave, valor) values (1, null, 'core', 'horario', core_horario_do_antigo('{"inicio":"07:00","fim":"23:00","dias":[0,1,2,3,4,5,6]}'::jsonb))`)
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true })
 const erros = []
@@ -81,8 +80,8 @@ try {
   if (ids[1]) { sql(`delete from contato_identidades where contato_id in (${ids[1]})`); sql(`delete from contatos where id in (${ids[1]})`) }
   if (agendaAntes === 'nenhum') sql(`delete from empresa_modulos where empresa_id=1 and modulo='agenda'`)
   else sql(`update empresa_modulos set ativo=${agendaAntes} where empresa_id=1 and modulo='agenda'`)
-  if (horarioAntes) sql(`update configuracoes_sistema set valor='${horarioAntes.replace(/'/g, "''")}'::jsonb where empresa_id=1 and chave='horario_comercial'`)
-  else sql(`delete from configuracoes_sistema where empresa_id=1 and chave='horario_comercial'`)
+  if (horarioAntes) sql(`update empresa_config set valor = '${horarioAntes.replace(/'/g, "''")}'::jsonb where empresa_id=1 and filial_id is null and modulo='core' and chave='horario'`)
+  else sql(`delete from empresa_config where empresa_id=1 and filial_id is null and modulo='core' and chave='horario'`)
   console.log(`limpeza: contatos de teste restantes = ${sql(`select count(*) from contatos where nome = '${NOME}'`)}`)
   console.log(falhas.length ? `\n${falhas.length} FALHA(S)` : '\ntudo ok')
   process.exit(falhas.length ? 1 : 0)

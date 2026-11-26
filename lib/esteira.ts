@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { minutosUteis, HORARIO_PADRAO, type HorarioLoja } from './horario-util'
+import { minutosDeExpediente } from './horario'
+import { horarioDaEmpresa } from './horario-empresa'
 import { conversasDosLeads } from './leads'
 import { fusoDaEmpresa } from './fuso-empresa'
 
@@ -61,15 +62,21 @@ export async function devolverLeadsSemResposta(
   }
   ultimaVarredura.set(empresaId, agora)
 
-  const [{ data: cfgRow }, { data: horarioRow }, fuso] = await Promise.all([
+  const [{ data: cfgRow }, fuso] = await Promise.all([
     db.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'devolucao_esteira').maybeSingle(),
-    db.from('configuracoes_sistema').select('valor').eq('empresa_id', empresaId).eq('chave', 'horario').maybeSingle(),
     // O expediente é contado no relógio DA LOJA.
     fusoDaEmpresa(db, empresaId),
   ])
   const cfg: ConfigDevolucao = { ...DEVOLUCAO_PADRAO, ...((cfgRow?.valor ?? {}) as Partial<ConfigDevolucao>) }
   if (!cfg.ativo || !(cfg.minutos > 0)) return { devolvidos: 0, avaliados: 0 }
-  const horario: HorarioLoja = { ...HORARIO_PADRAO, ...((horarioRow?.valor ?? {}) as Partial<HorarioLoja>) }
+  // 1.1h parte 2 (26/11/2026): o expediente é o horário por dia da LOJA do negócio (core.horario), não mais o
+  // formato antigo `horario` (que via o sábado reduzido como dia inteiro). Um horário por loja, lido uma vez.
+  const horarios = new Map<string, Awaited<ReturnType<typeof horarioDaEmpresa>>>()
+  const horarioDe = async (filialId: number | null | undefined) => {
+    const k = String(filialId ?? '')
+    if (!horarios.has(k)) horarios.set(k, await horarioDaEmpresa(db as never, empresaId, filialId ?? null))
+    return horarios.get(k)!
+  }
 
   // Etapas finais não entram: lead ganho ou perdido não tem resposta pendente.
   const { data: etapasFinais } = await db.from('funil_etapas')
@@ -116,7 +123,7 @@ export async function devolverLeadsSemResposta(
     if (l.manual) continue // atribuição manual: não volta sozinha
     const marco = marcoDeCobranca(l, ultima.get(l.id))
     if (!marco) continue
-    if (minutosUteis(new Date(marco), new Date(agora), horario, fuso) >= cfg.minutos) vencidos.push(l.id)
+    if (minutosDeExpediente(new Date(marco), new Date(agora), await horarioDe(l.filial_id), fuso) >= cfg.minutos) vencidos.push(l.id)
   }
   if (!vencidos.length) return { devolvidos: 0, avaliados: leads.length }
 

@@ -1,8 +1,13 @@
+-- 1.1h parte 2: config_salvar não grava mais o envelope; t1 vira nulo e os itens 9a/9b provam que gravar o envelope
+-- direto (sem linha antiga) não altera a tabela nova.
 -- Teste da 20261125000400_empresa_config (etapa 1.1a): armazenamento definitivo, ponte nos dois sentidos e
 -- auditoria. O comportamento das funções (respostas e códigos de erro) continua provado pelo
 -- teste-config-provisoria.sql, que roda sem mudança sobre o corpo novo.
 -- Bloco que termina com RAISE: tudo é desfeito; o resultado volta em RESULTADO_TESTE_EMPRESA_CONFIG {...}.
 -- Empresa 1 = JM de teste (lojas 3 e 6; dono a632db2c…, vendedora f4ec6a87…). Empresa 5 = Demonstração (loja 1).
+-- 1.1h parte 2 (26/11/2026): a H1 desligou a ponte envelope → empresa_config. Este teste carrega a configuração
+-- pelo envelope antigo (atalho de carga dos dados); a ponte é ligada SÓ dentro da transação do teste (desfeita no fim).
+alter table public.configuracoes_sistema enable trigger configuracoes_sistema_ponte;
 do $teste$
 declare
   r jsonb := '{}';

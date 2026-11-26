@@ -1,11 +1,92 @@
 {
-  "1_diferencas_horario": 0,
-  "1_exemplos": null,
+  "1_diferencas_horario": 5,
+  "1_exemplos": {
+    "loja": null,
+    "nova": {
+      "semana": {
+        "0": [],
+        "1": [
+          {
+            "abre": "08:00",
+            "fecha": "17:00"
+          }
+        ],
+        "2": [
+          {
+            "abre": "08:00",
+            "fecha": "17:00"
+          }
+        ],
+        "3": [
+          {
+            "abre": "08:00",
+            "fecha": "17:00"
+          }
+        ],
+        "4": [
+          {
+            "abre": "08:00",
+            "fecha": "17:00"
+          }
+        ],
+        "5": [
+          {
+            "abre": "08:00",
+            "fecha": "17:00"
+          }
+        ],
+        "6": [
+          {
+            "abre": "09:00",
+            "fecha": "12:00"
+          }
+        ]
+      },
+      "sla_resposta_min": 20
+    },
+    "antiga": {
+      "semana": {
+        "0": [],
+        "1": [
+          {
+            "abre": "09:00",
+            "fecha": "18:00"
+          }
+        ],
+        "2": [
+          {
+            "abre": "09:00",
+            "fecha": "18:00"
+          }
+        ],
+        "3": [
+          {
+            "abre": "09:00",
+            "fecha": "18:00"
+          }
+        ],
+        "4": [
+          {
+            "abre": "09:00",
+            "fecha": "18:00"
+          }
+        ],
+        "5": [
+          {
+            "abre": "09:00",
+            "fecha": "18:00"
+          }
+        ],
+        "6": []
+      }
+    },
+    "empresa": 1
+  },
   "1_loja6_proprio": true,
   "1_loja3_herda_empresa": true,
-  "1_empresa5_formato_antigo": "07:30",
+  "1_empresa5_formato_antigo": null,
   "1_casos": 5,
-  "2_invalido_igual": true,
+  "2_invalido_igual": false,
   "2_invalido_cai_na_empresa": true,
   "3_empresas_liberacao_iguais": true,
   "3_roda": "object"

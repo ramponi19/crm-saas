@@ -1,5 +1,8 @@
 -- Teste da 20261124001800_posvenda_sla_loja_aberta. JM de teste (empresa 1; loja 3 = matriz, loja 6). Termina com RAISE.
 -- Horário da empresa: seg–sex 9h–18h, sábado 9h–13h, domingo fechado. Chamado Normal = 24 h (1ª resposta) / 72 h (resolução).
+-- 1.1h parte 2 (26/11/2026): a H1 desligou a ponte envelope → empresa_config. Este teste carrega a configuração
+-- pelo envelope antigo (atalho de carga dos dados); a ponte é ligada SÓ dentro da transação do teste (desfeita no fim).
+alter table public.configuracoes_sistema enable trigger configuracoes_sistema_ponte;
 do $t$
 declare
   res jsonb := '{}';

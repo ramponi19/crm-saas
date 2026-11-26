@@ -6,9 +6,8 @@ import { empresaAtualId } from '@/lib/empresa-atual'
 import { Card, Input, Button, notify } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { DEVOLUCAO_PADRAO, type ConfigDevolucao } from '@/lib/esteira'
-import { HORARIO_PADRAO, type HorarioLoja } from '@/lib/horario-util'
-
-const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
+import { HORARIO_PADRAO, horarioDaLoja, resumoDoHorario, type Horario } from '@/lib/horario'
+import { montarEnvelopes, type LinhaConfig } from '@/lib/config'
 
 /**
  * Devolução automática do lead à esteira.
@@ -19,7 +18,7 @@ const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
 export function DevolucaoCard() {
   const supabase = createClient()
   const [cfg, setCfg] = useState<ConfigDevolucao>(DEVOLUCAO_PADRAO)
-  const [horario, setHorario] = useState<HorarioLoja>(HORARIO_PADRAO)
+  const [horario, setHorario] = useState<Horario>(HORARIO_PADRAO)
   const [salvando, setSalvando] = useState(false)
   const [carregou, setCarregou] = useState(false)
 
@@ -29,10 +28,12 @@ export function DevolucaoCard() {
       if (!empId) { setCarregou(true); return }
       const [{ data: d }, { data: h }] = await Promise.all([
         supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empId).eq('chave', 'devolucao_esteira').maybeSingle(),
-        supabase.from('configuracoes_sistema').select('valor').eq('empresa_id', empId).eq('chave', 'horario').maybeSingle(),
+        // 1.1h parte 2: o horário por dia de core.horario (empresa_config), não mais o formato antigo `horario`.
+        (supabase as unknown as import('@supabase/supabase-js').SupabaseClient).from('empresa_config')
+          .select('modulo, chave, filial_id, valor').eq('empresa_id', empId).eq('modulo', 'core').eq('chave', 'horario'),
       ])
       if (d?.valor) setCfg({ ...DEVOLUCAO_PADRAO, ...(d.valor as Partial<ConfigDevolucao>) })
-      if (h?.valor) setHorario({ ...HORARIO_PADRAO, ...(h.valor as Partial<HorarioLoja>) })
+      setHorario(horarioDaLoja(montarEnvelopes((h ?? []) as LinhaConfig[])['core.horario'] ?? null, null, null))
       setCarregou(true)
     })()
   }, [supabase])
@@ -50,7 +51,6 @@ export function DevolucaoCard() {
   }
 
   if (!carregou) return null
-  const diasTexto = (horario.dias ?? []).map((d) => DIAS[d]).join(', ') || 'nenhum dia'
 
   return (
     <Card title="Devolver lead sem resposta"
@@ -84,8 +84,8 @@ export function DevolucaoCard() {
         )}
 
         <p className="text-[11.5px] leading-relaxed text-ink-3">
-          O relógio corre das <strong className="text-ink-2">{horario.inicio}</strong> às{' '}
-          <strong className="text-ink-2">{horario.fim}</strong>, {diasTexto} — conforme a aba Horário.
+          O relógio corre no horário de funcionamento (<strong className="text-ink-2">{resumoDoHorario(horario)}</strong>;
+          cada loja no seu, se tiver horário próprio) — conforme a aba Horário.
           Fora disso ele pausa: lead que chega às 22h não é devolvido às 22h15 com a loja fechada.
         </p>
       </div>

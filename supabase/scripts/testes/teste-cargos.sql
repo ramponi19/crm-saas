@@ -173,9 +173,8 @@ begin
   perform set_config('request.jwt.claims', jsonb_build_object('sub', v_dono1::text, 'role', 'authenticated')::text, true);
   perform usuario_cargo_trocar(v_m1, c_vend1);
 
-  -- 9. ponte da tela antiga de Permissões: salvar empresas.permissoes muda o cargo Vendedor
-  update empresas set permissoes = coalesce(permissoes, '{}'::jsonb) || '{"vendedor": {"verRelatorios": true}}'::jsonb where id = 1;
-  r := r || jsonb_build_object('t9_ponte_vendedor_relatorios', exists (select 1 from empresa_cargo_permissoes where cargo_id = c_vend1 and permissao = 'core.ver_relatorios'));
+  -- 9. 1.1h parte 2 (H1b/H1c): a tela antiga de Permissões e a coluna empresas.permissoes saíram; o cargo é a fonte.
+  r := r || jsonb_build_object('t9_coluna_permissoes_saiu', not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'empresas' and column_name = 'permissoes'));
 
   -- 10. configuração: config.editar (admin grava; vendedor não)
   perform set_config('request.jwt.claims', jsonb_build_object('sub', v_adm1::text, 'role', 'authenticated')::text, true);

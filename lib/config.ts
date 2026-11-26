@@ -35,6 +35,24 @@ export interface DefinicaoConfig {
   obsoleta?: string
   /** Módulo do manifesto que precisa estar instalado para a chave ser gravada (nulo: nasce com a empresa). */
   modulo_requerido?: string
+  /** Leitura protegida (1.1h H2): só quem tem esta permissão lê a chave (empresa_config, config_valor, Auditoria). */
+  leitura?: string
+}
+
+/**
+ * LEITURA PROTEGIDA POR PREFIXO (1.1h parte 2, H2; docs/etapa-1.1-plano.md §5.1). Espelho exato da tabela
+ * `config_chave_leitura` (migração 20261126001300; tests/config-leitura.test.ts confere os dois). A margem da
+ * precificação somada ao preço revela o custo: `precificacao.*` só com `estoque.ver_custo`.
+ */
+export const LEITURA_PROTEGIDA: Record<string, string> = { 'precificacao.': 'estoque.ver_custo' }
+
+/** A permissão exigida para LER a chave `modulo.chave` (nula = qualquer pessoa da empresa). */
+export function permissaoDeLeitura(modulo: string, chave: string): string | null {
+  const def = DEFINICOES_CONFIG.find((d) => d.modulo === modulo && d.chave === chave)
+  if (def?.leitura) return def.leitura
+  const k = `${modulo}.${chave}`
+  const prefixo = Object.keys(LEITURA_PROTEGIDA).filter((p) => k.startsWith(p)).sort((x, y) => y.length - x.length)[0]
+  return prefixo ? LEITURA_PROTEGIDA[prefixo] : null
 }
 
 const CORE: DefinicaoConfig[] = [
@@ -74,7 +92,7 @@ export function definicaoConfig(modulo: string, chave: string): DefinicaoConfig 
 /** Formato das telas de configuração: valor da empresa e de cada loja. */
 export interface EnvelopeConfig { empresa: unknown; lojas: Record<string, unknown> }
 
-interface LinhaConfig { modulo: string; chave: string; filial_id: number | null; valor: unknown }
+export interface LinhaConfig { modulo: string; chave: string; filial_id: number | null; valor: unknown }
 
 /** Monta {empresa, lojas} por '<modulo>.<chave>' a partir das linhas de empresa_config. Pura (testável). */
 export function montarEnvelopes(linhas: LinhaConfig[]): Record<string, EnvelopeConfig> {

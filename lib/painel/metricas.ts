@@ -319,7 +319,10 @@ export async function primeirosPassos(db: Db) {
   const [lojasCompletas, equipe, horario, canais, leads] = await Promise.all([
     db.from('filiais').select('id', head).eq('ativo', true).not('cidade', 'is', null),
     db.from('empresa_usuarios').select('id', head).eq('ativo', true),
-    db.from('configuracoes_sistema').select('chave', head).eq('chave', 'horario_comercial'),
+    // 1.1h parte 2: "definiu o horário" = alguém salvou core.horario (o formato antigo `horario_comercial` só existia
+    // quando a tela gravava; a semente da 1.1i grava sem pessoa e não conta).
+    (db as unknown as import('@supabase/supabase-js').SupabaseClient).from('empresa_config').select('chave', head)
+      .eq('modulo', 'core').eq('chave', 'horario').not('atualizado_por', 'is', null),
     db.from('canais').select('id', head).eq('status', 'ativo'),
     db.from('negocios').select('id', head).or(NEGOCIO_ATIVO),
   ])

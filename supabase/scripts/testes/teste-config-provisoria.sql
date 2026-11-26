@@ -2,6 +2,9 @@
 -- tudo num bloco que termina com RAISE (a transação inteira é desfeita) e devolve o resultado na mensagem.
 -- Antes da migração aplicada: rodar o corpo de 20261123000500_config_provisoria.sql na MESMA chamada, antes deste.
 -- Empresa 5 = Nexus Demonstração (dono f47a8e4f…, loja 1). Empresa 1 = JM (loja 3; vendedora f4ec6a87…).
+-- 1.1h parte 2 (26/11/2026): a H1 desligou a ponte envelope → empresa_config. Este teste carrega a configuração
+-- pelo envelope antigo (atalho de carga dos dados); a ponte é ligada SÓ dentro da transação do teste (desfeita no fim).
+alter table public.configuracoes_sistema enable trigger configuracoes_sistema_ponte;
 do $teste$
 declare
   r jsonb := '{}';
@@ -30,7 +33,7 @@ begin
   r := r || jsonb_build_object('t3_responsavel_loja1', config_valor('posvenda', 'responsavel_padrao', 1),
     't3_responsavel_empresa_vazio', config_valor('posvenda', 'responsavel_padrao'),
     't3_chave_inexistente', config_valor('posvenda', 'nao_existe', 1),
-    't3_linha_gravada', (select chave from configuracoes_sistema where empresa_id = 5 and chave = 'posvenda.responsavel_padrao'));
+    't3_linha_gravada', (select modulo || '.' || chave from empresa_config where empresa_id = 5 and modulo = 'posvenda' and chave = 'responsavel_padrao' limit 1));  -- 1.1h: só a tabela nova
 
   -- 4. tirar o valor da loja (null) volta a valer o da empresa
   v := config_salvar('core', 'teste_m2', null, 1);

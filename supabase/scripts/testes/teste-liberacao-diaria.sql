@@ -1,6 +1,9 @@
 -- Teste da 20261124001600_liberacao_diaria. JM de teste (empresa 1), matriz = loja 3 (M1, M2, SL na roleta: dono e
 -- administradores ficam fora, participa_roleta = false). Horário padrão seg–sex 9h–18h. Relógio fixo: terça 24/11/2026.
 -- Cada caso numa subtransação desfeita. Termina com RAISE: nada fica gravado.
+-- 1.1h parte 2 (26/11/2026): a H1 desligou a ponte envelope → empresa_config. Este teste carrega a configuração
+-- pelo envelope antigo (atalho de carga dos dados); a ponte é ligada SÓ dentro da transação do teste (desfeita no fim).
+alter table public.configuracoes_sistema enable trigger configuracoes_sistema_ponte;
 do $t$
 declare
   res jsonb := '{}';

@@ -70,22 +70,20 @@ export async function verificarEntradaParada(svc: SupabaseClient<any>, agora = n
     const empresas = [...new Set(lista.map((c) => c.empresa_id))]
     const [{ data: cfg }, { data: cfgNova }] = await Promise.all([
       svc.from('configuracoes_sistema').select('empresa_id, chave, valor')
-        .in('empresa_id', empresas).in('chave', ['horario_comercial', 'fuso']),
+        .in('empresa_id', empresas).eq('chave', 'fuso'),
       // core.horario mora no motor de configuração (empresa_config, etapa 1.1a)
       (svc as unknown as SupabaseClient).from('empresa_config').select('empresa_id, modulo, chave, filial_id, valor')
         .in('empresa_id', empresas).eq('modulo', 'core').eq('chave', 'horario'),
     ])
-    const novo = new Map<number, unknown>(); const antigo = new Map<number, unknown>(); const fuso = new Map<number, string>()
+    const novo = new Map<number, unknown>(); const fuso = new Map<number, string>()
     for (const e of empresas) {
       const linhas = ((cfgNova ?? []) as { empresa_id: number; modulo: string; chave: string; filial_id: number | null; valor: unknown }[])
         .filter((l) => l.empresa_id === e)
       if (linhas.length) novo.set(e, montarEnvelopes(linhas)['core.horario'])
     }
-    for (const c of cfg ?? []) {
-      if (c.chave === 'horario_comercial') antigo.set(c.empresa_id as number, c.valor)
-      else fuso.set(c.empresa_id as number, fusoDoValor(c.valor))
-    }
-    const horario = new Map<number, unknown>(empresas.map((e) => [e, horarioDaLoja(novo.get(e) ?? null, antigo.get(e) ?? null, null)]))
+    for (const c of cfg ?? []) fuso.set(c.empresa_id as number, fusoDoValor(c.valor))
+    // 1.1h parte 2: só core.horario (empresa_config); o formato antigo não é mais lido.
+    const horario = new Map<number, unknown>(empresas.map((e) => [e, horarioDaLoja(novo.get(e) ?? null, null, null)]))
     const { data: jaAbertos } = await svc.from('alertas_entrada').select('canal_id')
       .eq('tipo', 'entrada_parada').is('resolvido_em', null).in('canal_id', lista.map((c) => c.id))
     const comAlerta = new Set((jaAbertos ?? []).map((a) => a.canal_id as number))

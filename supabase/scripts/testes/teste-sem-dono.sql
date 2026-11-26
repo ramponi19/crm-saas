@@ -1,6 +1,9 @@
 -- Teste da 20261124001400_sem_dono. JM de teste (empresa 1; matriz 3 e Jaguariúna 6). Cada caso numa subtransação
 -- desfeita. Para a roleta ficar legível, dono e administradores saem dela (participa_roleta = false, como na JM):
 --   matriz = M1 (…0101), M2 (…0102), SL (…0103, sem loja); Jaguariúna = J2 (…0104), VJ (f4ec…). Termina com RAISE.
+-- 1.1h parte 2 (26/11/2026): a H1 desligou a ponte envelope → empresa_config. Este teste carrega a configuração
+-- pelo envelope antigo (atalho de carga dos dados); a ponte é ligada SÓ dentro da transação do teste (desfeita no fim).
+alter table public.configuracoes_sistema enable trigger configuracoes_sistema_ponte;
 do $t$
 declare
   res jsonb := '{}';

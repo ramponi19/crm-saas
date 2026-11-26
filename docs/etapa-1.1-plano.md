@@ -739,6 +739,32 @@ A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas 
 - **trava:** `check-config-padroes` no `npm run check` (padrão no chamador reprova);
 - **critério:** empresa nova criada no local tem as mesmas chaves e valores que o catálogo diz; JM e Aletrini sem nenhuma mudança de valor efetivo (`config_valor_emp` igual antes e depois); instalar um módulo grava os padrões dele.
 
+### 5.4.1 1.1h PARTE 2: PRONTA NO LOCAL em 26/11/2026 (branch feat/etapa-1.1-base), PARADA antes do deploy
+
+**Pacote (4 entregas, nesta ordem; cada uma pelos portões e com volta):**
+
+| # | O quê | Arquivos | Volta |
+|---|---|---|---|
+| 1 | **App** (sem migração): leitores do formato antigo passam à tabela nova; a rota do horário para de gravar `horario_comercial`/`horario`; `/api/permissoes` sai; o `/entrar` não lê mais `empresas.permissoes`; trava `check:config-antiga` no `npm run check` | `lib/horario-empresa.ts`, `lib/alertas-entrada.ts`, `lib/esteira.ts` (+ `minutosDeExpediente` em `lib/horario.ts`), `components/.../devolucao-card.tsx`, `lib/painel/metricas.ts`, `app/api/configuracoes/horario/route.ts`, `app/entrar/page.tsx`, `scripts/check-config-antiga.mjs` | promover o deploy anterior |
+| 2 | **H1** `20261126001200_h1_config_contracao`: `config_salvar` não grava mais o envelope; backup `_backup_config_antiga_1_1h` e remoção das linhas `modulo.chave` + `horario_comercial`/`horario` (produção: 5 linhas, só JM); ponte `configuracoes_sistema_ponte` desligada; `core_horario` só da tabela nova | migração | `volta-h1-config-contracao.sql` |
+| 2b | **H1b** `20261126001210`: backup `_backup_empresas_permissoes_1_1h` e ponte `empresas_permissoes_ponte` desligada (DDL em `empresas`, sozinha) | migração | `volta-h1-permissoes.sql` |
+| 2c | **H1c** `20261126001220` (≥ 1 dia depois da H1b, sem leitor nos logs): `cargos_semear` deixa de ler a coluna; sai a ponte e a coluna `empresas.permissoes` | migração | `volta-h1-permissoes.sql` (parte 2) |
+| 3 | **H2** `20261126001300`: `config_chave_leitura` (`precificacao.` → `estoque.ver_custo`, espelho de `LEITURA_PROTEGIDA` em `lib/config.ts`); SELECT de `empresa_config` e de `auditoria_eventos` (linhas de `config`) exigem a permissão da chave marcada; `config_valor` devolve nulo para quem não tem (`config_valor_emp`, interna, continua lendo) | migração | `volta-h2-config-leitura.sql` |
+
+**Provas no local:**
+- `teste-config-h1-h2.sql` (esperado salvo): formato antigo 0, ponte desligada, coluna fora, `core_horario` só da tabela, `config_salvar` sem envelope; Vendedor com só `auditoria.ver` não lê `precificacao.*` por `empresa_config`, `config_valor` nem Auditoria (lê a chave comum e a Auditoria comum); Administrador lê; a função interna lê.
+- Unitários: `minutosDeExpediente` (sábado reduzido, pausa, loja fechada), `resumoDoHorario`, espelho catálogo × tabela (`tests/config-leitura.test.ts`); 665/665.
+- Os testes antigos que carregavam configuração pelo envelope ligam a ponte só dentro da própria transação; o item 9 de `teste-cargos` passa a provar que a coluna saiu; os e2e manuais (`agendar-publico`, `automatize`, `entrada-sempre-gravada`, `transmissao`) gravam `core.horario` na tabela nova (sintaxe conferida; **não rodados**: pedem o app local de pé).
+- Pré-condição conferida na produção (só leitura): o passo "horário" do cartão de começo dá igual nas 3 empresas com o critério novo (`core.horario` salvo por uma pessoa); digital dos efetivos `bcda4935` (a mesma da 1.1i).
+
+**Mudança de comportamento a decidir antes do passo 1 (só a JM tem sábado reduzido):** a devolução de 30 min da esteira usava o formato antigo `horario` (9h–18h de segunda a SÁBADO). Com o horário por dia, sábado conta só das 9h às 12h: um lead sem resposta no sábado às 11h50 deixa de ser devolvido às 12h20 e passa a ser na segunda às 9h20. É o horário que a JM configurou (correção), mas muda o que acontece hoje.
+
+**Roteiro de deploy (cada passo com IOwait, 10 min sem ação humana na JM, fora dos minutos 05–15, registro de sessões):**
+1. Passo 1 (app): build igual ao da Vercel; push ff; smoke na Demonstração (Configurações › Horário salva e relê; SLA mostra o horário por dia; painel com o cartão de começo); logs 15 min; rodadas seguintes (liberação, pós-venda, automações) na página Rotinas.
+2. H1: digital dos efetivos antes; aplicar; digital depois **igual** (senão volta); conferir 0 linhas antigas e o backup com 5; Rotinas.
+3. H1b: aplicar; Cargos de todos os vínculos iguais (matriz antes/depois); 1 dia de logs sem leitura da coluna → H1c.
+4. H2: aplicar; na Demonstração (usuários temporários com rollback, como na 1.1d): Vendedor/Consulta sem `precificacao.*`, Dono lê; Auditoria igual para chaves comuns.
+
 ### 5.4 1.1h, SEGUNDA PARTE: plano (26/11/2026; só plano, sem código; ok do Lucas antes de começar)
 
 **Prazo:** no ar **antes da P1a** da precificação (a leitura protegida das chaves `precificacao.*` é condição dela).

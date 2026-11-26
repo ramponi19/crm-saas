@@ -58,13 +58,13 @@ describe('horário de funcionamento por dia (rota + config_salvar + banco)', () 
     const r = await put({ filialId: null, horario: { semana: { ...SEMANA, '1': dia('18:00', '09:00') } } })
     assert.equal(r.status, 400)
   })
-  test('admin grava o sábado reduzido; o formato antigo acompanha', async () => {
+  test('admin grava o sábado reduzido; o formato antigo NÃO é mais gravado (1.1h parte 2)', async () => {
     atual = sessoes.admin
     const r = await put({ filialId: null, horario: { semana: SEMANA, sla_resposta_min: 20 } })
     assert.equal(r.status, 200, JSON.stringify(r.corpo))
     assert.deepEqual((await ler()).empresa.semana['6'], dia('09:00', '13:00'))
-    assert.deepEqual(await chave('horario_comercial'), { inicio: '09:00', fim: '18:00', dias: [1, 2, 3, 4, 5, 6], sla_resposta_min: 20 })
-    assert.deepEqual(await chave('horario'), { inicio: '09:00', fim: '18:00', dias: [1, 2, 3, 4, 5, 6] })
+    assert.equal((await chave('horario_comercial')) ?? null, null)
+    assert.equal((await chave('horario')) ?? null, null)
     // o banco lê o mesmo horário (core_horario / dia útil derivado)
     const { data: abre } = await svc.rpc('core_abre_no_dia', { p_empresa: EMPRESA, p_filial: LOJA, p_dia: '2026-11-28' })
     assert.equal(abre, true)
