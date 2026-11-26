@@ -72,7 +72,7 @@ begin
     'venda', (select valor_custo from vendas_vendas_custos where venda_id = vP),
     'retorno', x -> 'venda_preenchida'));
   r := r || jsonb_build_object('4_pendentes_resumo', estoque_custos_pendentes_resumo() -> 'total');
-  -- H2 decide antes: venda concluída não muda de valor pela coluna antiga
+  -- custo de venda concluída pela coluna antiga: barrado pela guarda do satélite (desde a 0800 o H2 vigia só valor e desconto)
   begin update vendas_vendas set valor_custo = 1 where id = vA; e := 'passou'; exception when others then e := sqlerrm; end;
   r := r || jsonb_build_object('4_h2_primeiro', e);
   execute 'reset role';

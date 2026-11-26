@@ -1,0 +1,127 @@
+{
+  "1_dono": {
+    "saldo": {
+      "pago": 0,
+      "saldo": 0,
+      "total": 0
+    },
+    "vendas": [
+      [
+        1000,
+        0,
+        "concluida",
+        "encomenda",
+        true,
+        true,
+        "",
+        [
+          0,
+          false
+        ],
+        null,
+        null
+      ],
+      [
+        50,
+        0,
+        "concluida",
+        "encomenda",
+        true,
+        true,
+        "Acessório: Capinha",
+        [
+          0,
+          false
+        ],
+        null,
+        null
+      ]
+    ],
+    "pagamentos": [
+      [
+        "pix",
+        400
+      ],
+      [
+        "dinheiro",
+        650
+      ]
+    ],
+    "retorno_ok": true
+  },
+  "2_dono": [
+    "Pedido teste editado",
+    "pendente",
+    "2026-11-20",
+    true,
+    null,
+    654
+  ],
+  "1_vendedor": {
+    "saldo": {
+      "pago": 0,
+      "saldo": 0,
+      "total": 0
+    },
+    "vendas": [
+      [
+        1000,
+        0,
+        "concluida",
+        "encomenda",
+        true,
+        true,
+        "",
+        [
+          0,
+          false
+        ],
+        null,
+        null
+      ],
+      [
+        50,
+        0,
+        "concluida",
+        "encomenda",
+        true,
+        true,
+        "Acessório: Capinha",
+        [
+          null,
+          false
+        ],
+        null,
+        null
+      ]
+    ],
+    "pagamentos": [
+      [
+        "pix",
+        400
+      ],
+      [
+        "dinheiro",
+        650
+      ]
+    ],
+    "retorno_ok": true
+  },
+  "2_vendedor": [
+    "Pedido teste editado",
+    "pendente",
+    "2026-11-20",
+    true,
+    null,
+    null
+  ],
+  "3_h2_valor": "Venda concluída não muda de valor",
+  "3_h2_desconto": "Venda concluída não muda de valor",
+  "3_h3_encomenda_pode": "passou",
+  "3_h3_pendente_entrega": "Preço e custo só se ajustam em encomenda",
+  "3_custo_concluida_pela_coluna": [
+    "barrado",
+    0,
+    null
+  ]
+}

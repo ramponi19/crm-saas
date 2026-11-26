@@ -685,6 +685,34 @@ A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas 
 - **Smoke:** contador da JM lido como o Dono = **16** (loja 3: 1; loja 6: 15). P2 na Demonstração (simulação desfeita): o Dono rebaixado recebe "Seu cargo foi alterado — Meta App Review mudou o seu cargo de Dono para Administrador", com a linha de Auditoria; quem mudou não vê aviso. Tela da Demonstração: sino abre sem erro; chamadas a `usuario_avisos` com 200.
 - **Logs 14:21–14:36:** Vercel sem erro; API 1.100 requisições, nenhum 4xx/5xx; Postgres sem erro.
 
+**1b. Reescrita das três funções (pré-requisito da 1.1g): PRONTA NO LOCAL em 26/11/2026, PARADA antes do deploy.**
+- **Migração `20261126000800_custo_so_nos_satelites_funcoes`:**
+  - **`concluir_encomenda`** (hotfix do pagamento): copiada linha a linha da 20261125000100. A única mudança é que a venda do acessório levado na entrega deixa de gravar `valor_custo = 0` e nasce como as vendas do PDV sem unidade. O custo dela (0 para quem vê custo, pendente para quem não vê) chega ao satélite pelo mesmo caminho de hoje;
+  - **`compras_pedido_salvar`**: o pedido nasce sem tocar na coluna antiga, e o valor vai direto a `compras_pedidos_custos` (só com `estoque.ver_custo`, como hoje). Na edição, o valor só muda com a permissão e com número, como a porta de entrada fazia;
+  - **`vendas_valor_guarda`** (H2/H3): vigia `valor_venda` e `desconto_valor`. O gatilho é recriado com `create or replace trigger` (sem drop, com `lock_timeout`) sem a coluna `valor_custo`. O custo da venda concluída já é vigiado no satélite pela `vendas_custo_guarda` (CUSTO_CONGELADO).
+  - Depois disto, nenhuma função grava nem lê as colunas antigas, salvo os gatilhos-ponte e o valor padrão `0` de `vendas_vendas.valor_custo`, que saem juntos na 1.1g. Na 1.1g, o gatilho da venda assume a regra "venda sem unidade: 0 para quem vê custo".
+- **Volta:** `supabase/scripts/volta/volta-custo-so-nos-satelites-funcoes.sql` (os três corpos de hoje e o gatilho com `valor_custo`; numa transação; testada).
+- **Provas no local:**
+  - **comparação antes e depois:** o cenário `teste-custo-funcoes-satelite` (encomenda concluída com acessório como Dono e como Vendedor; pedido de compra criado e editado como Dono e como Vendedor; H2 valor e desconto; H3 em encomenda e em pendente de entrega; custo de concluída pela coluna antiga) roda com as funções antigas (volta aplicada) e com as novas. **Idêntico nos 9 blocos**: vendas (valor, desconto, situação, origem, datas, observação), pagamentos, saldo, custo no satélite, coluna antiga e lucro, pedidos e guardas;
+  - **prova do banco do hotfix** (`tests/banco/prova-concluir-encomenda.sql`): **28/28** com as funções de hoje e com as novas. Três verificações liam o custo na coluna antiga, vazia desde a 1.1f (H2e e H3 já falhavam no estado de hoje), e passaram a ler o satélite. H2b aceita as duas guardas (continua barrado);
+  - **e2e `entregar-pagamento`:** 16 ok (Histórico › Finalizar, PDV com falta, H1, H3, limpeza);
+  - **custo pendente em venda:** `teste-custo-satelites` e `custo-local` (API, tempos 2 e 3) verdes;
+  - `npm test` 658/658; `npm run check` verde;
+  - **conferência visual:** pedido de compra criado pela tela como Dono (satélite R$ 1.234,56, coluna antiga vazia, "Investido no mês" com o valor); PDV e encomenda pelo e2e.
+- **Mudança visível (só mensagem):** gravar custo pela coluna antiga numa venda concluída continua barrado. Quem barra agora é a guarda do satélite ("CUSTO_CONGELADO…"), não o H2. Nenhuma tela faz isso (o `check-custo` garante).
+- **Roteiro de deploy (só banco, sem app):**
+  1. portões de sempre;
+  2. backup dos corpos atuais (o script de volta já os contém);
+  3. `apply_migration` da 0800, fora dos minutos 05–15;
+  4. conferências:
+     - definição do gatilho sem `valor_custo` (`pg_get_triggerdef`);
+     - `pg_proc` sem as três funções citando colunas antigas;
+     - na Demonstração, simulação desfeita: encomenda com acessório concluída por um Dono e por um Vendedor temporários, mais um pedido de compra (custo no satélite, coluna nula);
+     - logs de 15 min;
+     - rodadas seguintes na página Rotinas.
+  - **Volta:** o script acima.
+  - **A evidência da 1.1g começa a contar no dia seguinte ao deploy da 0800.**
+
 **2. 1.1g — remover as colunas antigas de custo** (detalhe no §4.6):
 - **coleta da evidência (começou em 26/11/2026):**
   - **banco:** funções, views e dependências que citam as colunas. Em 26/11, além dos gatilhos-ponte, **duas funções ainda GRAVAM nas colunas antigas** (o gatilho leva o valor ao satélite): `compras_pedido_salvar` (`compras_pedidos.valor_total`) e `concluir_encomenda` (`vendas_vendas.valor_custo`); e o gatilho `vendas_valor_guarda` depende de `vendas_vendas.valor_custo`. **Antes do `drop`, uma migração da 1.1g reescreve as três para o satélite** (e o teste prova);
@@ -710,6 +738,59 @@ A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas 
 - **onde vale:** criação da empresa e instalação de módulo materializam os padrões em `empresa_config`; o chamador deixa de ter padrão próprio;
 - **trava:** `check-config-padroes` no `npm run check` (padrão no chamador reprova);
 - **critério:** empresa nova criada no local tem as mesmas chaves e valores que o catálogo diz; JM e Aletrini sem nenhuma mudança de valor efetivo (`config_valor_emp` igual antes e depois); instalar um módulo grava os padrões dele.
+
+### 5.4 1.1h, SEGUNDA PARTE: plano (26/11/2026; só plano, sem código; ok do Lucas antes de começar)
+
+**Prazo:** no ar **antes da P1a** da precificação (a leitura protegida das chaves `precificacao.*` é condição dela).
+
+**O que ainda existe do formato antigo (levantado na produção em 26/11):**
+- **Envelope `modulo.chave` em `configuracoes_sistema`:** só na JM, três linhas (`core.horario`, `distribuicao.liberacao_diaria`, `distribuicao.sem_dono`). Nenhuma função do banco o lê desde a parte 1; quem ainda o toca é `config_salvar` (grava os dois) e o gatilho `configuracoes_sistema_ponte` (envelope → tabela nova).
+- **Formato antigo do horário (chaves sem ponto):** `horario_comercial` e `horario`.
+  - **Gravação:** `app/api/configuracoes/horario` grava os dois a cada mudança do horário da empresa ("fase 1").
+  - **Leitura:**
+    - `core_horario`, como reserva;
+    - `lib/esteira.ts` e o card de devolução de 30 min (`horario`);
+    - `lib/horario-util.ts` e `lib/automatize/travas.ts`;
+    - o passo "horário" do cartão de começo (`lib/painel/metricas.ts`, `horario_comercial`).
+- **`empresas.permissoes`** e o gatilho-ponte para os cargos (1.1b): leitores em `lib/permissoes.ts`, `app/api/permissoes`, a página antiga e `lib/assistente/acesso.ts` (a conferir um a um no início).
+- **Chaves sem ponto que NÃO são configuração do catálogo e ficam:** `roleta_leads`/`roleta_leads:<loja>` (ponteiro da roleta), `devolucao_esteira`, `sla_atendimento`, `automacoes_pausadas`, `whatsapp_saude`, `fuso`, `mensagens_templates`, `reativacao`, `lead_scoring`, `preferencias`, `import_imoveis`, `comissao_imob`. Não fazem parte desta contração (cada uma tem dono próprio e não tem duplicata).
+
+**Nenhuma empresa depende de "padrão quando falta" que deixe de existir:**
+- Depois da 1.1i (preenchimento das empresas existentes + semente das novas), toda empresa tem explícitas as chaves do núcleo e as dos módulos instalados. Confere-se no início da parte 2: `config_padroes()` × empresas (e × módulos ativos) sem nenhuma falta.
+- Assim, tirar o envelope e o formato antigo não muda valor efetivo de ninguém.
+- Os padrões no chamador (`core_horario`, `HORARIO_PADRAO`, coalesces do pós-venda) **ficam** como rede de segurança: a contração não os remove; uma empresa nova sem semente (falha) continua com o comportamento de hoje.
+- **Prova antes e depois:** a mesma digital de `conciliacao-pedidos/etapa-1.1i-20261126/efetivos.sql`, para todas as empresas e lojas.
+
+**Ordem (cada passo com deploy próprio, pelos portões):**
+1. **App primeiro (sem migração):**
+   - os leitores do formato antigo passam a ler `core.horario` pela tabela nova (`lerConfig`/`horarioDaLoja`): esteira, devolução, travas da automação, `horario-util`, cartão de começo;
+   - a rota do horário para de gravar `horario_comercial`/`horario`;
+   - os leitores de `empresas.permissoes` passam aos cargos; `/api/permissoes` e a página antiga saem;
+   - `check-config-antiga` (novo, no `npm run check`) reprova leitura de `configuracoes_sistema` com chave do catálogo ou do formato antigo do horário.
+2. **Migração H1 (contração):**
+   - `config_salvar` para de escrever o envelope;
+   - backup e remoção das linhas `modulo.chave` e de `horario_comercial`/`horario`;
+   - sai o gatilho `configuracoes_sistema_ponte` (só o gatilho, por `create or replace`/desligar; a função fica até a 1.1g-config);
+   - `core_horario` lê só a tabela nova (loja → empresa → padrão fixo; sem o formato antigo);
+   - `empresas.permissoes`: backup, ponte desligada, coluna removida **num passo separado**, com `lock_timeout` (DDL em `empresas`: lição de 25/11).
+3. **Migração H2 (leitura protegida, §5.1):**
+   - `config_chave_leitura` gerada do catálogo (as `precificacao.*` com `estoque.ver_custo`);
+   - política de SELECT de `empresa_config` e `auditoria_eventos` (entidade `config` da chave marcada);
+   - `config_valor`/`config_valor_emp` sem valor para quem não tem a permissão;
+   - tela Auditoria filtrando.
+
+**Critérios de pronto:**
+- digital dos efetivos igual antes e depois (todas as empresas e lojas);
+- `config_valor_emp` de todas as chaves igual;
+- rodadas reais seguintes de liberação, pós-venda e automações ok na página Rotinas;
+- Cargos igual para todo vínculo (matriz dos 18 da JM antes e depois);
+- teste do §5.1 (Vendedor e Consulta sem `precificacao.*` por `empresa_config`, `config_valor`, Auditoria e tela; o Dono lê);
+- ritual do zero, build e e2e verdes.
+
+**Volta:**
+- de cada passo de app: promover o deploy anterior;
+- H1: restaurar o envelope e o formato antigo do backup e religar a ponte (antes de remover a coluna de permissões; a remoção da coluna só depois de 1 dia sem leitor);
+- H2: devolver as políticas anteriores.
 
 ### 5.3 1.1i detalhada: PRONTA NO LOCAL em 26/11/2026 (commit `347ee7c5`), PARADA antes do deploy
 

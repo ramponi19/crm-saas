@@ -70,7 +70,7 @@
     "retorno": null
   },
   "4_pendentes_resumo": 2,
-  "4_h2_primeiro": "Venda concluída não muda de valor",
+  "4_h2_primeiro": "CUSTO_CONGELADO: venda concluída não muda de custo (só o preenchimento único de um custo pendente)",
   "5_concluida": "CUSTO_CONGELADO",
   "5_preenchida": "CUSTO_CONGELADO",
   "5_marca_de_script": "1490",

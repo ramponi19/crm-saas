@@ -280,7 +280,8 @@ begin
     update vendas_vendas set valor_custo = 10 where id = v1;
     perform pg_temp.admin(); perform pg_temp.r('FALHOU H2b: service_role mudou o custo da venda concluída');
   exception when others then perform pg_temp.admin();
-    perform pg_temp.r(case when sqlerrm = 'Venda concluída não muda de valor' then 'OK H2b: rota do servidor também não muda — ' || sqlerrm else 'FALHOU H2b: ' || sqlerrm end);
+    -- desde a 0800 (26/11/2026) o custo é vigiado no satélite: quem barra é a vendas_custo_guarda (CUSTO_CONGELADO)
+    perform pg_temp.r(case when sqlerrm = 'Venda concluída não muda de valor' or sqlerrm like 'CUSTO_CONGELADO%' then 'OK H2b: rota do servidor também não muda — ' || sqlerrm else 'FALHOU H2b: ' || sqlerrm end);
   end;
   -- desconto também é valor
   perform pg_temp.como(dono);
@@ -303,7 +304,8 @@ begin
     update vendas_vendas set valor_custo = 1400 where id = v1;
     perform set_config('nexus.venda_valor_ajuste', '', true);
     perform pg_temp.admin();
-    perform pg_temp.r(case when (select valor_custo from vendas_vendas where id = v1) = 1400
+    -- desde a 1.1f o custo mora no satélite (a coluna antiga fica vazia): confere lá
+    perform pg_temp.r(case when (select valor_custo from vendas_vendas_custos where venda_id = v1) = 1400
       then 'OK H2e: script com nexus.venda_valor_ajuste corrige o custo' else 'FALHOU H2e: não gravou' end);
   exception when others then perform set_config('nexus.venda_valor_ajuste', '', true); perform pg_temp.admin(); perform pg_temp.r('FALHOU H2e: ' || sqlerrm);
   end;
@@ -317,7 +319,7 @@ begin
   begin
     update vendas_vendas set valor_venda = 2900, valor_custo = 2500 where id = v2;
     perform pg_temp.admin();
-    perform pg_temp.r(case when (select valor_custo from vendas_vendas where id = v2) = 2500
+    perform pg_temp.r(case when (select valor_custo from vendas_vendas_custos where venda_id = v2) = 2500
       then 'OK H3: encomenda ajusta preço e custo pelo navegador' else 'FALHOU H3: ajuste não gravou' end);
   exception when others then perform pg_temp.admin(); perform pg_temp.r('FALHOU H3: ' || sqlerrm);
   end;
