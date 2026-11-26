@@ -129,7 +129,8 @@ function pessoa(n, nome, { loja = LA, et = 'proposta', status = 'aberto', dias =
   const f = fone(n)
   const c = um(`insert into contatos (empresa_id, filial_id, nome, telefone, telefone_e164, origem, tipo, ativo, opt_out_em)
     values (${E}, ${loja}, '${nome} ${T}', ${telefone ? `'${f}'` : 'null'}, ${telefone ? `'+${f}'` : 'null'}, 'whatsapp', 'pessoa', ${!bloqueado}, ${optOut ? 'now()' : 'null'}) returning id`)
-  const neg = um(`insert into negocios (empresa_id, filial_id, contato_id, funil_id, etapa_id, status, ganho_em, perdido_em, dados)
+  // Desde 24/11 (venda obrigatória no ganho) o negócio ganho de teste entra como script, com a marca de exceção.
+  const neg = um(`set nexus.venda_excecao = 'e2e transmissao'; insert into negocios (empresa_id, filial_id, contato_id, funil_id, etapa_id, status, ganho_em, perdido_em, dados)
     values (${E}, ${loja}, ${c}, ${F}, ${ET[et]}, '${status}', ${status === 'ganho' ? "now() - interval '60 days'" : 'null'}, ${status === 'perdido' ? "now() - interval '60 days'" : 'null'}, '{"_lead":{"ativo":true}}') returning id`)
   if (dias != null) sql(`insert into conversas (empresa_id, filial_id, contato_id, canal_id, ultima_mensagem_at) values (${E}, ${loja}, ${c}, ${loja === LA ? CANAL : 'null'}, now() - interval '${dias} days')`)
   return { c, neg, fone: f, nome: `${nome} ${T}` }

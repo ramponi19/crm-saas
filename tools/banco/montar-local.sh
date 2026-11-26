@@ -46,8 +46,23 @@ for f in projeto.dump auth-storage-dados.dump; do [ -f "$D/$f" ] || { echo "Falt
 npx supabase db reset 2>&1 | grep -v -i -E "key|secret|jwt|token" | tail -2
 
 # As migrações semeiam algumas tabelas (presets, módulos): os dados da produção substituem tudo.
-$B/psql.exe "$L" -X -q -v ON_ERROR_STOP=1 -c "do \$\$ declare t text; begin select string_agg(format('%I.%I', schemaname, tablename), ', ') into t from pg_tables where schemaname = 'public'; execute 'truncate ' || t || ' restart identity cascade'; end \$\$" && echo "public zerado"
-$B/pg_restore.exe -d "$L" --data-only --disable-triggers --no-owner --exit-on-error -n public "$D/projeto.dump" && echo "public restaurado"
+# Em modo réplica: a Auditoria recusa truncate pelo gatilho (AUDITORIA_IMUTAVEL).
+$B/psql.exe "$L" -X -q -v ON_ERROR_STOP=1 -c "set session_replication_role = replica; do \$\$ declare t text; begin select string_agg(format('%I.%I', schemaname, tablename), ', ') into t from pg_tables where schemaname = 'public'; execute 'truncate ' || t || ' restart identity cascade'; end \$\$" && echo "public zerado"
+# Dump anterior à 1.1h H1c (26/11/2026): os dados ainda trazem empresas.permissoes. A coluna volta por um instante e
+# sai de novo quando a H1c é reaplicada abaixo.
+$B/psql.exe "$L" -X -q -v ON_ERROR_STOP=1 -c "alter table public.empresas add column if not exists permissoes jsonb"
+# As tabelas _backup_* só existem na produção: ficam fora do restore.
+LISTA_TOC=$(mktemp)
+$B/pg_restore.exe -l "$D/projeto.dump" | grep -v "_backup_" > "$LISTA_TOC"
+$B/pg_restore.exe -d "$L" --data-only --disable-triggers --no-owner --exit-on-error -n public -L "$LISTA_TOC" "$D/projeto.dump" && echo "public restaurado"
+rm -f "$LISTA_TOC"
+# Migrações de DADOS posteriores ao dump, reaplicadas sobre os dados da produção (idempotentes): sementes da 5a/5b, a
+# contração da configuração (H1) e a saída da coluna de permissões (H1c) — só as que existirem no repositório.
+for m in 20261126001010_lojas_que_enxerga_semente 20261126001110_distribuicao_por_loja_semente 20261126001200_h1_config_contracao 20261126001220_h1_permissoes_coluna_sai; do
+  if [ -f "supabase/migrations/$m.sql" ]; then
+    $B/psql.exe "$L" -X -q -1 -v ON_ERROR_STOP=1 -f "supabase/migrations/$m.sql" > /dev/null && echo "reaplicada $m"
+  fi
+done
 $B/pg_restore.exe -d "$L" --data-only --disable-triggers --no-owner --exit-on-error -t users -t identities -n auth "$D/auth-storage-dados.dump" && echo "auth restaurado"
 $B/pg_restore.exe -d "$L" --data-only --disable-triggers --no-owner --exit-on-error -t buckets -t objects -n storage "$D/auth-storage-dados.dump" 2>/dev/null \
   || { $B/psql.exe "$L" -X -q -c "truncate storage.objects, storage.buckets cascade"; \
