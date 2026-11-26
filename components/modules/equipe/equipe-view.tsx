@@ -868,7 +868,8 @@ export default function EquipeView({ usuarios, uso, filiais = [], sinaisIniciais
       render: (u: Usuario) => {
         const f = filiais.find(x => x.id === u.filial_id)
         // 5a: além da principal, as outras lojas que a pessoa enxerga (ou "todas", para quem vê a rede).
-        const outras = u.ve_rede ? null : filiais.filter(x => x.id !== u.filial_id && (u.lojas ?? []).includes(x.id))
+        // Sem loja definida, a principal é a matriz (a primeira da lista): ela não conta como "outra".
+        const outras = u.ve_rede ? null : filiais.filter(x => x.id !== (u.filial_id ?? filiais[0]?.id) && (u.lojas ?? []).includes(x.id))
         return (
           <span className="text-ink-2">
             {f ? f.nome : <span className="text-ink-3">principal (não definida)</span>}
