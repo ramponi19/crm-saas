@@ -2,6 +2,8 @@
 -- (a sincronia é nos dois sentidos): nada a restaurar nelas. Tira gatilhos, funções e satélites; o espelho
 -- itens.custo volta a ser preenchido a partir da coluna antiga.
 -- ATENÇÃO: só serve enquanto o app do tempo 2 (1.1e) NÃO estiver no ar (ele lê os satélites).
+-- Uma transação só: ou volta tudo, ou nada (psql -f manda comando por comando).
+begin;
 set local lock_timeout = '5s';
 
 drop trigger if exists custo_unidade_pendente on public.estoque_unidades;
@@ -79,3 +81,5 @@ end $function$;
 update public.itens i set custo = u.preco_custo
   from public.estoque_unidades u
  where i.ref_tabela = 'estoque_unidades' and i.ref_id = u.id and i.custo is distinct from u.preco_custo;
+
+commit;

@@ -8,6 +8,7 @@ import type { Acesso } from './acesso'
 import { agora, diaNoFuso, formatarDataHora, instanteLocal, paraData, somarDias } from '@/lib/datas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { dataDaConclusao, filtroConcluidaNoPeriodo, resumoEmAberto, STATUS_EM_ABERTO, type LinhaEmAberto } from '@/lib/vendas-mes'
+import { JUNCAO_CUSTO_VENDA, custoDaVenda } from '@/lib/custo'
 
 /**
  * AS CONSULTAS QUE O ASSISTENTE PODE FAZER — TODAS SÓ DE LEITURA.
@@ -474,11 +475,19 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
   const filialId = loja.filialId
 
   type V = {
-    id: number; data_venda: string | null; concluida_em: string | null; created_at: string; valor_venda: number | null; valor_custo: number | null
-    lucro: number | null; forma_pagamento: string | null; canal_venda: string | null; status: string | null
+    id: number; data_venda: string | null; concluida_em: string | null; created_at: string; valor_venda: number | null
+    forma_pagamento: string | null; canal_venda: string | null; status: string | null
     vendedor_id: string | null; produto_id: number | null; quantidade: number | null; filial_id: number | null
     grupo_pdv: string | null; cliente_id: number | null
+    /** Satélite do custo (etapa 1.1e): só pedido com estoque.ver_custo. */
+    custo?: { valor_custo: number | null } | { valor_custo: number | null }[] | null
   }
+  /**
+   * CUSTO PROTEGIDO (etapa 1.1e): custo, lucro e margem dependem de `estoque.ver_custo` (Acesso.verCusto). Sem
+   * ela a junção do satélite nem é pedida — o custo não é lido, nem com a chave de serviço (`ler` pode ser ela).
+   * Nunca a coluna antiga de vendas_vendas.
+   */
+  const fin = c.acesso.verCusto
   /**
    * FATURAMENTO = a mesma definição do painel (25/11/2026): só vendas CONCLUÍDAS, pelo dia da conclusão
    * (`coalesce(concluida_em, data_venda)`, lib/vendas-mes). Antes entrava todo status, inclusive encomenda
@@ -487,7 +496,8 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
    */
   const vendas = await buscarTudo<V>((de, ate, primeira) => {
     let q = ler(c).from('vendas_vendas')
-      .select('id, data_venda, concluida_em, created_at, valor_venda, valor_custo, lucro, forma_pagamento, canal_venda, status, vendedor_id, produto_id, quantidade, filial_id, grupo_pdv, cliente_id',
+      .select('id, data_venda, concluida_em, created_at, valor_venda, forma_pagamento, canal_venda, status, vendedor_id, produto_id, quantidade, filial_id, grupo_pdv, cliente_id'
+        + (fin ? `, ${JUNCAO_CUSTO_VENDA}` : ''),
         primeira ? { count: 'exact' } : undefined)
       .eq('empresa_id', c.acesso.empresaId)
       .eq('status', 'concluida')
@@ -519,7 +529,6 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
     })(),
   ])
   const nomeFilial = new Map(lojas.map((f) => [f.id, f.rotulo]))
-  const fin = c.acesso.verFinanceiro
 
   // Uma venda do PDV com 3 itens são 3 linhas com o mesmo `grupo_pdv`.
   const pedidos = new Set(vendas.map((v) => v.grupo_pdv ?? `v${v.id}`))
@@ -532,17 +541,19 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
   }
   /**
    * LUCRO SÓ ONDE HÁ CUSTO. Medido em 14/10/2026: as vendas da JM não têm
-   * `valor_custo`, e a coluna `lucro` sai igual ao faturamento. Somá-la
-   * anunciaria margem de 100% — número inventado com cara de relatório.
+   * custo, e o lucro sairia igual ao faturamento. Somá-lo anunciaria margem
+   * de 100% — número inventado com cara de relatório. Custo pendente (nulo)
+   * e o 0 das vendas antigas contam como "sem custo".
    */
-  const comCusto = vendas.filter((v) => Number(v.valor_custo ?? 0) > 0)
+  const custoDe = (v: V): number => (fin ? custoDaVenda(v) ?? 0 : 0)
+  const comCusto = vendas.filter((v) => custoDe(v) > 0)
   if (fin) {
     if (!comCusto.length) {
       totais.lucro = null
       totais.aviso_lucro = 'nenhuma venda do período tem custo registrado — lucro e margem não podem ser calculados'
     } else {
       const fatC = comCusto.reduce((s, v) => s + Number(v.valor_venda ?? 0), 0)
-      const custo = comCusto.reduce((s, v) => s + Number(v.valor_custo ?? 0), 0)
+      const custo = comCusto.reduce((s, v) => s + custoDe(v), 0)
       totais.lucro = reais(fatC - custo)
       totais.margem = fatC ? `${Math.round(((fatC - custo) / fatC) * 100)}%` : null
       if (comCusto.length < vendas.length) {
@@ -551,7 +562,7 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
     }
   }
   const lucroDe = (v: V): number | null =>
-    Number(v.valor_custo ?? 0) > 0 ? Number(v.valor_venda ?? 0) - Number(v.valor_custo) : null
+    custoDe(v) > 0 ? Number(v.valor_venda ?? 0) - custoDe(v) : null
 
   const chave = (v: V): string => {
     switch (e.agrupar_por) {
@@ -603,7 +614,7 @@ async function vendasResumo(c: Contexto, e: Entrada): Promise<string> {
     recorte: loja.recorte,
     periodo: `${e.de} a ${e.ate}`,
     escopo: c.acesso.soMinhasVendas ? 'só as vendas deste usuário (permissão do papel)' : 'todas as vendas que o usuário pode ver',
-    ...(fin ? {} : { aviso: 'custo e lucro ocultos: este usuário não tem permissão financeira' }),
+    ...(fin ? {} : { aviso: 'custo, lucro e margem ocultos: este usuário não tem a permissão de ver custo' }),
     totais, grupos, vendas: lista,
     em_aberto: {
       observacao: 'encomendas e pendentes de entrega de agora; NÃO entram no faturamento acima (cada uma conta no dia em que for entregue)',

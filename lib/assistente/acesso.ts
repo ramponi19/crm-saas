@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { permissoesDoVinculo, permsDoContexto } from '@/lib/permissoes-cargo'
+import { permissoesDoVinculo, permsDoContexto, temPermissao } from '@/lib/permissoes-cargo'
 
 /**
  * O QUE QUEM PERGUNTA PODE VER — decidido antes de o chat ler qualquer coisa.
@@ -23,8 +23,11 @@ export interface Acesso {
   soMinhasVendas: boolean
   /** Só os leads dele — e os sem responsável, que são de todos (ver leads/page.tsx). */
   soMeusLeads: boolean
-  /** Custo, lucro e margem. */
-  verFinanceiro: boolean
+  /**
+   * Custo, lucro e margem: a permissão `estoque.ver_custo` (etapa 1.1e). Antes era `core.ver_financeiro`; o custo
+   * tem permissão própria desde a 1.1b e a tela e o chat precisam dizer a mesma coisa para o mesmo cargo.
+   */
+  verCusto: boolean
 }
 
 export async function acessoDoUsuario(
@@ -41,17 +44,17 @@ export async function acessoDoUsuario(
 
   // Super admin é o suporte: precisa conferir a loja inteira.
   if (usuario?.is_super_admin) {
-    return { empresaId, userId, nome, papel: 'superadmin', soMinhasVendas: false, soMeusLeads: false, verFinanceiro: true }
+    return { empresaId, userId, nome, papel: 'superadmin', soMinhasVendas: false, soMeusLeads: false, verCusto: true }
   }
   const papel = vinculo.papel ?? ''
   if (!papel) {
-    return { empresaId, userId, nome, papel: '', soMinhasVendas: true, soMeusLeads: true, verFinanceiro: false }
+    return { empresaId, userId, nome, papel: '', soMinhasVendas: true, soMeusLeads: true, verCusto: false }
   }
   const p = permsDoContexto(vinculo)
   return {
     empresaId, userId, nome, papel,
     soMinhasVendas: !p.verVendasOutros,
     soMeusLeads: !p.verLeadsOutros,
-    verFinanceiro: p.verFinanceiro,
+    verCusto: temPermissao(vinculo, 'estoque.ver_custo'),
   }
 }

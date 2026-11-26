@@ -269,7 +269,8 @@ const STATUS_TONE: Record<string, 'ok' | 'warn' | 'bad' | 'neutro'> = {
   cancelada: 'bad', devolvido: 'neutro',
 }
 
-export function DashboardView({ data }: { data: DashboardData }) {
+/** `verCusto` (estoque.ver_custo): sem ela o servidor nem leu o custo, e o card de lucro e margem não aparece. */
+export function DashboardView({ data, verCusto = false }: { data: DashboardData; verCusto?: boolean }) {
   const {} = useEmpresa()
   const fuso = useFuso()
   const router = useRouter()
@@ -306,9 +307,9 @@ export function DashboardView({ data }: { data: DashboardData }) {
           <OnboardingCard />
 
           {/* KPIs */}
-          {comVendas && <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+          {comVendas && <div className={cn('grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card [&>*]:border-line-soft [&>*:not(:last-child)]:border-r', verCusto ? 'md:grid-cols-4' : 'md:grid-cols-3')}>
             <StatCard bare label={`Vendas · ${periodLabel}`} value={<AnimatedCurrency value={receita} />} spark={sparkNorm} />
-            <LucroBruto lucro={lucro} margem={margem} semCusto={semCusto} qtdVendas={qtdVendas} />
+            {verCusto && <LucroBruto lucro={lucro} margem={margem} semCusto={semCusto} qtdVendas={qtdVendas} />}
             <StatCard bare label="Ticket médio" value={<AnimatedCurrency value={ticketMedio} />} delta="por venda fechada" deltaTone="neutral" />
             <StatCard bare label="Vendas fechadas" value={<AnimatedInt value={qtdVendas} />} delta="no período" deltaTone="neutral" />
           </div>}

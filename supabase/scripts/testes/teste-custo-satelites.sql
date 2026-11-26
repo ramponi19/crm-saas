@@ -1,4 +1,5 @@
--- Teste da 20261126000300_custo_satelites (1.1d, tempo 1). JM de teste (empresa 1, loja 3): dono a632… (Dono,
+-- Teste do custo protegido no ESTADO FINAL (1.1d + 1.1f: 20261126000300 e 20261126000400; tempo 3: coluna antiga vazia).
+-- O comportamento do tempo 1 sozinho foi provado em 26/11 no commit 51768bfa (antes da 0400). JM de teste (empresa 1, loja 3): dono a632… (Dono,
 -- tem estoque.ver_custo), vendedor M1 …0101 (sem). Termina com RAISE: nada fica gravado.
 do $t$
 declare
@@ -67,8 +68,8 @@ begin
     'resultado', venda_resultado(vP) - 'venda_id'));
   x := estoque_custo_informar(uP, 900, null, 'corrigido');
   r := r || jsonb_build_object('4_segunda_vez_venda_nao_muda', jsonb_build_object(
-    'unidade', (select preco_custo from estoque_unidades where id = uP),
-    'venda', (select valor_custo from vendas_vendas where id = vP),
+    'unidade', (select preco_custo from estoque_unidades_custos where unidade_id = uP),
+    'venda', (select valor_custo from vendas_vendas_custos where venda_id = vP),
     'retorno', x -> 'venda_preenchida'));
   r := r || jsonb_build_object('4_pendentes_resumo', estoque_custos_pendentes_resumo() -> 'total');
   -- H2 decide antes: venda concluída não muda de valor pela coluna antiga
@@ -84,7 +85,7 @@ begin
   begin
     perform set_config('nexus.venda_valor_ajuste', 'teste', true);
     update vendas_vendas_custos set valor_custo = 1490 where venda_id = vA;
-    e := (select valor_custo::text from vendas_vendas where id = vA);
+    e := (select valor_custo::text from vendas_vendas_custos where venda_id = vA);
     perform set_config('nexus.venda_valor_ajuste', '', true);
     raise exception 'desfaz';
   exception when others then if sqlerrm <> 'desfaz' then e := sqlerrm; end if; end;
@@ -117,14 +118,27 @@ begin
     'vendedor_sem_valor', (select jsonb_build_array(p.valor_total, c.valor_total) from compras_pedidos p join compras_pedidos_custos c on c.pedido_id = p.id where p.id = n)),
     '7_itens_custo_nulo', (select count(*) from itens where ref_tabela = 'estoque_unidades' and custo is not null));
 
-  -- 8. prova: coluna antiga = satélite em todas as unidades, vendas e compras (contagem e soma por empresa)
-  r := r || jsonb_build_object('8_somas_iguais', jsonb_build_object(
-    'unidades', not exists (select empresa_id, count(*), sum(coalesce(preco_custo, 0)), count(preco_custo) from estoque_unidades where empresa_id is not null group by 1
-                            except select empresa_id, count(*), sum(coalesce(preco_custo, 0)), count(preco_custo) from estoque_unidades_custos group by 1),
-    'vendas', not exists (select empresa_id, count(*), sum(coalesce(valor_custo, 0)), count(valor_custo) from vendas_vendas where empresa_id is not null group by 1
-                          except select empresa_id, count(*), sum(coalesce(valor_custo, 0)), count(valor_custo) from vendas_vendas_custos group by 1),
-    'compras', not exists (select empresa_id, count(*), sum(coalesce(valor_total, 0)), count(valor_total) from compras_pedidos where empresa_id is not null group by 1
-                           except select empresa_id, count(*), sum(coalesce(valor_total, 0)), count(valor_total) from compras_pedidos_custos group by 1)));
+  -- 8. porta de entrada (1.1f): o vendedor grava na coluna antiga → ignorado (sem a permissão); o dono → vai ao satélite;
+  --    nos dois casos a coluna volta a nulo
+  perform set_config('request.jwt.claims', jsonb_build_object('sub', M1::text, 'role', 'authenticated')::text, true);
+  update estoque_unidades set preco_custo = 5 where id = uA;
+  perform set_config('request.jwt.claims', jsonb_build_object('sub', DONO::text, 'role', 'authenticated')::text, true);
+  update estoque_unidades set preco_custo = 1100 where id = uV;
+  -- sem usuário (chave de serviço, script): escrita confiável, vai ao satélite
+  perform set_config('request.jwt.claims', '', true);
+  update estoque_unidades set preco_custo = 321 where id = uR;
+  r := r || jsonb_build_object('8_porta_de_entrada', jsonb_build_object(
+    'vendedor_ignorado', (select jsonb_build_array(u.preco_custo, c.preco_custo) from estoque_unidades u join estoque_unidades_custos c on c.unidade_id = u.id where u.id = uA),
+    'dono_vai_ao_satelite', (select jsonb_build_array(u.preco_custo, c.preco_custo) from estoque_unidades u join estoque_unidades_custos c on c.unidade_id = u.id where u.id = uV),
+    'servico_vai_ao_satelite', (select jsonb_build_array(u.preco_custo, c.preco_custo) from estoque_unidades u join estoque_unidades_custos c on c.unidade_id = u.id where u.id = uR)));
+
+  -- 9. tempo 3: colunas antigas vazias para todos, satélite completo
+  r := r || jsonb_build_object('9_colunas_antigas_vazias', jsonb_build_object(
+    'unidades', not exists (select 1 from estoque_unidades where preco_custo is not null or custo_reparo is not null),
+    'vendas', not exists (select 1 from vendas_vendas where valor_custo is not null or lucro is not null),
+    'compras', not exists (select 1 from compras_pedidos where valor_total is not null),
+    'satelites_completos', not exists (select 1 from estoque_unidades u where u.empresa_id is not null and not exists (select 1 from estoque_unidades_custos c where c.unidade_id = u.id))
+                       and not exists (select 1 from vendas_vendas v where v.empresa_id is not null and not exists (select 1 from vendas_vendas_custos c where c.venda_id = v.id))));
 
   raise exception 'RESULTADO_TESTE_CUSTO_SATELITES %', r::text;
 end $t$;

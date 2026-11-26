@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { AlertTriangle, Check, MessageCircle, PackageCheck, Pencil, ShoppingCart, Truck } from 'lucide-react'
 import { Badge, Button, ConfirmDialog, EmptyState, Input, notify } from '@/components/ui'
@@ -37,7 +38,11 @@ export interface EncomendaPDV {
   cliente_telefone: string | null
   produto_nome: string
   valor_venda: number
-  valor_custo: number
+  /**
+   * Custo da venda, do satélite (etapa 1.1e). `null` = sem `estoque.ver_custo` (o servidor nem pediu) ou custo
+   * pendente. Quem não tem a permissão não recebe número nenhum.
+   */
+  custo: number | null
   previsao_entrega: string | null
   status: string
   unidade_id: number | null
@@ -80,7 +85,8 @@ function juntar(itens: EncomendaPDV[]): Encomenda {
   return {
     ...base,
     valor_venda: soma((i) => i.valor_venda),
-    valor_custo: soma((i) => i.valor_custo),
+    // Um item sem custo (pendente ou sem permissão) deixa o custo do grupo desconhecido, não menor.
+    custo: itens.some((i) => i.custo === null) ? null : soma((i) => i.custo ?? 0),
     sinal_pago: soma((i) => i.sinal_pago),
     produto_nome: itens.length === 1 ? base.produto_nome : `${itens.length} produtos`,
     status_pedido: todos((i) => i.status_pedido === 'recebido') ? 'recebido' : null,
@@ -137,8 +143,10 @@ const soDigitos = (t: string | null) => (t || '').replace(/\D/g, '')
 const dataBR = (iso: string | null) =>
   iso ? iso.slice(0, 10).split('-').reverse().join('/') : null
 
-export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, documentos = [], celulares = false }: {
+export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, verCusto = false, documentos = [], celulares = false }: {
   encomendas: EncomendaPDV[]; taxas?: Taxa[]; isAdmin?: boolean; documentos?: DocumentoDisponivel[]
+  /** `estoque.ver_custo`: o campo de custo do ajuste e o aviso "sem custo". Sem ela, os dois somem. */
+  verCusto?: boolean
   /** Módulo Celulares ligado: o rótulo da entrada em aparelho e o acessório de celular. */
   celulares?: boolean
 }) {
@@ -281,6 +289,10 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
    *
    * O custo vai junto para o pedido de compra: são o mesmo número visto de dois
    * lados, e deixar um só atualizado seria criar a divergência que ninguém acha.
+   *
+   * CUSTO PROTEGIDO (etapa 1.1e): o custo não vai mais no update da venda nem do pedido. Vai pelas RPCs
+   * `venda_custo_ajustar` (só encomenda; audita) e `compras_pedido_salvar`, que conferem `estoque.ver_custo` no
+   * banco — e só quem tem a permissão vê o campo.
    */
   async function salvarAjuste(
     e: Encomenda,
@@ -308,20 +320,32 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
     setOcupado(e.id)
     let erro: string | null = null
     for (const l of linhas) {
-      const vCusto = Number(l.custo) || 0
       const { data: gravou, error } = await supabase.from('vendas_vendas')
-        .update({ valor_venda: Number(l.venda), valor_custo: vCusto, previsao_entrega: prazo || null } as never)
+        .update({ valor_venda: Number(l.venda), previsao_entrega: prazo || null } as never)
         .eq('id', l.id)
         .select('id')
       if (error) { erro = error.message; break }
       if (nadaGravado(gravou)) { erro = NADA_GRAVADO; break }
+      if (!verCusto) continue
+      const item = e.itens.find((i) => i.id === l.id)
+      const vCusto = Number(l.custo) || 0
+      // Só chama quando o custo mudou: cada chamada vira uma linha na Auditoria. Pendente com o campo vazio fica
+      // pendente (não vira zero sem ninguém ter informado).
+      if (vCusto !== (item?.custo ?? 0)) {
+        const { error: eCusto } = await (supabase as unknown as SupabaseClient).rpc('venda_custo_ajustar', {
+          p_venda: l.id, p_custo: vCusto, p_motivo: 'Ajuste da encomenda no PDV',
+        } as never)
+        if (eCusto) { erro = eCusto.message; break }
+      }
       // O custo vai junto para o pedido de compra do MESMO item: são o mesmo
       // número visto de dois lados, e deixar um só atualizado cria a
       // divergência que ninguém acha depois.
-      const pedido = e.itens.find((i) => i.id === l.id)?.pedido_id
+      const pedido = item?.pedido_id
       if (pedido && vCusto > 0) {
-        const { data: noPedido } = await supabase.from('compras_pedidos').update({ valor_total: vCusto } as never).eq('id', pedido).select('id')
-        if (nadaGravado(noPedido)) {
+        const { error: ePedido } = await (supabase as unknown as SupabaseClient).rpc('compras_pedido_salvar', {
+          p: { id: pedido, valor_total: vCusto },
+        } as never)
+        if (ePedido) {
           notify.warn('O custo não foi para o pedido de compra', `Pedido #${pedido}: ajuste o valor em Compras.`)
         }
       }
@@ -426,9 +450,12 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
                   * ainda ia pagar. O aviso na hora de lançar não bastou, porque
                   * some. Aqui ele fica, até alguém resolver.
                   */}
-                {(e.valor_custo <= 0 || !e.tem_fornecedor) && (
+                {/* O aviso de custo é de quem vê custo (etapa 1.1e): sem a permissão, nem o aviso nem o número. */}
+                {((verCusto && !(Number(e.custo) > 0)) || !e.tem_fornecedor) && (
                   <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-warn">
-                    {e.valor_custo <= 0 && <span>⚠ sem custo — o lucro aparece como 100%</span>}
+                    {verCusto && !(Number(e.custo) > 0) && (
+                      <span>{e.custo === null ? '⚠ custo pendente' : '⚠ sem custo — o lucro aparece como 100%'}</span>
+                    )}
                     {!e.tem_fornecedor && <span>⚠ sem fornecedor</span>}
                   </div>
                 )}
@@ -537,6 +564,7 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
               <AjusteInline
                 key={`ajuste-${e.id}`}
                 encomenda={e}
+                verCusto={verCusto}
                 salvando={ocupado === e.id}
                 onCancelar={() => setEditando(null)}
                 onSalvar={(linhas, prazo) => { void salvarAjuste(e, linhas, prazo) }}
@@ -549,9 +577,10 @@ export function EncomendasAbertas({ encomendas, taxas = [], isAdmin = false, doc
   )
 }
 
-/** Os três campos que a encomenda pode ter nascido errados. */
-function AjusteInline({ encomenda, salvando, onSalvar, onCancelar }: {
+/** Os três campos que a encomenda pode ter nascido errados (o custo, só para quem tem `estoque.ver_custo`). */
+function AjusteInline({ encomenda, verCusto, salvando, onSalvar, onCancelar }: {
   encomenda: Encomenda
+  verCusto: boolean
   salvando: boolean
   onSalvar: (linhas: { id: number; venda: string; custo: string }[], prazo: string) => void
   onCancelar: () => void
@@ -561,7 +590,7 @@ function AjusteInline({ encomenda, salvando, onSalvar, onCancelar }: {
       id: i.id,
       nome: i.produto_nome,
       venda: String(i.valor_venda || ''),
-      custo: i.valor_custo > 0 ? String(i.valor_custo) : '',
+      custo: i.custo != null && i.custo > 0 ? String(i.custo) : '',
     })),
   )
   const [prazo, setPrazo] = useState(encomenda.previsao_entrega?.slice(0, 10) ?? '')
@@ -576,11 +605,13 @@ function AjusteInline({ encomenda, salvando, onSalvar, onCancelar }: {
             {linhas.length > 1 && (
               <p className="mb-1 truncate text-[11.5px] font-medium text-ink-2">{l.nome}</p>
             )}
-            <div className="grid grid-cols-2 gap-2">
+            <div className={verCusto ? 'grid grid-cols-2 gap-2' : ''}>
               <Input label="Venda (R$)" type="number" value={l.venda}
                 onChange={(ev) => mexer(l.id, { venda: ev.target.value })} />
-              <Input label="Custo (R$)" type="number" value={l.custo} placeholder="0,00"
-                onChange={(ev) => mexer(l.id, { custo: ev.target.value })} />
+              {verCusto && (
+                <Input label="Custo (R$)" type="number" value={l.custo} placeholder="0,00"
+                  onChange={(ev) => mexer(l.id, { custo: ev.target.value })} />
+              )}
             </div>
           </div>
         ))}

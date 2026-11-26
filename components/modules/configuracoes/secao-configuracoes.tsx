@@ -5,6 +5,7 @@ import { semSegredos } from '@/lib/segredos'
 import { notFound } from 'next/navigation'
 import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { ABAS_DE_MODULO, abasDosModulos } from '@/core/modulos'
+import { contextoDaSessao, temPermissao } from '@/lib/sessao'
 
 /**
  * UMA ABA DA ANTIGA /admin/configuracoes COMO SEÇÃO PRÓPRIA (navegação nova, 21/10/2026).
@@ -55,7 +56,7 @@ async function carregar() {
 }
 
 export async function SecaoConfiguracoes({ aba, titulo }: { aba: string; titulo: string }) {
-  const { ligados, ...dados } = await carregar()
+  const [{ ligados, ...dados }, ctx] = await Promise.all([carregar(), contextoDaSessao()])
   const abas = abasDosModulos(ligados)
   // Portais de imóveis e de veículos moram no mesmo endereço: vale o do módulo ligado.
   const abaReal = aba === 'portais' && !abas.includes('portais') && abas.includes('veiculos-portais') ? 'veiculos-portais' : aba
@@ -63,7 +64,7 @@ export async function SecaoConfiguracoes({ aba, titulo }: { aba: string; titulo:
   return (
     <>
       <Topbar title={titulo} />
-      <ConfiguracoesView {...dados} aba={abaReal} />
+      <ConfiguracoesView {...dados} aba={abaReal} verCusto={temPermissao(ctx, 'estoque.ver_custo')} />
     </>
   )
 }

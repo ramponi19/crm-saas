@@ -28,11 +28,12 @@ interface Venda {
   canal_venda: string | null
   valor_venda: number
   desconto_valor: number | null
+  /** Venda − custo, calculado no servidor (etapa 1.1e). Nulo sem estoque.ver_custo ou com custo pendente. */
   lucro: number | null
   /**
-   * Custo da venda. Entra aqui para a tela detectar quando o "Lucro total" é
-   * FICTÍCIO: `lucro` é coluna gerada (venda − custo), então custo zerado devolve o
-   * faturamento inteiro como se fosse margem.
+   * Custo da venda, do satélite vendas_vendas_custos (etapa 1.1e); nulo sem estoque.ver_custo. Entra aqui para a
+   * tela detectar quando o lucro seria FICTÍCIO: custo zerado (as vendas antigas) devolveria o faturamento inteiro
+   * como se fosse margem.
    */
   valor_custo?: number | null
   forma_pagamento: string | null
@@ -119,7 +120,7 @@ function exportCSV(rows: Venda[], fuso: string, verCusto: boolean) {
       formatarData(v.data_venda, undefined, '', fuso),
       v.cliente_nome ?? '', v.produto_nome ?? '', v.vendedor_nome ?? '',
       CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '',
-      // Sem custo lançado o lucro fica em branco: a coluna gerada daria o preço cheio.
+      // Sem custo lançado o lucro fica em branco: venda − 0 daria o preço cheio.
       v.valor_venda, v.desconto_valor ?? 0,
       ...(verCusto ? [temCusto({ valor_custo: v.valor_custo ?? null }) ? (v.lucro ?? 0) : ''] : []),
       v.troca_pendente ? 'sim' : 'nao',
@@ -161,29 +162,26 @@ async function exportClientes(fuso: string) {
   )
 }
 
-/** O IMEI entra no arquivo só com o módulo Celulares ligado. */
-async function exportEstoque(fuso: string, celulares: boolean, verCusto: boolean) {
-  const supabase = createClient()
-  // Sem estoque.ver_custo o custo nem é pedido (nem vai para a planilha).
-  const { data, error } = await supabase
-    .from('estoque_unidades')
-    .select(`imei, numero_serie, estado, status, ${verCusto ? 'preco_custo, ' : ''}preco_venda, produtos:estoque_produtos!produto_id(nome)`)
-    .eq('ativo', true)
-    .order('id', { ascending: false })
-  if (error || !data) { toast.error('Erro ao exportar estoque'); return }
-  if (data.length === 0) { toast.info('Nenhuma unidade para exportar'); return }
-  downloadCSV(
-    'estoque',
-    ['Produto', ...(celulares ? [RELATORIOS_CELULAR.colunaImei] : []), 'Nº Série', 'Estado', 'Status', ...(verCusto ? ['Custo'] : []), 'Venda'],
-    (data as unknown as Array<{ imei: string | null; numero_serie: string | null; estado: string | null; status: string | null; preco_custo?: number | null; preco_venda: number | null; produtos: { nome: string | null } | { nome: string | null }[] | null }>).map(u => {
-      const prod = Array.isArray(u.produtos) ? u.produtos[0] : u.produtos
-      return [
-        prod?.nome ?? '', ...(celulares ? [u.imei ?? ''] : []), u.numero_serie ?? '', u.estado ?? '',
-        u.status ?? '', ...(verCusto ? [u.preco_custo ?? 0] : []), u.preco_venda ?? 0,
-      ]
-    }),
-    fuso,
-  )
+/**
+ * CSV DE ESTOQUE PELO SERVIDOR (etapa 1.1e). Antes o navegador lia `estoque_unidades.preco_custo` direto; agora a
+ * rota /api/relatorios/estoque-csv monta o arquivo: exige core.exportar, decide o IMEI pelo módulo Celulares e só
+ * põe o custo (do satélite) com estoque.ver_custo. A tela só baixa.
+ */
+async function exportEstoque(fuso: string) {
+  const r = await fetch('/api/relatorios/estoque-csv').catch(() => null)
+  if (!r || !r.ok) {
+    const erro = r ? ((await r.json().catch(() => ({}))) as { error?: string }).error : undefined
+    toast.error('Erro ao exportar estoque', erro ? { description: erro } : undefined)
+    return
+  }
+  if (r.headers.get('X-Linhas') === '0') { toast.info('Nenhuma unidade para exportar'); return }
+  const blob = await r.blob()
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  // O dia do nome do arquivo é o da loja: às 22h ainda é hoje, não amanhã (UTC).
+  a.download = `estoque_${diaNoFuso(agora(), fuso)}.csv`
+  a.click()
+  URL.revokeObjectURL(a.href)
 }
 
 function BarChart({ vendas }: { vendas: Venda[] }) {
@@ -254,7 +252,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores, emAberto, de, 
     /**
      * Vendas concluídas SEM custo lançado.
      *
-     * Cada uma soma o preço cheio no "Lucro total", porque `lucro` é venda − custo.
+     * Cada uma somaria o preço cheio no "Lucro total", porque lucro é venda − custo.
      * Hoje isso vale para 100% das vendas da JM: o relatório mostra margem total
      * onde não há informação de margem nenhuma — e número que parece calculado é
      * pior que número ausente, porque ninguém desconfia dele.
@@ -460,7 +458,7 @@ export function RelatoriosView({ vendas, lancamentos, vendedores, emAberto, de, 
               {[
                 { label: 'Exportar Vendas',      sub: 'Todas as vendas do período filtrado',  action: () => exportCSV(vendasFiltradas, fuso, verCusto) },
                 { label: 'Exportar Clientes',    sub: 'Lista completa de clientes', action: () => exportClientes(fuso) },
-                { label: 'Exportar Estoque',     sub: 'Inventário atual',           action: () => exportEstoque(fuso, celulares, verCusto) },
+                { label: 'Exportar Estoque',     sub: 'Inventário atual',           action: () => exportEstoque(fuso) },
                 ...(verFinanceiro ? [{ label: 'Exportar Financeiro',  sub: 'Lançamentos financeiros',    action: () => exportFinanceiro(lancamentos, fuso) }] : []),
               ].map(e => (
                 <button key={e.label} onClick={e.action}

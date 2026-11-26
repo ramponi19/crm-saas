@@ -1,5 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { createServiceClient } from '@/lib/supabase/service'
 import type { Json } from '@/types/database'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { exigirModuloLigado } from '@/lib/modulo-ligado'
@@ -110,6 +112,8 @@ export async function PATCH(req: Request) {
       const v = (av.veiculo ?? {}) as Veiculo
       const desc = [v.marca, v.modelo, v.versao].filter(Boolean).join(' ')
       const produtoId = await resolverProduto(supabase, empresaId!, v)
+      // A unidade nasce sem as colunas de custo (etapa 1.1e: o app não grava mais a coluna antiga); o custo vai para
+      // o satélite logo abaixo.
       const { data: unidade } = await supabase.from('estoque_unidades').insert({
         empresa_id: empresaId,
         produto_id: produtoId,
@@ -118,16 +122,29 @@ export async function PATCH(req: Request) {
         ano: v.ano ?? null,
         cor: v.cor ?? null,
         km: av.km ?? null,
-        preco_custo: av.valor_ofertado ?? null,
         condicao: 'usado',
         estado: 'bom',
         tipo: 'troca',
         status: 'disponivel',
         observacoes: `Entrada por avaliação #${av.id}${desc ? ` — ${desc}` : ''}.`,
         ativo: true,
-      } as never).select('id').single()
+      } as never).select('id, filial_id').single()
       if (unidade?.id) {
         unidadeId = unidade.id
+        /**
+         * O CUSTO DO USADO É O VALOR OFERTADO na avaliação (o que a loja pagou). O satélite não tem escrita pelo
+         * navegador: o servidor grava com a chave de serviço, origem `avaliacao`, e o valor não volta na resposta.
+         * Sem valor ofertado, a unidade fica com custo pendente.
+         */
+        if (av.valor_ofertado != null) {
+          const svc = createServiceClient() as unknown as SupabaseClient
+          const { error: eCusto } = await svc.from('estoque_unidades_custos').upsert({
+            unidade_id: unidade.id, empresa_id: empresaId,
+            filial_id: (unidade as { filial_id?: number | null }).filial_id ?? null,
+            preco_custo: av.valor_ofertado, custo_origem: 'avaliacao',
+          }, { onConflict: 'unidade_id' })
+          if (eCusto) console.error('[avaliacoes] custo da unidade não gravado', unidade.id, eCusto.message)
+        }
         await supabase.from('avaliacoes_usados').update({ unidade_id: unidade.id } as never).eq('id', id).eq('empresa_id', empresaId)
       }
     }

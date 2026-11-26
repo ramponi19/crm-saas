@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { margem as margemDe } from '@/lib/custo'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Modal, Input, Select, Textarea, Button, ConfirmDialog, UploadFotos, notify } from '@/components/ui'
-import type { TablesInsert, TablesUpdate } from '@/types/database'
+import type { TablesUpdate } from '@/types/database'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
 import { ESTOQUE_CELULAR } from '@/components/modules/celulares/rotulos'
 import { CamposCelularModal, CampoBateriaModal } from '@/components/modules/celulares/campos-unidade'
@@ -45,6 +46,8 @@ interface Props {
   isVeiculo?: boolean
   /** Módulo Celulares ligado: IMEI 1 e 2, bateria, armazenamento, seminovo. */
   celulares?: boolean
+  /** estoque.ver_custo (etapa 1.1e): sem ela não há campo de custo; a unidade nova nasce com custo pendente. */
+  verCusto?: boolean
   onClose: () => void
 }
 
@@ -67,7 +70,7 @@ const EMPTY: Unidade = {
 
 const supabase = createClient()
 
-export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, celulares = false, onClose }: Props) {
+export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, celulares = false, onClose, verCusto = false }: Props) {
   const router = useRouter()
   const R = celulares ? ESTOQUE_CELULAR : GENERICO
   const isNew = !unidade?.id
@@ -96,9 +99,11 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, ce
     setForm(f => ({ ...f, [field]: value }))
   }
 
-  const margem = form.preco_venda && form.preco_custo
-    ? ((form.preco_venda - form.preco_custo) / form.preco_custo * 100).toFixed(1)
-    : null
+  // Fórmula única (lib/custo): margem sobre o PREÇO DE VENDA, custo = custo + reparo. Antes este modal dividia
+  // pelo custo e a lista pela venda: a mesma peça mostrava duas margens.
+  const margemNum = verCusto && form.preco_venda && form.preco_custo
+    ? margemDe(Number(form.preco_venda), Number(form.preco_custo) + (Number(form.custo_reparo) || 0)) : null
+  const margem = margemNum != null ? margemNum.toFixed(1) : null
 
   // Modelo selecionado → listas exclusivas de cor/armazenamento (se cadastradas).
   const produtoSel = produtos.find((p) => p.id === form.produto_id)
@@ -117,7 +122,8 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, ce
       produto_id: form.produto_id,
       imei: form.imei, imei2: form.imei2, numero_serie: form.numero_serie, bateria: form.bateria,
       condicao: form.condicao, cor: form.cor, armazenamento: form.armazenamento,
-      preco_custo: num(form.preco_custo), preco_venda: num(form.preco_venda), custo_reparo: num(form.custo_reparo),
+      // Etapa 1.1e: sem preco_custo/custo_reparo. O custo vai pelo banco (estoque_unidade_criar / estoque_custo_informar).
+      preco_venda: num(form.preco_venda),
       fornecedor_id: form.fornecedor_id, observacoes: form.observacoes, fotos_urls: form.fotos_urls, status: form.status, tipo: form.tipo, estado: form.estado,
       placa: form.placa, chassi: form.chassi, renavam: form.renavam, km: num(form.km), ano: num(form.ano),
     }
@@ -146,18 +152,32 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, ce
     }
 
     if (isNew) {
-      const { data, error } = await supabase
-        .from('estoque_unidades')
-        .insert(payload as TablesInsert<'estoque_unidades'>)
-        .select('id').single()
-      if (error) { notify.bad('Erro ao cadastrar', error.message); setSaving(false); return }
-      await gravarVeiculo(data.id)
+      // Nasce pela função do banco: o custo entra só com a permissão (ou na troca); sem ela, fica pendente.
+      const p = verCusto ? { ...payload, preco_custo: num(form.preco_custo), custo_reparo: num(form.custo_reparo) } : payload
+      const { data: novoId, error } = await supabase.rpc('estoque_unidade_criar' as never, { p } as never)
+      if (error || novoId == null) { notify.bad('Erro ao cadastrar', error?.message ?? 'Sem resposta do banco'); setSaving(false); return }
+      await gravarVeiculo(Number(novoId))
       notify.ok('Unidade adicionada ao estoque')
     } else {
       const { data: gravou, error } = await supabase.from('estoque_unidades').update(payload as TablesUpdate<'estoque_unidades'>).eq('id', unidade!.id!).select('id')
       if (error) { notify.bad('Erro ao salvar', error.message); setSaving(false); return }
       if (nadaGravado(gravou)) { notify.bad('Erro ao salvar', NADA_GRAVADO); setSaving(false); return }
       await gravarVeiculo(unidade!.id!)
+      // Custo mudou (só com a permissão): pelo banco, com auditoria. Se a unidade foi vendida com custo pendente, a
+      // venda recebe o custo uma vez.
+      const custoMudou = verCusto
+        && (num(form.preco_custo) !== num(unidade?.preco_custo) || num(form.custo_reparo) !== num(unidade?.custo_reparo))
+      if (custoMudou && num(form.preco_custo) == null) {
+        // estoque_custo_informar exige o custo: reparo sozinho, ou custo apagado, não grava — avisar em vez de calar
+        notify.warn('Unidade atualizada, mas o custo não', 'Informe o preço de custo para gravar o custo e o reparo.')
+        router.refresh(); setSaving(false); onClose(); return
+      }
+      if (custoMudou) {
+        const { error: erroCusto } = await supabase.rpc('estoque_custo_informar' as never, {
+          p_unidade: unidade!.id!, p_custo: num(form.preco_custo), p_reparo: num(form.custo_reparo), p_motivo: 'editado na unidade',
+        } as never)
+        if (erroCusto) { notify.bad('Custo não gravado', erroCusto.message); setSaving(false); return }
+      }
       notify.ok('Unidade atualizada')
     }
     router.refresh()
@@ -282,14 +302,17 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, ce
             </>
           )}
 
-          <Input
-            label="Preço de custo"
-            type="number"
-            value={form.preco_custo ?? ''}
-            onChange={e => set('preco_custo', e.target.value ? Number(e.target.value) : null)}
-            placeholder="0,00"
-            className="num"
-          />
+          {verCusto && (
+            <Input
+              label="Preço de custo"
+              hint={!isNew && unidade?.preco_custo == null ? 'Custo pendente: informe para fechar a margem' : undefined}
+              type="number"
+              value={form.preco_custo ?? ''}
+              onChange={e => set('preco_custo', e.target.value ? Number(e.target.value) : null)}
+              placeholder="0,00"
+              className="num"
+            />
+          )}
           <Input
             label="Preço de venda"
             hint={margem ? `${margem}% margem` : undefined}
@@ -304,14 +327,16 @@ export default function UnidadeModal({ unidade, empresaId, isVeiculo = false, ce
             <option value="">Nenhum</option>
             {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome_fantasia}</option>)}
           </Select>
-          <Input
-            label="Custo de reparo"
-            type="number"
-            value={form.custo_reparo ?? ''}
-            onChange={e => set('custo_reparo', e.target.value || null)}
-            placeholder="0,00"
-            className="num"
-          />
+          {verCusto && (
+            <Input
+              label="Custo de reparo"
+              type="number"
+              value={form.custo_reparo ?? ''}
+              onChange={e => set('custo_reparo', e.target.value || null)}
+              placeholder="0,00"
+              className="num"
+            />
+          )}
 
           <Textarea
             wrapperClassName="col-span-2"

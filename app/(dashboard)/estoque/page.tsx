@@ -6,6 +6,8 @@ import { getEmpresaRole } from '@/lib/owner'
 import { separacaoAtiva } from '@/lib/filiais'
 import type { Tables } from '@/types/database'
 import { consultaClientes } from '@/lib/clientes'
+import { contextoDaSessao, temPermissao } from '@/lib/sessao'
+import { COLUNAS_UNIDADE, JUNCAO_CUSTO_UNIDADE, custoDaUnidade } from '@/lib/custo'
 
 export const metadata = { title: 'Estoque' }
 
@@ -13,7 +15,9 @@ type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
 export default async function EstoquePage() {
-  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  const [supabase, empresaId, ctx] = await Promise.all([createClient(), getEmpresaId(), contextoDaSessao()])
+  // Etapa 1.1e: custo só com estoque.ver_custo. Sem a permissão o servidor nem pede a junção do satélite.
+  const verCusto = temPermissao(ctx, 'estoque.ver_custo')
 
   const [{ data: unidades }, { data: marcas }, { data: categorias }, { data: produtosRaw }, { data: movsRaw }, comPlaca, { data: clientesRaw }, { data: tabelaRaw }, { data: fornecedoresRaw }, { data: filiaisRaw }] = await Promise.all([
     supabase
@@ -23,7 +27,7 @@ export default async function EstoquePage() {
       // `usuarios!usuario_id(nome)` derruba a consulta INTEIRA no PostgREST e a
       // página recebe `null` — o estoque aparecia vazio. O nome vem numa consulta
       // separada, logo abaixo.
-      .select(`*, produtos:estoque_produtos!produto_id(nome, foto_url, marcas_produtos:estoque_marcas!marca_id(nome)), fornecedores:estoque_fornecedores!fornecedor_id(nome_fantasia)`)
+      .select(`${COLUNAS_UNIDADE}, ${verCusto ? `${JUNCAO_CUSTO_UNIDADE}, ` : ''}produtos:estoque_produtos!produto_id(nome, foto_url, marcas_produtos:estoque_marcas!marca_id(nome)), fornecedores:estoque_fornecedores!fornecedor_id(nome_fantasia)`)
       .eq('empresa_id', empresaId)
       .eq('ativo', true)
       .order('created_at', { ascending: false }),
@@ -51,6 +55,10 @@ export default async function EstoquePage() {
 
   // Transferir mexe no estoque de duas lojas — mesma régua da tela de filiais.
   const papel = await getEmpresaRole()
+  // Contador da aba "Custo pendente" (a função recusa quem não tem a permissão; aqui nem é chamada).
+  const pendentes = verCusto
+    ? Number(((await supabase.rpc('estoque_custos_pendentes_resumo' as never)).data as { total?: number } | null)?.total ?? 0)
+    : 0
 
   // O que é de ramo aparece só com o módulo dono ligado: Celulares (IMEI,
   // bateria, seminovo, modelo Apple) e Avaliações (veículo — e só para quem tem o
@@ -60,7 +68,7 @@ export default async function EstoquePage() {
   // Nome de quem respondeu pela unidade (entrada por troca). Consulta à parte
   // porque o embed não é possível — ver o comentário no select acima.
   const responsaveisIds = [...new Set(
-    ((unidades ?? []) as { usuario_id: string | null }[])
+    ((unidades ?? []) as unknown as { usuario_id: string | null }[])
       .map((u) => u.usuario_id).filter((id): id is string => !!id),
   )]
   const nomePorUsuario = new Map<string, string>()
@@ -71,7 +79,8 @@ export default async function EstoquePage() {
     }
   }
 
-  type UnidadeRow = Tables<'estoque_unidades'> & {
+  type UnidadeRow = Omit<Tables<'estoque_unidades'>, 'preco_custo' | 'custo_reparo'> & {
+    custo?: { preco_custo: number | null; custo_reparo: number | null } | null
     produtos: Embed<{ nome: string | null; foto_url: string | null; marcas_produtos: Embed<{ nome: string | null }> }>
     fornecedores: Embed<{ nome_fantasia: string | null }>
   }
@@ -80,8 +89,13 @@ export default async function EstoquePage() {
 
   const itens = ((unidades ?? []) as unknown as UnidadeRow[]).map(u => {
     const prod = one(u.produtos)
+    const custo = verCusto ? custoDaUnidade(u) : null
+    const { custo: _c, ...resto } = u
     return {
-      ...u,
+      ...resto,
+      // do satélite, com a permissão; sem ela, nulo (a tela esconde a coluna)
+      preco_custo: custo?.preco_custo ?? null,
+      custo_reparo: custo?.custo_reparo ?? null,
       produto_id: u.produto_id ?? null,
       produto_nome: prod?.nome ?? (u.observacoes?.split(' (cliente')[0]?.trim() || '—'),
       produto_foto: prod?.foto_url ?? null,
@@ -141,6 +155,8 @@ export default async function EstoquePage() {
       celulares={ligados.has(HREF_CELULARES)}
       filiais={filiais}
       podeTransferir={separacaoAtiva(filiais) && (papel === 'owner' || papel === 'admin')}
+      verCusto={verCusto}
+      pendentes={pendentes}
     />
   )
 }

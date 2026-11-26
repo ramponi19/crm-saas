@@ -4,11 +4,12 @@ import { capacidades, carregarConfigEmpresa } from '@/lib/empresa-config'
 import { escopoDoUsuario } from '@/lib/escopo'
 import { painelCompleto } from '@/lib/painel/metricas'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
+import { contextoDaSessao, temPermissao } from '@/lib/sessao'
 import DashboardImob from '@/components/modules/imoveis/dashboard-imob'
 
 export const metadata = { title: 'Dashboard' }
 
-async function getDashboardData() {
+async function getDashboardData(verCusto: boolean) {
   const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
 
   /**
@@ -18,9 +19,12 @@ async function getDashboardData() {
    *
    * Uma conta só, aqui no servidor (lib/painel/metricas.ts → painelCompleto). Até
    * 21/10/2026 o navegador ainda chamava /api/dashboard e refazia tudo.
+   *
+   * Custo protegido (etapa 1.1e): sem estoque.ver_custo o custo nem é lido; lucro e margem ficam nulos e o card
+   * some da tela.
    */
   const [escopo, fuso] = await Promise.all([escopoDoUsuario(supabase, empresaId), fusoDaEmpresa(supabase, empresaId)])
-  return painelCompleto(supabase, empresaId, escopo, fuso)
+  return painelCompleto(supabase, empresaId, escopo, fuso, { verCusto })
 }
 
 export default async function DashboardPage() {
@@ -30,6 +34,7 @@ export default async function DashboardPage() {
   if (capacidades(await carregarConfigEmpresa(supabase, empresaId ?? 0)).telasProprias) {
     return <DashboardImob />
   }
-  const data = await getDashboardData()
-  return <DashboardView data={data} />
+  const verCusto = temPermissao(await contextoDaSessao(), 'estoque.ver_custo')
+  const data = await getDashboardData(verCusto)
+  return <DashboardView data={data} verCusto={verCusto} />
 }

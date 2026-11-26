@@ -14,17 +14,26 @@ import { embedLead } from '@/lib/leads'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
 import { agora, inicioDoDiaHaDias } from '@/lib/datas'
 import { DIAS_DA_MEDIANA, medianasPorProduto, referenciaDoProduto } from '@/lib/valor-abaixo-do-catalogo'
+import { contextoDaSessao, temPermissao } from '@/lib/sessao'
+import { JUNCAO_CUSTO_VENDA, custoDaVenda } from '@/lib/custo'
+import { valoresDaTroca } from '@/lib/troca-referencia'
 
 export const metadata = { title: 'PDV' }
 
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
 
-const SELECT_RESERVA: string = 'id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, fotos_urls, observacoes, reservado_lead_id, reservado_por, reserva_expira_em, produtos:estoque_produtos!produto_id(nome, preco, garantia_dias, foto_url, marcas_produtos:estoque_marcas!marca_id(nome)), '
+const SELECT_RESERVA: string = 'id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_venda, status, fotos_urls, observacoes, reservado_lead_id, reservado_por, reserva_expira_em, produtos:estoque_produtos!produto_id(nome, preco, garantia_dias, foto_url, marcas_produtos:estoque_marcas!marca_id(nome)), '
   + embedLead('inventario_unidades_reservado_lead_id_fkey')
 
 export default async function PDVPage() {
-  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  const [supabase, empresaId, ctx] = await Promise.all([createClient(), getEmpresaId(), contextoDaSessao()])
+  /**
+   * CUSTO PROTEGIDO (etapa 1.1e): o PDV não lê custo de unidade nem de venda — o custo da venda é o gatilho do banco
+   * que grava, a partir da unidade. A única leitura é o custo das encomendas em aberto (o lápis do ajuste), e só
+   * com `estoque.ver_custo`: sem ela o servidor nem pede a junção e a tela não recebe custo nenhum.
+   */
+  const verCusto = temPermissao(ctx, 'estoque.ver_custo')
 
   // Expiração preguiçosa das reservas de lead (48h): vencida volta a disponível.
   await supabase
@@ -50,7 +59,7 @@ export default async function PDVPage() {
       .from('estoque_unidades')
       // `quantidade` = saldo do lote (item sem série). `tipo_formulario` da
       // categoria diz se o item é vendido por peça ou por quantidade.
-      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_custo, preco_venda, status, quantidade, fotos_urls, observacoes, produtos:estoque_produtos!produto_id(nome, preco, garantia_dias, foto_url, marcas_produtos:estoque_marcas!marca_id(nome), categorias_produtos:estoque_categorias!categoria_id(tipo_formulario))')
+      .select('id, produto_id, imei, numero_serie, cor, armazenamento, bateria, condicao, estado, preco_venda, status, quantidade, fotos_urls, observacoes, produtos:estoque_produtos!produto_id(nome, preco, garantia_dias, foto_url, marcas_produtos:estoque_marcas!marca_id(nome), categorias_produtos:estoque_categorias!categoria_id(tipo_formulario))')
       .eq('empresa_id', empresaId)
       .eq('ativo', true).eq('status', 'disponivel')
       .order('created_at', { ascending: false }),
@@ -65,7 +74,7 @@ export default async function PDVPage() {
     consultaClientes(supabase, 'id, nome, telefone, cpf_cnpj').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     supabase.from('financeiro_taxas').select('*').eq('empresa_id', empresaId).eq('ativo', true),
     supabase.from('vendas_vendas')
-      .select('id, valor_venda, valor_custo, lucro, forma_pagamento, data_venda, status, clientes:contatos!cliente_id(nome), produtos:estoque_produtos!produto_id(nome)')
+      .select('id, valor_venda, forma_pagamento, data_venda, status, clientes:contatos!cliente_id(nome), produtos:estoque_produtos!produto_id(nome)')
       .eq('empresa_id', empresaId)
       .order('data_venda', { ascending: false }).limit(20),
     carregarConfigEmpresa(supabase, empresaId ?? 0),
@@ -81,11 +90,11 @@ export default async function PDVPage() {
      * três da JM estavam paradas há 28, 21 e 1 dia sem ninguém ver — cortar a
      * lista seria recriar o problema com outro nome.
      *
-     * O embed de `vendas_pagamentos` traz o sinal já pago; o de
-     * `pedidos_compra`, se a peça chegou.
+     * O embed de `vendas_pagamentos` traz o sinal já pago (e, pela forma `troca`, o valor dado pelo aparelho da
+     * entrada); o de `pedidos_compra`, se a peça chegou. O custo vem do satélite e só com a permissão.
      */
     supabase.from('vendas_vendas')
-      .select('id, produto_id, valor_venda, valor_custo, previsao_entrega, status, observacoes, unidade_id, data_venda, grupo_pdv, cliente_id, clientes:contatos!cliente_id(nome, telefone), produtos:estoque_produtos!produto_id(nome, preco), pedidos_compra:compras_pedidos!pedido_compra_id(id, status, fornecedor_id, solicitado_em), vendas_pagamentos(valor_pago)')
+      .select(`id, produto_id, valor_venda, ${verCusto ? `${JUNCAO_CUSTO_VENDA}, ` : ''}previsao_entrega, status, observacoes, unidade_id, data_venda, grupo_pdv, cliente_id, clientes:contatos!cliente_id(nome, telefone), produtos:estoque_produtos!produto_id(nome, preco), pedidos_compra:compras_pedidos!pedido_compra_id(id, status, fornecedor_id, solicitado_em), vendas_pagamentos(id, valor_pago, forma_pagamento)` as string)
       .eq('empresa_id', empresaId)
       .in('status', ['encomenda', 'pendente_entrega'])
       .order('previsao_entrega', { ascending: true, nullsFirst: false }),
@@ -121,16 +130,20 @@ export default async function PDVPage() {
    * trazer isto, o aparelho existiria no estoque e não na tela onde a encomenda
    * vive, e o vendedor não teria como conferir na frente do cliente o que foi
    * entregue na entrada.
+   *
+   * O VALOR de cada aparelho não vem mais do `preco_custo` da unidade (custo, protegido, e muda depois): vem do
+   * pagamento em troca do grupo (`vendas_pagamentos`, forma `troca`), que é o que o cliente recebeu (roteiro C2).
    */
   const gruposAbertos = [...new Set(
-    ((encomendasRaw ?? []) as { grupo_pdv: string | null }[])
+    ((encomendasRaw ?? []) as unknown as { grupo_pdv: string | null }[])
       .map((v) => v.grupo_pdv).filter((g): g is string => !!g),
   )]
   const { data: trocasRaw } = gruposAbertos.length > 0
     ? await supabase.from('estoque_unidades')
-        .select('id, grupo_pdv, imei, preco_custo, observacoes, status')
+        .select('id, grupo_pdv, imei, observacoes, status')
         .eq('empresa_id', empresaId).eq('tipo', 'troca').eq('ativo', true)
         .in('grupo_pdv', gruposAbertos)
+        .order('id')
     : { data: [] }
 
   type UnidadeRow = Tables<'estoque_unidades'> & {
@@ -187,28 +200,43 @@ export default async function PDVPage() {
   }))
 
   type EncomendaRow = {
-    id: number; produto_id: number | null; valor_venda: number | null; valor_custo: number | null; grupo_pdv: string | null; cliente_id: number | null
+    id: number; produto_id: number | null; valor_venda: number | null; grupo_pdv: string | null; cliente_id: number | null
     previsao_entrega: string | null; status: string | null; observacoes: string | null
     unidade_id: number | null; data_venda: string | null
     clientes: Embed<{ nome: string | null; telefone: string | null }>
     produtos: Embed<{ nome: string | null; preco: number | null }>
     pedidos_compra: Embed<{ id: number; status: string | null; fornecedor_id: number | null; solicitado_em: string | null }>
-    vendas_pagamentos: { valor_pago: number | null }[] | null
+    vendas_pagamentos: { id: number; valor_pago: number | null; forma_pagamento: string | null }[] | null
+    /** Satélite do custo: só vem com `estoque.ver_custo`. */
+    custo?: Embed<{ valor_custo: number | null }>
   }
   // Módulo Celulares ligado: a troca de aparelho, o IMEI e os textos de celular no PDV.
   const celulares = ligadosDaEmpresa(cfgEmpresa).has(HREF_CELULARES)
   const trocaSemDescricao = celulares ? ENCOMENDA_CELULAR.trocaSemDescricao : 'Item'
-  const trocaPorGrupo = new Map<string, { descricao: string; imei: string | null; valor: number }[]>()
-  for (const t of (trocasRaw ?? []) as { grupo_pdv: string | null; imei: string | null; preco_custo: number | null; observacoes: string | null }[]) {
+  // O que foi pago em troca, por grupo, na ordem de gravação (a linha fica na venda que recebeu o sinal; o grupo junta).
+  const pagoEmTrocaPorGrupo = new Map<string, { id: number; valor: number }[]>()
+  for (const v of (encomendasRaw ?? []) as unknown as EncomendaRow[]) {
+    if (!v.grupo_pdv) continue
+    for (const p of v.vendas_pagamentos ?? []) {
+      if (p.forma_pagamento !== 'troca') continue
+      pagoEmTrocaPorGrupo.set(v.grupo_pdv, [...(pagoEmTrocaPorGrupo.get(v.grupo_pdv) ?? []), { id: p.id, valor: Number(p.valor_pago) || 0 }])
+    }
+  }
+  const unidadesTrocaPorGrupo = new Map<string, { imei: string | null; observacoes: string | null }[]>()
+  for (const t of (trocasRaw ?? []) as { grupo_pdv: string | null; imei: string | null; observacoes: string | null }[]) {
     if (!t.grupo_pdv) continue
-    const lista = trocaPorGrupo.get(t.grupo_pdv) ?? []
-    lista.push({
+    unidadesTrocaPorGrupo.set(t.grupo_pdv, [...(unidadesTrocaPorGrupo.get(t.grupo_pdv) ?? []), t])
+  }
+  const trocaPorGrupo = new Map<string, { descricao: string; imei: string | null; valor: number }[]>()
+  for (const [grupo, unidadesTroca] of unidadesTrocaPorGrupo) {
+    const pagos = (pagoEmTrocaPorGrupo.get(grupo) ?? []).sort((a, b) => a.id - b.id).map((p) => p.valor)
+    const valores = valoresDaTroca(unidadesTroca.length, pagos)
+    trocaPorGrupo.set(grupo, unidadesTroca.map((t, i) => ({
       // A descricao mora antes do travessao: "iPhone 13 128GB — entrada da encomenda de Fulano."
       descricao: (t.observacoes ?? '').split(' — ')[0] || trocaSemDescricao,
       imei: t.imei,
-      valor: Number(t.preco_custo) || 0,
-    })
-    trocaPorGrupo.set(t.grupo_pdv, lista)
+      valor: valores[i] ?? 0,
+    })))
   }
 
   const encomendas: EncomendaPDV[] = ((encomendasRaw ?? []) as unknown as EncomendaRow[]).map((v) => {
@@ -226,7 +254,8 @@ export default async function PDVPage() {
       produto_nome: one(v.produtos)?.nome
         ?? (v.observacoes?.replace(/^Encomenda:\s*/i, '').split('.')[0]?.trim() || 'Produto não identificado'),
       valor_venda: Number(v.valor_venda) || 0,
-      valor_custo: Number(v.valor_custo) || 0,
+      // null = sem a permissão (a junção nem foi pedida) ou custo pendente.
+      custo: verCusto ? custoDaVenda(v) : null,
       referencia: referenciaDoProduto(one(v.produtos)?.preco, v.produto_id != null ? medianas[v.produto_id] : null),
       previsao_entrega: v.previsao_entrega,
       status: v.status ?? 'encomenda',
@@ -262,6 +291,7 @@ export default async function PDVPage() {
           encomendas={encomendas}
           medianas={medianas}
           isAdmin={isAdmin}
+          verCusto={verCusto}
         documentos={documentos} />
       </div>
     </>

@@ -5,6 +5,7 @@ import { SEM_NOME } from '@/lib/sem-nome'
 import { lerFechamentos } from '@/lib/fechamentos'
 import { dataDaConclusao, filtroConcluidaDesde, resumoEmAberto, STATUS_EM_ABERTO, type ResumoEmAberto } from '@/lib/vendas-mes'
 import { FUSO_PADRAO, agora, inicioDoAno, inicioDoDia, inicioDoDiaHaDias, inicioDoMes, mesNoFuso, paraData } from '@/lib/datas'
+import { JUNCAO_CUSTO_VENDA, custoDaVenda } from '@/lib/custo'
 
 /**
  * TODO NÚMERO DO PAINEL SAI DAQUI (etapa 0, 21/10/2026).
@@ -23,7 +24,8 @@ import { FUSO_PADRAO, agora, inicioDoAno, inicioDoDia, inicioDoDiaHaDias, inicio
  *   ───────────────────────── ─────────────────────── ─────────────────────────────────────
  *   vendas, ticket, lucro     vendas_vendas           fora encomenda e pendente_entrega;
  *                                                     KPI só conta `concluida`
- *   lucro bruto e margem      vendas_vendas           SÓ sobre vendas com valor_custo > 0
+ *   lucro bruto e margem      vendas_vendas_custos    SÓ sobre vendas com custo > 0, e só com
+ *                             (satélite, etapa 1.1e)  estoque.ver_custo (sem ela a junção nem é pedida)
  *   leads ativos              negocios                dados._lead.ativo ausente ou ≠ false
  *   leads novos / funil       negocios + funil_etapas slug da etapa (novo, em_contato…)
  *   clientes                  contatos                tem `_cliente` em dados e ativo
@@ -51,10 +53,11 @@ export interface ResultadoVendas {
   qtdVendas: number
   ticketMedio: number
   /**
-   * `null` quando NENHUMA venda do período tem custo lançado. A coluna
-   * `lucro` de vendas_vendas é `valor_venda - valor_custo` com custo 0 por
-   * padrão: somá-la anunciava "margem de 100%" — em 20/10, 63 das 66 vendas
-   * do ano da JM estavam sem custo.
+   * `null` quando NENHUMA venda do período tem custo lançado. Antes da 1.1e a
+   * coluna `lucro` de vendas_vendas era `valor_venda - valor_custo` com custo 0
+   * por padrão: somá-la anunciava "margem de 100%" — em 20/10, 63 das 66 vendas
+   * do ano da JM estavam sem custo. Desde a 1.1e o custo vem do satélite e o
+   * pendente é nulo; o 0 das vendas antigas continua contando como "sem custo".
    */
   lucro: number | null
   /** Margem sobre o faturamento das vendas COM custo; `null` junto com o lucro. */
@@ -111,6 +114,10 @@ export function inicioDosPeriodos(agoraRef: Date = agora(), fuso: string = FUSO_
 export interface VendaDoPainel {
   id: number
   valor_venda: number
+  /**
+   * Custo da venda, do satélite vendas_vendas_custos (etapa 1.1e) — NÃO a coluna antiga de vendas_vendas. Nulo
+   * sem estoque.ver_custo (a junção nem é pedida) ou com custo pendente. Fica no servidor: não sai em VendaRecente.
+   */
   valor_custo: number | null
   data_venda: string | null
   /** Quando foi concluída (hotfix H1). O mês do faturamento é `concluida_em ?? data_venda` (lib/vendas-mes). */
@@ -127,19 +134,24 @@ export interface VendaDoPainel {
 const FORA_DO_PAINEL = '("encomenda","pendente_entrega")'
 
 const COLUNAS_VENDA =
-  'id, valor_venda, valor_custo, data_venda, concluida_em, canal_venda, forma_pagamento, status, vendedor_id, ' +
+  'id, valor_venda, data_venda, concluida_em, canal_venda, forma_pagamento, status, vendedor_id, ' +
   'produto:estoque_produtos!produto_id(nome), cliente:contatos!cliente_id(nome)'
 
-type LinhaVenda = Omit<VendaDoPainel, 'produto_nome' | 'cliente_nome'> & {
+/** As colunas da venda, com a junção do custo só para quem tem estoque.ver_custo. */
+const colunasVenda = (verCusto: boolean): string => (verCusto ? `${COLUNAS_VENDA}, ${JUNCAO_CUSTO_VENDA}` : COLUNAS_VENDA)
+
+type LinhaVenda = Omit<VendaDoPainel, 'produto_nome' | 'cliente_nome' | 'valor_custo'> & {
   produto: { nome: string | null } | null
   cliente: { nome: string | null } | null
+  custo?: { valor_custo: number | null } | { valor_custo: number | null }[] | null
 }
 
 function normalizarVenda(v: LinhaVenda): VendaDoPainel {
-  const { produto, cliente, ...resto } = v
+  const { produto, cliente, custo, ...resto } = v
   return {
     ...resto,
     valor_venda: Number(v.valor_venda) || 0,
+    valor_custo: custoDaVenda({ custo }),
     produto_nome: produto?.nome ?? null,
     cliente_nome: cliente ? (cliente.nome ?? SEM_NOME) : null,
   }
@@ -150,9 +162,9 @@ function normalizarVenda(v: LinhaVenda): VendaDoPainel {
  * `coalesce(concluida_em, data_venda) >= desde` (lib/vendas-mes). A encomenda lançada em outubro e
  * entregue em novembro entra em novembro.
  */
-export async function vendasDesde(db: Db, empresaId: number, escopo: Escopo, desde: Date): Promise<VendaDoPainel[]> {
+export async function vendasDesde(db: Db, empresaId: number, escopo: Escopo, desde: Date, verCusto = false): Promise<VendaDoPainel[]> {
   const { data } = await aplicarEscopo(
-    db.from('vendas_vendas').select(COLUNAS_VENDA)
+    db.from('vendas_vendas').select(colunasVenda(verCusto))
       .eq('empresa_id', empresaId)
       .not('status', 'in', FORA_DO_PAINEL)
       .or(filtroConcluidaDesde(desde.toISOString())),
@@ -344,13 +356,17 @@ export interface DadosPainel {
  * saiu; a página chama esta função e entrega pronto, inclusive os outros períodos
  * (a troca Hoje/7 dias/Mês/Ano é só escolher qual mostrar).
  */
-export async function painelCompleto(db: Db, empresaId: number, escopo: Escopo, fuso: string = FUSO_PADRAO, agoraRef: Date = agora()): Promise<DadosPainel> {
+export async function painelCompleto(
+  db: Db, empresaId: number, escopo: Escopo, fuso: string = FUSO_PADRAO,
+  /** estoque.ver_custo de quem abre o painel: sem ela o custo nem é lido (lucro e margem ficam nulos). */
+  { verCusto = false, agoraRef = agora() }: { verCusto?: boolean; agoraRef?: Date } = {},
+): Promise<DadosPainel> {
   const inicio12m = inicioDoMes(agoraRef, fuso, -12)
   // A meta do mês é a do mês DA LOJA: no dia 30 às 21h o UTC já está no mês seguinte.
   const mesAtual = mesNoFuso(agoraRef, fuso) // YYYY-MM
 
   const [vendas, recentes, contagens, { vendedores, metaPorUsuario }, emAberto] = await Promise.all([
-    vendasDesde(db, empresaId, escopo, inicio12m),
+    vendasDesde(db, empresaId, escopo, inicio12m, verCusto),
     vendasRecentes(db, empresaId, escopo, 6),
     contagensDoPainel(db, empresaId, escopo),
     equipeEMetas(db, empresaId, mesAtual),

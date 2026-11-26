@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { useEmpresa } from '@/lib/empresa-context'
 import { ChevronDown, MapPin, Plus, UserPlus } from 'lucide-react'
 import { Input, Select, Textarea, Button, ConfirmDialog, notify } from '@/components/ui'
@@ -276,27 +277,30 @@ export function EncomendaForm({ clientes, taxas = [], celulares = false, mediana
       const descricao = descreverItem(item)
       const vItem = Number(item.valor) || 0
 
-      const { data: pedido, error: e1 } = await supabase.from('compras_pedidos').insert({
-        empresa_id: empresaId,
-        // Fornecedor sai do balcão: quem compra define depois, em Compras. O
-        // aviso "sem fornecedor" na lista de encomendas é quem cobra isso.
-        fornecedor_id: null,
-        descricao: `Encomenda: ${descricao}${cliNome ? ` — ${cliNome}` : ''}`,
-        // Sem custo no lançamento: quem define preço de compra preenche depois,
-        // pelo lápis da lista. O pedido nasce com zero de propósito.
-        valor_total: 0,
-        status: 'aberto',
-        usuario_id: user?.id ?? null,
-        data_pedido: new Date().toISOString(),
-        observacoes: obs.trim() || null,
-      } as never).select('id').single()
+      /**
+       * Pela RPC `compras_pedido_salvar` (etapa 1.1e): o valor do pedido é custo e o navegador não grava a coluna.
+       * A RPC põe a empresa, quem lançou (`auth.uid()`) e a data no DIA DA LOJA (fuso da empresa) — por isso não vão
+       * mais daqui (o `toISOString()` de antes era o dia em UTC).
+       */
+      const { data: pedidoCriado, error: e1 } = await (supabase as unknown as SupabaseClient).rpc('compras_pedido_salvar', {
+        p: {
+          // Fornecedor sai do balcão: quem compra define depois, em Compras. O
+          // aviso "sem fornecedor" na lista de encomendas é quem cobra isso.
+          fornecedor_id: null,
+          descricao: `Encomenda: ${descricao}${cliNome ? ` — ${cliNome}` : ''}`,
+          // Sem custo no lançamento: quem define preço de compra preenche depois,
+          // pelo lápis da lista. O pedido nasce com o valor PENDENTE (nulo) de propósito.
+          status: 'aberto',
+          observacoes: obs.trim() || null,
+        },
+      } as never)
 
       // Sem pedido de compra não há como "Chegou" depois → não cria venda órfã.
-      if (e1 || !pedido) {
+      if (e1 || pedidoCriado == null) {
         await desfazer(criados)
         setSalvando(false); notify.bad(`Erro ao criar o pedido do item ${n + 1}`, e1?.message); return
       }
-      const pedidoId = (pedido as { id: number }).id
+      const pedidoId = Number(pedidoCriado)
 
       const { data: venda, error: e2 } = await supabase.from('vendas_vendas').insert({
         empresa_id: empresaId,
@@ -342,14 +346,13 @@ export function EncomendaForm({ clientes, taxas = [], celulares = false, mediana
      */
     const vendaId = (venda as { id: number }).id
     if (vEntrada > 0) {
-      const { error: e3 } = await supabase.from('vendas_pagamentos').insert({
-        empresa_id: empresaId,
-        venda_id: vendaId,
-        // Aparelho é pagamento em espécie: entra como `troca`, o mesmo nome que
-        // o PDV usa, para o relatório não ter duas palavras para a mesma coisa.
-        forma_pagamento: formaEntrada === 'aparelho' ? 'troca' : formaEntrada,
-        valor_pago: vEntrada,
-      } as never)
+      // Aparelho é pagamento em espécie: entra como `troca`, o mesmo nome que o PDV usa, para o relatório não ter
+      // duas palavras para a mesma coisa. UMA linha POR APARELHO, na ordem em que as unidades são criadas abaixo
+      // (etapa 1.1e): o valor de cada um fica público na venda (termo e lista de encomendas), sem ler o custo.
+      const linhasEntrada = formaEntrada === 'aparelho'
+        ? aparelhosValidos.map((a) => ({ empresa_id: empresaId, venda_id: vendaId, forma_pagamento: 'troca', valor_pago: Number(a.valor) || 0 }))
+        : [{ empresa_id: empresaId, venda_id: vendaId, forma_pagamento: formaEntrada, valor_pago: vEntrada }]
+      const { error: e3 } = await supabase.from('vendas_pagamentos').insert(linhasEntrada as never)
       if (e3) notify.warn('Encomenda lançada, mas a entrada não foi registrada', 'Lance o pagamento manualmente.')
     }
 
@@ -379,24 +382,32 @@ export function EncomendaForm({ clientes, taxas = [], celulares = false, mediana
      *
      * ⚠️ Falhar aqui NÃO desfaz a encomenda: o aparelho está fisicamente no
      * balcão e a venda é real. O aviso manda dar entrada pelo Estoque.
+     *
+     * Pela RPC `estoque_unidade_criar` (etapa 1.1e), um aparelho por chamada: o navegador não grava custo direto.
+     * Com `tipo: 'troca'` a RPC aceita o valor dado ao cliente como custo mesmo de quem não tem `estoque.ver_custo`
+     * (é o que a loja pagou pelo aparelho).
      */
     if (formaEntrada === 'aparelho' && aparelhosValidos.length > 0) {
-      const { error: e4 } = await supabase.from('estoque_unidades').insert(
-        aparelhosValidos.map((a) => ({
-          empresa_id: empresaId,
-          grupo_pdv: grupo,
-          cliente_id: Number(clienteId),
-          produto_id: null,
-          condicao: 'usado',
-          tipo: 'troca',
-          status: 'pendente',
-          usuario_id: user?.id ?? null,
-          preco_custo: Number(a.valor) || 0,
-          imei: a.imei.trim() || null,
-          observacoes: TEXTOS_ENTRADA_APARELHO.observacaoUnidade(a, cliNome),
-          ativo: true,
-        })) as never,
-      )
+      let e4: { message: string } | null = null
+      for (const a of aparelhosValidos) {
+        const { error } = await (supabase as unknown as SupabaseClient).rpc('estoque_unidade_criar', {
+          p: {
+            empresa_id: empresaId,
+            grupo_pdv: grupo,
+            cliente_id: Number(clienteId),
+            produto_id: null,
+            condicao: 'usado',
+            tipo: 'troca',
+            status: 'pendente',
+            usuario_id: user?.id ?? null,
+            preco_custo: Number(a.valor) || 0,
+            imei: a.imei.trim() || null,
+            observacoes: TEXTOS_ENTRADA_APARELHO.observacaoUnidade(a, cliNome),
+            ativo: true,
+          },
+        } as never)
+        if (error) e4 = error
+      }
       if (e4) {
         notify.warn(
           TEXTOS_ENTRADA_APARELHO.naoEntrou(aparelhosValidos.length),

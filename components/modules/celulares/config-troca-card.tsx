@@ -18,7 +18,10 @@ import { TOLERANCIA_PADRAO } from '@/lib/troca-referencia'
  * alerta que aparece toda hora vira clique automático, o que anula o log que ele
  * deveria justificar.
  */
-export function TrocaCard() {
+export function TrocaCard({ verCusto = false }: {
+  /** `estoque.ver_custo` (etapa 1.1e): a frase sobre margem da loja é leitura de margem, só de quem vê custo. */
+  verCusto?: boolean
+} = {}) {
   const supabase = createClient()
   const [empresaId, setEmpresaId] = useState<number | null>(null)
   const [pct, setPct] = useState(String(TOLERANCIA_PADRAO))
@@ -70,7 +73,11 @@ export function TrocaCard() {
             Tabela de preços. Passando desta margem, o vendedor precisa confirmar que está
             ciente — e o aceite fica registrado na venda, com nome e hora.
             <br />
-            <span className="text-ink-3">Pagar abaixo da referência não gera aviso: isso é margem para a loja, não risco.</span>
+            <span className="text-ink-3">
+              {verCusto
+                ? 'Pagar abaixo da referência não gera aviso: isso é margem para a loja, não risco.'
+                : 'Pagar abaixo da referência não gera aviso.'}
+            </span>
           </p>
         </div>
 

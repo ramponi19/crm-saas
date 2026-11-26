@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/lib/supabase/service'
 import { moduloEstaLigado } from '@/lib/modulo-ligado'
 import { rotulosOrcamento } from '@/components/modules/celulares/orcamento-rotulos'
@@ -85,7 +87,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
       // PENDENTE, não disponível: o cliente aprovou por link, o aparelho dele
       // ainda não passou pelo balcão. Fica no nome do responsável pelo lead.
-      await svc.from('estoque_unidades').insert({
+      // Sem as colunas de custo (etapa 1.1e): o custo vai para o satélite logo abaixo.
+      const { data: usado } = await svc.from('estoque_unidades').insert({
         empresa_id: orc.empresa_id,
         produto_id: null,
         condicao: 'usado',
@@ -96,10 +99,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         status: 'pendente',
         grupo_pdv: grupoPdv,
         usuario_id: vendedorId,
-        preco_custo: orc.valor_entrada ?? null,
         observacoes: `Entrada por downgrade — orçamento #${orc.id}${orc.aparelho_usado ? ` (${orc.aparelho_usado})` : ''}, cliente ${orc.cliente_nome}.`,
         ativo: true,
-      } as never)
+      } as never).select('id, filial_id').maybeSingle()
+      /**
+       * O CUSTO DO USADO É O VALOR DE ENTRADA combinado no orçamento (o que a loja deu por ele). Vai direto para o
+       * satélite (`estoque_unidades_custos`, origem `orcamento`): a rota é de serviço, e o app não grava mais a
+       * coluna antiga. Sem valor de entrada, a unidade fica com custo pendente.
+       */
+      const usadoRow = usado as { id?: number; filial_id?: number | null } | null
+      if (usadoRow?.id && orc.valor_entrada != null) {
+        const { data: custoGravado, error: eCusto } = await (svc as unknown as SupabaseClient).from('estoque_unidades_custos').upsert({
+          unidade_id: usadoRow.id, empresa_id: orc.empresa_id, filial_id: usadoRow.filial_id ?? null,
+          preco_custo: orc.valor_entrada, custo_origem: 'orcamento',
+        }, { onConflict: 'unidade_id' }).select('unidade_id')
+        // a aprovação do cliente segue (a unidade existe); o custo sem gravar fica pendente na aba do Estoque
+        if (eCusto || nadaGravado(custoGravado)) console.warn('[orcamento] custo da unidade de entrada não gravado (fica pendente)', usadoRow.id, eCusto?.message ?? NADA_GRAVADO)
+      }
       // A venda vale o aparelho que sai MAIS os itens da negociação. O aparelho
       // recebido não abate daqui: ele é pagamento em espécie, igual ao PDV. Abater
       // registraria prejuízo numa venda lucrativa.
@@ -167,12 +183,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
     // Venda/semi-novo com unidade do estoque → baixa a unidade + registra a venda.
     if (orc.tipo === 'venda' && orc.unidade_id) {
-      // O CUSTO vem da unidade. Sem ele a venda entra com valor_custo no default 0
-      // e `lucro` (coluna gerada) devolve o preço inteiro como margem — 100% de
-      // lucro num aparelho comprado por dinheiro. O relatório mostrava isso como
-      // se fosse conta fechada.
+      // O CUSTO vem da unidade. Sem ele a venda entraria com custo 0 e o resultado
+      // devolveria o preço inteiro como margem — 100% num aparelho comprado por
+      // dinheiro. Desde a 1.1e quem copia é o gatilho do banco (venda com
+      // `unidade_id` → custo do satélite da unidade × quantidade): a rota não lê
+      // nem manda custo.
       const { data: uni } = await svc.from('estoque_unidades')
-        .select('id, status, preco_custo, produto_id, imei, numero_serie')
+        .select('id, status, produto_id, imei, numero_serie')
         .eq('id', orc.unidade_id).eq('empresa_id', orc.empresa_id).maybeSingle()
 
       // Claim atômico: só sai do estoque o que ainda ESTÁ no estoque. Se o balcão
@@ -211,9 +228,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
           produto_id: uni?.produto_id ?? null,
           numero_serie: uni?.imei ?? uni?.numero_serie ?? null,
           valor_venda: orc.total ?? 0,
-          valor_custo: uni?.preco_custo ?? 0,
-          // `lucro` não entra: é coluna gerada (venda − custo). Enviar valor faz o
-          // Postgres recusar o INSERT inteiro com 428C9.
+          // Sem custo: o gatilho grava a partir da unidade (ver a nota acima).
           cliente_id: orc.cliente_id ?? null,
           data_venda: nowIso,
           vendedor_id: vendedorId,

@@ -90,7 +90,7 @@ async function conversar(rodadas: Rodada[], pergunta: string, resultado = '{"err
   const r = respostaDoChat({
     db: nada, svc: nada, cliente: f.cliente, executor: async () => resultado,
     recorte: { alcance: [1, 2, 0], loja: null, rotulo: 'Rede JM', escolheLoja: true },
-    acesso: { empresaId: 1, userId: 'u', nome: 'Teste', papel: 'owner', soMinhasVendas: false, soMeusLeads: false, verFinanceiro: true },
+    acesso: { empresaId: 1, userId: 'u', nome: 'Teste', papel: 'owner', soMinhasVendas: false, soMeusLeads: false, verCusto: true },
     turnos: [{ role: 'user', text: pergunta }],
     modelo: 'claude-falso', empresa: 'JM Store Importados', modulos: null, lojas: ['Mogi Guaçu', 'Jaguariúna'],
     tela: null, extra: null, fuso: 'America/Sao_Paulo', registrar: async () => {},

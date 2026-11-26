@@ -1,8 +1,10 @@
 /**
- * CUSTO PROTEGIDO, TEMPO 1 (etapa 1.1d; npm run test:local; migração 20261126000300) — o Vendedor e a Consulta lendo
- * custo PELA API, com sessão real (docs/etapa-1.1-plano.md §4.3, tabela "Vendedor lendo custo pela API").
- * Nenhuma exposição nova: satélites vazios, junção nula, funções recusadas. A coluna antiga continua respondendo
- * como hoje (fecha no tempo 3). O Dono lê os satélites, com as mesmas somas da coluna antiga.
+ * CUSTO PROTEGIDO PELA API (npm run test:local; docs/etapa-1.1-plano.md §4.3–§4.5, "Vendedor lendo custo pela API") —
+ * o Vendedor e a Consulta lendo custo com sessão real.
+ *   TESTE_CUSTO_TEMPO=3 (padrão; banco com a 20261126000400, 1.1f): a coluna antiga volta NULA para todos.
+ *   TESTE_CUSTO_TEMPO=2 (banco sem a 0400, ou depois da volta-custo-coluna-antiga-vazia.sql; 1.1d/1.1e): a coluna
+ *     antiga ainda responde como hoje (a exposição antiga que o tempo 3 fecha).
+ * Nos dois: satélites vazios, junção nula e funções recusadas para quem não tem estoque.ver_custo; o Dono lê.
  */
 import { test, describe, before, after } from 'node:test'
 import assert from 'node:assert/strict'
@@ -11,6 +13,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 const URL_LOCAL = process.env.TESTE_LOCAL_URL ?? ''
 if (!/^http:\/\/(127\.0\.0\.1|localhost):/.test(URL_LOCAL)) throw new Error('RECUSADO: test:local só roda contra o banco local (TESTE_LOCAL_URL em 127.0.0.1).')
 
+const TEMPO = process.env.TESTE_CUSTO_TEMPO === '2' ? 2 : 3
 const EMPRESA = 1
 const M2 = '0e5e0000-0000-4000-8000-000000000102'
 const svc = createClient(URL_LOCAL, process.env.TESTE_LOCAL_SERVICE!, { auth: { persistSession: false } })
@@ -75,13 +78,17 @@ for (const quem of ['vendedor', 'consulta'] as const) {
         assert.match(error?.message ?? 'passou', /SEM_PERMISSAO/, fn)
       }
     })
-    test('coluna antiga: os mesmos valores de hoje (exposição atual, fecha no tempo 3)', async () => {
-      const u = await s[quem].from('estoque_unidades').select('preco_custo').eq('id', unidade).single()
-      assert.equal(Number((u.data as { preco_custo: number }).preco_custo), 1234)
+    test(TEMPO === 3 ? 'coluna antiga: nula (tempo 3)' : 'coluna antiga: os mesmos valores de hoje (tempo 2; fecha no 3)', async () => {
+      const u = await s[quem].from('estoque_unidades').select('preco_custo, custo_reparo').eq('id', unidade).single()
       const v = await s[quem].from('vendas_vendas').select('valor_custo, lucro').eq('id', venda).single()
-      assert.equal(Number((v.data as { valor_custo: number }).valor_custo), 1234)   // da unidade, não o 1 mandado
       const c = await s[quem].from('compras_pedidos').select('valor_total').eq('id', pedido).single()
-      assert.equal(Number((c.data as { valor_total: number }).valor_total), 4321)
+      const lido = [
+        (u.data as { preco_custo: number | null }).preco_custo, (u.data as { custo_reparo: number | null }).custo_reparo,
+        (v.data as { valor_custo: number | null }).valor_custo, (v.data as { lucro: number | null }).lucro,
+        (c.data as { valor_total: number | null }).valor_total,
+      ].map((x) => (x === null ? null : Number(x)))
+      // tempo 2: venda com o custo da unidade (1234, não o 1 mandado) e lucro 2000 − 1234
+      assert.deepEqual(lido, TEMPO === 3 ? [null, null, null, null, null] : [1234, 66, 1234, 766, 4321])
     })
     test('itens.custo: nulo', async () => {
       const { data } = await s[quem].from('itens').select('custo').eq('ref_tabela', 'estoque_unidades').eq('ref_id', unidade)
@@ -107,7 +114,16 @@ describe('dono: lê os satélites, com os mesmos valores da coluna antiga', () =
     assert.equal(r.error, null, r.error?.message)
     assert.equal(Number((r.data as { lucro: number }).lucro), 766)
   })
-  test('somas da empresa: coluna antiga = satélite', async () => {
+  test(TEMPO === 3 ? 'colunas antigas vazias na empresa inteira (tempo 3)' : 'somas da empresa: coluna antiga = satélite (tempo 2)', async () => {
+    if (TEMPO === 3) {
+      const [u, v, c] = await Promise.all([
+        svc.from('estoque_unidades').select('id', { count: 'exact', head: true }).eq('empresa_id', EMPRESA).or('preco_custo.not.is.null,custo_reparo.not.is.null'),
+        svc.from('vendas_vendas').select('id', { count: 'exact', head: true }).eq('empresa_id', EMPRESA).or('valor_custo.not.is.null,lucro.not.is.null'),
+        svc.from('compras_pedidos').select('id', { count: 'exact', head: true }).eq('empresa_id', EMPRESA).not('valor_total', 'is', null),
+      ])
+      assert.deepEqual([u.count, v.count, c.count], [0, 0, 0])
+      return
+    }
     const soma = (linhas: Record<string, unknown>[] | null, k: string) => (linhas ?? []).reduce((a, l) => a + Number(l[k] ?? 0), 0)
     const [ua, us] = await Promise.all([svc.from('estoque_unidades').select('preco_custo').eq('empresa_id', EMPRESA), s.dono.from('estoque_unidades_custos').select('preco_custo').eq('empresa_id', EMPRESA)])
     assert.equal(soma(us.data, 'preco_custo'), soma(ua.data, 'preco_custo'))

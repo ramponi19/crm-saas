@@ -91,6 +91,8 @@ interface Props {
   celulares?: boolean
   /** Módulo Avaliações ligado + campo placa no item: o tipo "veículo". */
   veiculos?: boolean
+  /** estoque.ver_custo (etapa 1.1e): sem ela a coluna "Custo total" some. */
+  verCusto?: boolean
 }
 
 /** Os textos do catálogo sem módulo de ramo (com Celulares: PRODUTO_CELULAR). */
@@ -134,7 +136,7 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase()
 }
 
-export default function CatalogoView({ produtos: produtosInit, unidades, categorias, marcas, tabelaPrecos: tabelaInit, celulares = false, veiculos = false }: Props) {
+export default function CatalogoView({ produtos: produtosInit, unidades, categorias, marcas, tabelaPrecos: tabelaInit, celulares = false, veiculos = false, verCusto = false }: Props) {
   const fuso = useFuso()
   const tipos = tiposFormulario({ celulares, veiculos })
   const idUnidade = celulares ? ESTOQUE_CELULAR : null
@@ -364,10 +366,14 @@ export default function CatalogoView({ produtos: produtosInit, unidades, categor
     },
     { key: 'estado', header: 'Estado', render: (u) => { const c = COND[u.estado ?? 'lacrado'] ?? COND.lacrado; return <Badge tone={c.tone}>{c.label}</Badge> } },
     { key: 'tipo', header: 'Tipo', hideOnMobile: true, render: (u) => <span className="capitalize text-ink-2">{u.tipo ?? '—'}</span> },
-    {
+    ...(verCusto ? [{
       key: 'custo', header: 'Custo total', align: 'right', hideOnMobile: true, className: 'num',
-      render: (u) => { const t = (u.preco_custo ?? 0) + (u.custo_reparo ?? 0); return t > 0 ? <span className="text-ink-2">{fmt(t)}</span> : <span className="text-ink-3">—</span> },
-    },
+      render: (u: Unidade) => u.preco_custo == null
+        ? <span className="text-[12px] text-warn">pendente</span>
+        : Number(u.preco_custo) > 0
+          ? <span className="text-ink-2">{fmt(u.preco_custo + (u.custo_reparo ?? 0))}</span>
+          : <span className="text-ink-3">—</span>,   // 0 = "sem custo" (o 0 antigo copiado na 1.1d), como antes
+    } as Column<Unidade>] : []),
     { key: 'venda', header: 'Venda', align: 'right', className: 'num', render: (u) => u.preco_venda ? <span className="font-semibold text-ink">{fmt(u.preco_venda)}</span> : <span className="text-ink-3">—</span> },
     { key: 'status', header: 'Status', align: 'right', render: (u) => { const s = STATUS[u.status ?? 'disponivel'] ?? STATUS.disponivel; return <Badge tone={s.tone} dot>{s.label}</Badge> } },
   ]

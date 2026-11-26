@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, ShoppingCart, Building2, PackageCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { notify } from '@/components/ui'
 import { useEmpresa } from '@/lib/empresa-context'
 import { formatarDiaMes } from '@/lib/datas'
@@ -15,7 +16,8 @@ import { COMPRAS_CELULAR } from '@/components/modules/celulares/rotulos'
 interface Pedido {
   id: number
   descricao: string | null
-  valor_total: number | null
+  /** Valor do pedido, do satélite (etapa 1.1e). `null` sem `estoque.ver_custo` (o servidor nem leu) ou não informado. */
+  valor: number | null
   status: string | null
   data_pedido: string | null
   created_at: string | null
@@ -33,7 +35,11 @@ interface Fornecedor {
   email: string | null
   created_at: string | null
 }
-interface Props { pedidos: Pedido[]; fornecedores: Fornecedor[]; isAdmin?: boolean }
+interface Props {
+  pedidos: Pedido[]; fornecedores: Fornecedor[]; isAdmin?: boolean
+  /** `estoque.ver_custo`: o valor do pedido (lista, "Investido" e o campo do formulário). Sem ela, some. */
+  verCusto?: boolean
+}
 
 const STATUS_PEDIDO: Record<string, { label: string; tone: 'acc' | 'ok' | 'warn' | 'neutro' }> = {
   aberto:      { label: 'Aberto',      tone: 'acc'    },
@@ -56,9 +62,9 @@ function getInitials(name: string) {
 }
 
 const FORM_VAZIO = { nome_fantasia: '', razao_social: '', cnpj: '', contato: '', telefone: '', email: '' }
-const PEDIDO_VAZIO = { descricao: '', fornecedor_id: '', valor_total: '', data_pedido: '', observacoes: '', status: 'aberto' }
+const PEDIDO_VAZIO = { descricao: '', fornecedor_id: '', valor: '', data_pedido: '', observacoes: '', status: 'aberto' }
 
-export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornecedoresInit, isAdmin = false }: Props) {
+export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornecedoresInit, isAdmin = false, verCusto = false }: Props) {
   const { empresa } = useEmpresa()
   const empresaId = empresa?.id
   const router = useRouter()
@@ -88,27 +94,46 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
   async function salvarPedido() {
     if (!empresaId) { setErroPedido('Empresa não encontrada'); return }
     if (!formPedido.descricao.trim()) { setErroPedido('Descrição é obrigatória'); return }
-    if (formPedido.valor_total && isNaN(parseFloat(formPedido.valor_total.replace(',', '.')))) {
+    if (verCusto && formPedido.valor && isNaN(parseFloat(formPedido.valor.replace(',', '.')))) {
       setErroPedido('Valor total inválido'); return
     }
     setSalvandoPedido(true)
     setErroPedido(null)
     const supabase = createClient()
-    const { data, error } = await supabase
-      .from('compras_pedidos')
-      .insert({
-        empresa_id:    empresaId,
+    const valor = verCusto && formPedido.valor ? parseFloat(formPedido.valor.replace(',', '.')) : null
+    const fornecedorId = formPedido.fornecedor_id ? Number(formPedido.fornecedor_id) : null
+    /**
+     * Pela RPC `compras_pedido_salvar` (etapa 1.1e): o valor do pedido é custo e vai para o satélite, e só entra
+     * com `estoque.ver_custo` (o banco confere). A RPC põe a empresa, quem lançou e, sem data, o dia da loja.
+     */
+    const { data: id, error } = await (supabase as unknown as SupabaseClient).rpc('compras_pedido_salvar', {
+      p: {
         descricao:     formPedido.descricao.trim(),
-        fornecedor_id: formPedido.fornecedor_id ? Number(formPedido.fornecedor_id) : null,
-        valor_total:   formPedido.valor_total ? parseFloat(formPedido.valor_total.replace(',', '.')) : null,
+        fornecedor_id: fornecedorId,
+        ...(verCusto ? { valor_total: valor } : {}),
         data_pedido:   formPedido.data_pedido || null,
         observacoes:   formPedido.observacoes.trim() || null,
         status:        formPedido.status,
-      })
-      .select('*, fornecedores:estoque_fornecedores(nome_fantasia, contato, telefone)')
-      .single()
-    if (error) { setErroPedido('Erro ao salvar. Tente novamente.') }
-    else { setPedidos(p => [data as Pedido, ...p]); setModalPedido(false); setFormPedido(PEDIDO_VAZIO) }
+      },
+    } as never)
+    if (error || id == null) { setErroPedido('Erro ao salvar. Tente novamente.') }
+    else {
+      const forn = fornecedores.find((f) => f.id === fornecedorId)
+      setPedidos(p => [{
+        id: Number(id),
+        descricao: formPedido.descricao.trim(),
+        valor,
+        status: formPedido.status,
+        data_pedido: formPedido.data_pedido || null,
+        created_at: new Date().toISOString(),
+        observacoes: formPedido.observacoes.trim() || null,
+        fornecedor_id: fornecedorId,
+        fornecedores: forn ? { nome_fantasia: forn.nome_fantasia, contato: forn.contato, telefone: forn.telefone } : null,
+      }, ...p])
+      setModalPedido(false); setFormPedido(PEDIDO_VAZIO)
+      // A data sem preencher é a do dia da loja, que a RPC calculou: o refresh traz a da gravação.
+      router.refresh()
+    }
     setSalvandoPedido(false)
   }
 
@@ -116,7 +141,8 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
     abertos:    pedidos.filter(p => p.status === 'aberto').length,
     transito:   pedidos.filter(p => p.status === 'em_transito').length,
     recebidos:  pedidos.filter(p => p.status === 'recebido').length,
-    investido:  pedidos.reduce((s, p) => s + (p.valor_total ?? 0), 0),
+    // Só com a permissão: sem ela os valores nem chegaram (null) e o card some.
+    investido:  verCusto ? pedidos.reduce((s, p) => s + (p.valor ?? 0), 0) : null,
   }
 
   function set(k: keyof typeof FORM_VAZIO, v: string) {
@@ -173,11 +199,11 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
         <div className="mx-auto max-w-[1240px] space-y-4">
 
           {/* Stats */}
-          <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+          <div className={`grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card ${stats.investido !== null ? 'md:grid-cols-4' : 'md:grid-cols-3'} [&>*]:border-line-soft [&>*:not(:last-child)]:border-r`}>
             <StatCard bare label="Pedidos abertos" value={stats.abertos} />
             <StatCard bare label="Em trânsito" value={stats.transito} />
             <StatCard bare label="Recebidos no mês" value={stats.recebidos} />
-            <StatCard bare label="Investido no mês" value={fmtBRL(stats.investido)} />
+            {stats.investido !== null && <StatCard bare label="Investido no mês" value={fmtBRL(stats.investido)} />}
           </div>
 
           {/* Painéis: fornecedores só p/ admin/proprietário */}
@@ -212,7 +238,7 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
                           <div className="mt-0.5 truncate text-[11px] text-ink-3">{isAdmin && <>{p.fornecedores?.nome_fantasia ?? '—'} · </>}<span className="num">{fmtData(p.data_pedido ?? p.created_at)}</span></div>
                         </div>
                         <div className="flex shrink-0 items-center gap-2.5">
-                          <span className="num text-[13px] font-semibold text-ink">{fmtBRL(p.valor_total)}</span>
+                          {verCusto && <span className="num text-[13px] font-semibold text-ink">{fmtBRL(p.valor)}</span>}
                           {p.status !== 'recebido' && p.status !== 'cancelado' ? (
                             <button
                               onClick={() => receber(p.id)}
@@ -344,13 +370,16 @@ export default function ComprasView({ pedidos: pedidosInit, fornecedores: fornec
               {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome_fantasia}</option>)}
             </Select>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
-              label="Valor total (R$)"
-              value={formPedido.valor_total}
-              onChange={e => setFormPedido(f => ({ ...f, valor_total: e.target.value }))}
-              placeholder="0,00"
-            />
+          <div className={verCusto ? 'grid grid-cols-1 sm:grid-cols-2 gap-3' : ''}>
+            {/* O valor do pedido é custo: o campo é de quem tem `estoque.ver_custo` (sem ela, fica pendente). */}
+            {verCusto && (
+              <Input
+                label="Valor total (R$)"
+                value={formPedido.valor}
+                onChange={e => setFormPedido(f => ({ ...f, valor: e.target.value }))}
+                placeholder="0,00"
+              />
+            )}
             <Input
               label="Data do pedido"
               type="date"

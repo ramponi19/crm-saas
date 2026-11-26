@@ -175,7 +175,7 @@ describe('Assistente: faturamento = só concluídas pela conclusão; em aberto �
     const db = loja() as unknown as SupabaseClient
     const c: Contexto = {
       db, svc: db, ler: db, fuso: FUSO,
-      acesso: { empresaId: 1, userId: 'u1', nome: 'Dono', papel: 'owner', soMinhasVendas: false, soMeusLeads: false, verFinanceiro: true },
+      acesso: { empresaId: 1, userId: 'u1', nome: 'Dono', papel: 'owner', soMinhasVendas: false, soMeusLeads: false, verCusto: true },
       recorte: { alcance: [3], loja: null, rotulo: 'Rede JM', escolheLoja: true },
     }
     const r = JSON.parse(await executar(c, 'vendas_resumo', { de: '2026-11-01', ate: '2026-11-30' }))
@@ -189,7 +189,7 @@ describe('Assistente: faturamento = só concluídas pela conclusão; em aberto �
     const db = loja() as unknown as SupabaseClient
     const c: Contexto = {
       db, svc: db, ler: db, fuso: FUSO,
-      acesso: { empresaId: 1, userId: 'u1', nome: 'Dono', papel: 'owner', soMinhasVendas: false, soMeusLeads: false, verFinanceiro: true },
+      acesso: { empresaId: 1, userId: 'u1', nome: 'Dono', papel: 'owner', soMinhasVendas: false, soMeusLeads: false, verCusto: true },
       recorte: { alcance: [3], loja: null, rotulo: 'Rede JM', escolheLoja: true },
     }
     const r = JSON.parse(await executar(c, 'vendas_resumo', { de: '2026-08-01', ate: '2026-11-30', agrupar_por: 'dia' }))

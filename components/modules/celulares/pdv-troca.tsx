@@ -130,6 +130,9 @@ type TrocaAcima = TrocaPdv['trocasAcima'][number]
 
 /** Os textos da troca que o PDV escreve na venda, no estoque e na tela. */
 export const TEXTOS_TROCA_PDV = {
+  /** Aviso quando a unidade da troca não foi criada (a venda segue; a entrada é feita no Estoque). */
+  naoEntrouTitulo: 'Aparelho da troca não entrou no estoque',
+  naoEntrouTexto: (t: TrocaValida, erro: string): string => `${t.aparelho.trim() || 'Aparelho'}: dê entrada em Estoque. ${erro}`,
   /** Anotação na observação da venda: "Troca: iPhone 12 (R$ 1.200,00)." */
   notaVenda: (validas: TrocaValida[]): string => (validas.length
     ? ` Troca: ${validas.map((t) => `${t.aparelho.trim() || 'aparelho'} (${fmt(t.num)})`).join(', ')}.`
@@ -153,8 +156,13 @@ export const TEXTOS_TROCA_PDV = {
   sucessoDiferenca: ' — a diferença entrou em aparelho.',
 }
 
-/** O bloco "Aparelho(s) na troca" do carrinho. */
-export function TrocaPdvBloco({ troca }: { troca: TrocaPdv }) {
+/**
+ * O bloco "Aparelho(s) na troca" do carrinho.
+ *
+ * `verCusto` (`estoque.ver_custo`, etapa 1.1e): o "abaixo da referência — margem para a loja" é leitura de margem, e
+ * margem é só de quem vê custo. Sem a permissão o vendedor segue vendo a referência e o aviso de quando passa dela.
+ */
+export function TrocaPdvBloco({ troca, verCusto = false }: { troca: TrocaPdv; verCusto?: boolean }) {
   const { trocaAtiva, setTrocaAtiva, trocas, setTrocas, buscandoCodigo, aplicarCodigoTroca, avaliacoesTroca } = troca
   return (
     <div className="mb-4 rounded-card border border-line p-3">
@@ -230,7 +238,7 @@ export function TrocaPdvBloco({ troca }: { troca: TrocaPdv }) {
                       <> · {fmt(av.excedente)} acima ({av.percentual.toFixed(0)}%)
                         {av.exigeAceite ? ' — vai pedir confirmação' : ''}</>
                     )}
-                    {av && av.excedente < 0 && <> · {fmt(-av.excedente)} abaixo — margem para a loja</>}
+                    {verCusto && av && av.excedente < 0 && <> · {fmt(-av.excedente)} abaixo — margem para a loja</>}
                   </p>
                 )
               })()}

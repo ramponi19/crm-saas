@@ -1,5 +1,7 @@
 import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import CatalogoView from './components/catalogo-view'
+import { contextoDaSessao, temPermissao } from '@/lib/sessao'
+import { JUNCAO_CUSTO_UNIDADE, custoDaUnidade } from '@/lib/custo'
 import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { HREF_CELULARES } from '@/components/modules/celulares/modulo'
 
@@ -27,8 +29,8 @@ interface UnidadeRow {
   estado: string | null
   tipo: string | null
   condicao: string | null
-  preco_custo: number | null
-  custo_reparo: number | null
+  /** Junção do satélite de custo; só vem com estoque.ver_custo. */
+  custo?: { preco_custo: number | null; custo_reparo: number | null } | null
   preco_venda: number | null
   status: string | null
   created_at: string
@@ -39,7 +41,9 @@ interface SubcategoriaRow { id: number; nome: string; categoria_id: number | nul
 interface MarcaRow { id: number; nome: string }
 
 export default async function CatalogoPage() {
-  const [supabase, empresaId] = await Promise.all([createClient(), getEmpresaId()])
+  const [supabase, empresaId, ctx] = await Promise.all([createClient(), getEmpresaId(), contextoDaSessao()])
+  // Etapa 1.1e: "Custo total" só com estoque.ver_custo (o servidor nem pede o satélite sem a permissão).
+  const verCusto = temPermissao(ctx, 'estoque.ver_custo')
 
   const [{ data: produtosRaw }, { data: unidadesRaw }, { data: categsRaw }, { data: subcatsRaw }, { data: marcasRaw }, { data: tabelaRaw }] = await Promise.all([
     supabase.from('estoque_produtos').select(`
@@ -49,8 +53,8 @@ export default async function CatalogoPage() {
       subcategorias_produtos:estoque_subcategorias!subcategoria_id(nome)
     `).eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
     supabase.from('estoque_unidades').select(`
-      id, produto_id, imei, numero_serie, estado, tipo, condicao,
-      preco_custo, custo_reparo, preco_venda, status, created_at,
+      id, produto_id, imei, numero_serie, estado, tipo, condicao, preco_venda, status, created_at,
+      ${verCusto ? `${JUNCAO_CUSTO_UNIDADE},` : ''}
       produtos:estoque_produtos!produto_id(nome)
     `).eq('empresa_id', empresaId).eq('ativo', true).order('created_at', { ascending: false }),
     // `tipo_formulario` decide os campos da entrada de estoque (lib/estoque-campos).
@@ -101,8 +105,8 @@ export default async function CatalogoPage() {
     numero_serie: u.numero_serie,
     estado: u.estado,
     tipo: u.tipo,
-    preco_custo: u.preco_custo,
-    custo_reparo: u.custo_reparo,
+    preco_custo: verCusto ? custoDaUnidade(u)?.preco_custo ?? null : null,
+    custo_reparo: verCusto ? custoDaUnidade(u)?.custo_reparo ?? null : null,
     preco_venda: u.preco_venda,
     status: u.status,
     created_at: u.created_at,
@@ -147,6 +151,7 @@ export default async function CatalogoPage() {
     <CatalogoView
       celulares={ligados.has(HREF_CELULARES)}
       veiculos={ligados.has('/avaliacoes')}
+      verCusto={verCusto}
       produtos={produtos}
       unidades={unidades}
       categorias={categorias}

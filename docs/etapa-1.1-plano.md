@@ -463,11 +463,12 @@ A primeira versão deste plano esvaziava a coluna antiga já no tempo 1, e as te
   - **`pdv-valor-catalogo-e2e`:** **tudo ok, sem ajuste**.
   - **`lote2-e2e`:** **tudo ok**, mas o teste está desatualizado desde a remoção das views (consulta `vendas` e `pedidos_compra`, que não existem mais nem na produção). Rodei uma cópia temporária com só esses nomes trocados nas consultas SQL do próprio teste; a parte de tela é idêntica, e a cópia foi apagada. **Pendência:** atualizar o `lote2-e2e` no repositório.
   - **Ao fim:** apaguei a cópia (`supabase stop --no-backup`, nenhum volume), a pasta `_claro` (o dump aberto), a cópia local do `usuarios.local.json` e o script com as chaves locais. Fica só o `.7z` cifrado.
-- **Falta, no deploy, com o ok do Lucas:**
-  - leitura de produção com sessão simulada e desfeita (o vendedor da JM);
-  - somas por empresa antes e depois;
-  - contagens da Aletrini;
-  - portões (backup, IOwait, fora dos minutos 05–15, 10 min sem atividade na JM).
+**EM PRODUÇÃO em 26/11/2026** (migração `20261126112709`; app `51768bfa`, `dpl_CWqjShg849MSpmZzqx9ecqpLkjiY`, READY 11:30:58 UTC).
+- **Portões:** build igual ao da Vercel no commit; backup `_backup_custo_1_1d_{unidades,vendas,compras,itens}_20261126` (57/131/127/57 linhas); ponto de volta do app `dpl_27hbJMjgwGZcCMfjWt21RZnR3jFv` (`7b33d924`) e do banco `volta-custo-satelites.sql`; IOwait medido; 10 min sem atividade na JM; migração fora dos minutos 05–15.
+- **Somas antes = depois, por empresa** (coluna antiga × satélite): JM 57 unidades, R$ 84.259 de custo e R$ 600 de reparo; 131 vendas, R$ 12.400; 127 compras, R$ 7.920; md5 das vendas igual (`ac785464…`); `itens.custo` 57 → 0. Aletrini: nenhuma linha de custo, antes e depois. Releitura às 11:33: 0 divergências, 0 linhas sem satélite.
+- **Fixes no caminho** (pegos pelo ritual antes do push): data do pedido sem `current_date` (`3681ac27`); `compras_pedido_salvar` como SECURITY DEFINER com as travas da RLS explícitas, porque `empresa_fuso` não é executável pelo navegador (`51768bfa`).
+- **Smoke:** na JM, simulação com rollback (Vendedor e Consulta: satélites 0 e `SEM_PERMISSAO`; Dono: 57/131/127). Na Demonstração, também com rollback: três usuários temporários (Dono, Vendedor, Consulta) e uma unidade com custo de R$ 1.234 criada pela `estoque_unidade_criar` — o Dono lê 1.234 na unidade e na venda, e `venda_resultado` passa; Vendedor e Consulta leem 0 linhas e recebem `SEM_PERMISSAO`. Conferido depois: nada ficou gravado.
+- **Logs de 15 min** (11:31–11:46): Vercel sem nenhum erro ou aviso; Postgres sem ERROR além das duas simulações (que terminam com `raise` de propósito); API do Supabase com 63 requisições e nenhum 4xx/5xx. Tráfego baixo (antes da abertura da loja).
 
 ### 4.4 Tempo 2 (entrega 1.1e): o app só no satélite
 
@@ -520,6 +521,53 @@ Sem migração. O app para de ler e de gravar as colunas antigas.
 - com o Dono: satélites com os valores, telas com custo (o app já lê só o satélite, então nada some para ele).
 
 **Aceite da 1.1f:** a lista acima; somas iguais; uma entrada e uma venda pela tela depois da migração gravam no satélite; smoke na Demonstração; logs sem erro novo por 15 minutos.
+
+### 4.5.1 Roteiro de deploy da 1.1e + 1.1f (mesma janela, uma logo depois da outra)
+
+**Por que nessa ordem:** o app da 1.1e só lê e grava os satélites, e o banco da 1.1d aceita os dois apps (o antigo e o novo), porque a sincronia ainda é nos dois sentidos. Já a 1.1f esvazia a coluna antiga: com ela no ar, o app antigo (1.1d) mostraria custo vazio. Então: **o app sobe primeiro; o banco, depois.** E, na volta, **o banco volta primeiro; o app, depois.**
+
+**Um commit só** (`feat/etapa-1.1-base` → `main`, só fast-forward) leva o app da 1.1e e o arquivo da migração 0400. A Vercel não aplica migração: o arquivo no repositório não muda nada até o `apply_migration` do passo 2.
+
+**0. Antes de tudo (portões; nada começa sem todos):**
+1. **ok do Lucas** para a janela;
+2. **local:** ritual do zero verde (com a 0400), `npm run check` verde (inclui `check:custo`), `custo-local` nos tempos 2 e 3, varredor `custo-oculto-e2e` verde, ciclo 0400 → volta → 0400 com somas iguais;
+3. **build igual ao da Vercel** no commit exato (checkout principal, `git checkout --detach <commit>`, `npm run -s build`);
+4. **retrato "antes"** (só leitura), por empresa: contagem e soma de `preco_custo`, `custo_reparo`, `valor_custo`, `lucro`, `valor_total` na coluna antiga e nos satélites, md5 da digital das vendas; salvo em `conciliacao-pedidos/etapa-1.1c-20261125/custo-1.1ef-antes.json`;
+5. **backup** das tabelas afetadas pela 1.1f: `_backup_custo_1_1f_unidades_<data>` (`id, preco_custo, custo_reparo`), `_vendas_` (`id, valor_custo`), `_compras_` (`id, valor_total`) e os três satélites inteiros;
+6. **pontos de volta anotados:** app = `dpl_CWqjShg849MSpmZzqx9ecqpLkjiY` (`51768bfa`, a 1.1d); banco = `supabase/scripts/volta/volta-custo-coluna-antiga-vazia.sql` (uma transação);
+7. **IOwait** (`SEG=65 node .gate/iowait-metricas.mjs`) sem pico; **10 min sem atividade na JM** (nenhuma escrita em unidades, vendas, pagamentos, compras).
+
+**1. 1.1e (app):**
+1. `git push origin feat/etapa-1.1-base:main` (fast-forward); esperar o deploy `READY` e conferir o `githubCommitSha`;
+2. **conferências antes de seguir para a 1.1f** (todas):
+   - `node scripts/check-custo.mjs` no commit em produção: verde;
+   - Demonstração, superadmin impersonando, como Dono: Estoque (lista com custo, aba "Custo pendente"), Histórico (lucro), Catálogo (custo total), PDV, Relatórios e Compras abrem sem erro e com custo;
+   - simulação com rollback na Demonstração (a mesma do smoke da 1.1d): Vendedor e Consulta sem custo; Dono com custo;
+   - somas coluna antiga = satélite, por empresa, ainda iguais (a sincronia do tempo 1 copia o que o app novo grava no satélite);
+   - logs: Vercel e Postgres sem erro novo por **5 minutos** (os 15 completos ficam para depois da 1.1f, que fecha a janela);
+3. **se algo falhar aqui:** volta da 1.1e = promover de novo o deploy `dpl_CWqjShg849MSpmZzqx9ecqpLkjiY` (a 1.1d). O banco não muda. A 1.1f não sobe.
+
+**2. 1.1f (banco), em seguida:**
+1. conferir o relógio: **fora dos minutos 05–15**;
+2. `apply_migration` com o conteúdo de `20261126000400_custo_coluna_antiga_vazia.sql` (tem `lock_timeout` de 5 s e a prova dentro: se as somas mudarem ou sobrar valor na coluna antiga, a migração inteira desfaz sozinha). Se cair por lock, esperar 2 min e repetir; nada fica pela metade;
+3. **conferências depois:**
+   - somas dos **satélites** por empresa idênticas ao retrato "antes" (JM e Aletrini); md5 das vendas igual;
+   - colunas antigas: zero valores (`preco_custo`, `custo_reparo`, `valor_custo`, `lucro`, `valor_total`, `itens.custo`);
+   - simulação com rollback na Demonstração: Vendedor e Consulta leem a coluna antiga **nula** e os satélites com 0 linhas; o Dono lê o satélite; uma entrada (pela `estoque_unidade_criar`) e uma venda gravam no satélite e deixam a coluna nula;
+   - smoke na tela da Demonstração como Dono: Estoque, Histórico, Catálogo e Relatórios com o mesmo custo de antes;
+   - logs de **15 minutos** (Vercel e Postgres), registrados;
+4. **se houver qualquer diferença nas somas:** parar e avisar o Lucas antes de qualquer outra coisa.
+
+**Volta, em cada caso:**
+
+| Situação | Volta | Ordem |
+|---|---|---|
+| a 1.1e falhou (antes da 1.1f) | promover `dpl_CWqjShg849MSpmZzqx9ecqpLkjiY` | só o app |
+| a 1.1f falhou na aplicação | nada: a migração é uma transação e desfaz sozinha | — |
+| a 1.1f subiu e algo está errado, mas a 1.1e está bem | `volta-custo-coluna-antiga-vazia.sql`: copia os satélites de volta para as colunas e religa a sincronia da 1.1d; conferir somas coluna = satélite | só o banco |
+| as duas precisam voltar | **primeiro** a volta da 1.1f (banco), conferir somas; **depois** promover a 1.1d (app) | banco → app, nunca o contrário (o app antigo com a coluna vazia mostraria custo em branco) |
+
+A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas dos satélites iguais nos três estados e a coluna antiga cheia de novo depois da volta (§4.5.2).
 
 ### 4.6 Tempo 4 (entrega 1.1g): remover as colunas antigas
 

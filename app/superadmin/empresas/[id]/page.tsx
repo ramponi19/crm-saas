@@ -110,7 +110,7 @@ export default async function EmpresaDetalhePage({ params }: PageProps) {
   const [{ count: leadsCount }, { count: vendasCount }, { count: clientesCount }, { data: ultimoLead }] = await Promise.all([
     // Lead = negócio (a view `leads` caiu); todos, ativos ou não, como antes.
     svc.from('negocios').select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId),
-    svc.from('vendas_vendas').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId),
+    svc.from('vendas_vendas').select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     consultaClientes(svc, 'id', { count: 'exact', head: true }).eq('empresa_id', empresaId),
     svc.from('negocios').select('created_at').eq('empresa_id', empresaId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])

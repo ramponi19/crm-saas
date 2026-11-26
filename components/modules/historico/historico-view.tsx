@@ -26,6 +26,10 @@ interface Venda {
   canal_venda: string | null
   forma_pagamento: string | null
   valor_venda: number
+  /**
+   * Venda − custo do satélite, calculado no servidor (etapa 1.1e). Nulo sem estoque.ver_custo (a junção nem é
+   * pedida) ou com custo pendente: a tela não mostra lucro nenhum, nunca "R$ 0" nem o preço cheio.
+   */
   lucro: number | null
   status: string | null
   parcelas: number | null
@@ -48,6 +52,10 @@ interface Props {
   taxas?: Taxa[]
   /** Módulo Celulares ligado: sugestões de acessório de celular na entrega. */
   celulares?: boolean
+  /** estoque.ver_custo: lucro por venda, card "Lucro bruto" e a coluna Lucro do CSV. */
+  verCusto?: boolean
+  /** core.exportar: o botão Exportar (CSV). */
+  podeExportar?: boolean
 }
 
 const STATUS: Record<string, { label: string; tone: 'ok' | 'warn' | 'bad' | 'neutro' }> = {
@@ -84,13 +92,15 @@ const csvCell = (v: string | number) => {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
-function exportCSV(rows: Venda[], fuso: string) {
-  const header = 'Data,Cliente,Produto,Qtd,Vendedor,Canal,Pagamento,Valor,Lucro,Status'
+/** A coluna Lucro só existe com estoque.ver_custo; sem custo lançado fica em branco (não "0"). */
+function exportCSV(rows: Venda[], fuso: string, verCusto: boolean) {
+  const header = ['Data', 'Cliente', 'Produto', 'Qtd', 'Vendedor', 'Canal', 'Pagamento', 'Valor', ...(verCusto ? ['Lucro'] : []), 'Status'].join(',')
   const lines = rows.map((v) => [
     formatarData(v.data_venda, undefined, '', fuso),
     v.cliente_nome ?? '', v.produto_nome ?? '', v.quantidade ?? 1, v.vendedor_nome ?? '',
     CANAL_LABEL[v.canal_venda ?? ''] ?? v.canal_venda ?? '',
-    descreverPagamentos(v.pagamentos, v.forma_pagamento, v.parcelas), v.valor_venda, v.lucro ?? 0, v.status ?? '',
+    descreverPagamentos(v.pagamentos, v.forma_pagamento, v.parcelas), v.valor_venda,
+    ...(verCusto ? [v.lucro ?? ''] : []), v.status ?? '',
   ].map(csvCell).join(','))
   // BOM (﻿) p/ o Excel abrir os acentos corretamente.
   const blob = new Blob(['﻿' + [header, ...lines].join('\n')], { type: 'text/csv;charset=utf-8' })
@@ -101,7 +111,7 @@ function exportCSV(rows: Venda[], fuso: string) {
   a.click()
 }
 
-export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empresaId, documentos = [], taxas = [], celulares = false }: Props) {
+export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empresaId, documentos = [], taxas = [], celulares = false, verCusto = false, podeExportar = false }: Props) {
   const fuso = useFuso()
   const [filtro, setFiltro] = useState('all')
   /** A encomenda cuja entrega está aberta (o mesmo recebimento da aba Encomenda do PDV). */
@@ -217,10 +227,14 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
 
   const stats = useMemo(() => {
     const conc = vendas.filter((v) => v.status === 'concluida')
+    // Lucro bruto só sobre as vendas com custo lançado (a regra do painel); sem nenhuma, não há número.
+    const comLucro = conc.filter((v) => v.lucro != null)
     return {
       total: vendas.length,
       faturamento: conc.reduce((s, v) => s + v.valor_venda, 0),
-      lucro: conc.reduce((s, v) => s + (v.lucro ?? 0), 0),
+      lucro: comLucro.length ? comLucro.reduce((s, v) => s + (v.lucro ?? 0), 0) : null,
+      semCusto: conc.length - comLucro.length,
+      concluidas: conc.length,
       canceladas: vendas.filter((v) => v.status === 'cancelada').length,
     }
   }, [vendas])
@@ -265,11 +279,11 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
       render: (v) => <span className="text-ink-2">{descreverPagamentos(v.pagamentos, v.forma_pagamento, v.parcelas)}</span>,
     },
     {
-      key: 'valor', header: 'Valor / Lucro', align: 'right', className: 'num',
+      key: 'valor', header: verCusto ? 'Valor / Lucro' : 'Valor', align: 'right', className: 'num',
       render: (v) => (
         <div>
           <div className="font-semibold text-ink">{formatCurrency(v.valor_venda)}</div>
-          {v.lucro != null && <div className={(v.lucro ?? 0) >= 0 ? 'text-[11px] font-semibold text-ok' : 'text-[11px] font-semibold text-bad'}>{(v.lucro ?? 0) >= 0 ? '+' : ''}{formatCurrency(v.lucro)}</div>}
+          {verCusto && v.lucro != null && <div className={(v.lucro ?? 0) >= 0 ? 'text-[11px] font-semibold text-ok' : 'text-[11px] font-semibold text-bad'}>{(v.lucro ?? 0) >= 0 ? '+' : ''}{formatCurrency(v.lucro)}</div>}
         </div>
       ),
     },
@@ -296,16 +310,22 @@ export function HistoricoView({ vendas, isAdmin = false, vendedores = [], empres
     <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-4 scrollbar-thin sm:px-6 sm:py-6">
       <div className="mx-auto max-w-[1240px] space-y-4">
 
-        <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card md:grid-cols-4 [&>*]:border-line-soft [&>*:not(:last-child)]:border-r">
+        <div className={`grid grid-cols-2 overflow-hidden rounded-card border border-line bg-card ${verCusto ? 'md:grid-cols-4' : 'md:grid-cols-3'} [&>*]:border-line-soft [&>*:not(:last-child)]:border-r`}>
           <StatCard bare label="Vendas no período" value={stats.total} />
           <StatCard bare label="Faturamento" value={formatCurrency(stats.faturamento)} />
-          <StatCard bare label="Lucro bruto" value={formatCurrency(stats.lucro)} deltaTone="ok" />
+          {/* Só com estoque.ver_custo. Sem custo lançado: "—" e quantas ficaram de fora, nunca o preço cheio. */}
+          {verCusto && (
+            <StatCard bare label="Lucro bruto"
+              value={stats.lucro === null ? <span className="text-ink-3">—</span> : formatCurrency(stats.lucro)}
+              delta={stats.semCusto > 0 ? `${stats.semCusto} de ${stats.concluidas} sem custo lançado` : undefined}
+              deltaTone="neutral" />
+          )}
           <StatCard bare label="Canceladas" value={stats.canceladas} />
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Tabs items={CHIPS} value={filtro} onValueChange={setFiltro} className="border-b-0" />
-          <Button variant="outline" size="sm" icon={<Download size={14} strokeWidth={1.7} />} onClick={() => exportCSV(filtered, fuso)}>Exportar</Button>
+          {podeExportar && <Button variant="outline" size="sm" icon={<Download size={14} strokeWidth={1.7} />} onClick={() => exportCSV(filtered, fuso, verCusto)}>Exportar</Button>}
         </div>
 
         <Card flush>

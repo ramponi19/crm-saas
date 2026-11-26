@@ -6,6 +6,7 @@ import { comNomeDoCliente } from '@/lib/sem-nome'
 import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { rotulosGarantia } from './rotulos'
 import { dataDeEntrega } from '@/lib/data-entrega'
+import { valoresDaTroca } from '@/lib/troca-referencia'
 
 type Embed<T> = T | T[] | null
 const one = <T,>(r: Embed<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
@@ -69,24 +70,50 @@ export default async function GarantiaPage() {
   // Itens recebidos em troca, para o termo de entrega do usado ter conteúdo.
   // Vêm do estoque, pelo `grupo_pdv` do fechamento — é o vínculo que liga a
   // unidade recebida à venda que a trouxe.
+  //
+  // O VALOR de cada aparelho vem do que foi PAGO em troca (`vendas_pagamentos`, forma `troca`, das vendas do grupo),
+  // não do `preco_custo` da unidade (etapa 1.1e; roteiro C2): custo é protegido e muda depois (reparo, ajuste), e o
+  // termo tem de dizer o que o cliente recebeu no dia.
   const gruposTroca = [...new Set(
     linhasTermo.filter((t) => t.tipo === 'troca').map((t) => one(t.venda)?.grupo_pdv).filter((g): g is string => !!g),
   )]
   const trocasPorGrupo = new Map<string, { aparelho: string; imei: string | null; valor: number }[]>()
   if (gruposTroca.length) {
-    const { data: unidades } = await supabase
-      .from('estoque_unidades')
-      .select('grupo_pdv, imei, preco_custo, observacoes')
-      .eq('empresa_id', empresaId).eq('tipo', 'troca').in('grupo_pdv', gruposTroca)
-    for (const u of (unidades ?? []) as { grupo_pdv: string | null; imei: string | null; preco_custo: number | null; observacoes: string | null }[]) {
+    const [{ data: unidades }, { data: vendasDoGrupo }] = await Promise.all([
+      supabase
+        .from('estoque_unidades')
+        .select('grupo_pdv, imei, observacoes')
+        .eq('empresa_id', empresaId).eq('tipo', 'troca').in('grupo_pdv', gruposTroca)
+        .order('id'),
+      supabase
+        .from('vendas_vendas')
+        .select('grupo_pdv, vendas_pagamentos(id, forma_pagamento, valor_pago)')
+        .eq('empresa_id', empresaId!).in('grupo_pdv', gruposTroca),
+    ])
+    // O que foi pago em troca, por grupo, na ordem de gravação.
+    const pagoEmTroca = new Map<string, { id: number; valor: number }[]>()
+    type VendaPagos = { grupo_pdv: string | null; vendas_pagamentos: { id: number; forma_pagamento: string | null; valor_pago: number | null }[] | null }
+    for (const v of (vendasDoGrupo ?? []) as unknown as VendaPagos[]) {
+      if (!v.grupo_pdv) continue
+      for (const p of v.vendas_pagamentos ?? []) {
+        if (p.forma_pagamento !== 'troca') continue
+        pagoEmTroca.set(v.grupo_pdv, [...(pagoEmTroca.get(v.grupo_pdv) ?? []), { id: p.id, valor: Number(p.valor_pago) || 0 }])
+      }
+    }
+    const unidadesPorGrupo = new Map<string, { imei: string | null; observacoes: string | null }[]>()
+    for (const u of (unidades ?? []) as { grupo_pdv: string | null; imei: string | null; observacoes: string | null }[]) {
       if (!u.grupo_pdv) continue
-      if (!trocasPorGrupo.has(u.grupo_pdv)) trocasPorGrupo.set(u.grupo_pdv, [])
-      trocasPorGrupo.get(u.grupo_pdv)!.push({
+      unidadesPorGrupo.set(u.grupo_pdv, [...(unidadesPorGrupo.get(u.grupo_pdv) ?? []), u])
+    }
+    for (const [grupo, lista] of unidadesPorGrupo) {
+      const pagos = (pagoEmTroca.get(grupo) ?? []).sort((a, b) => a.id - b.id).map((p) => p.valor)
+      const valores = valoresDaTroca(lista.length, pagos)
+      trocasPorGrupo.set(grupo, lista.map((u, i) => ({
         // A observação começa com a descrição digitada no PDV, antes do " — ".
         aparelho: (u.observacoes ?? '').split(' — ')[0]?.trim() || rotulos.recebidoEmTroca,
         imei: u.imei,
-        valor: Number(u.preco_custo) || 0,
-      })
+        valor: valores[i] ?? 0,
+      })))
     }
   }
 

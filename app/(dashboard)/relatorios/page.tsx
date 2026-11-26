@@ -5,7 +5,7 @@ import { RelatoriosView } from '@/components/modules/relatorios/relatorios-view'
 import { RelatoriosImobView } from '@/components/modules/imoveis/relatorios-imob-view'
 import { exigirPlano } from '@/lib/acesso'
 import { capacidades, carregarConfigEmpresa, vocabulario } from '@/lib/empresa-config'
-import type { Tables } from '@/types/database'
+import { JUNCAO_CUSTO_VENDA, custoDaVenda, lucro as lucroDaVenda } from '@/lib/custo'
 import { resumoEmAberto, STATUS_EM_ABERTO, type LinhaEmAberto } from '@/lib/vendas-mes'
 import { vendasDoPeriodo } from '@/lib/vendas-periodo'
 import { fusoDaEmpresa } from '@/lib/fuso-empresa'
@@ -25,8 +25,9 @@ export default async function RelatoriosPage({ searchParams }: {
   const ctx = await exigirPermissao('core.ver_relatorios')
   /**
    * Custo, lucro e margem só para quem tem estoque.ver_custo; o livro-caixa só para quem tem core.ver_financeiro
-   * (o cargo Consulta abre Relatórios e não vê nenhum dos dois). As colunas nem são pedidas ao banco: o dado não
-   * chega ao navegador. A 1.1e reforça isso no próprio banco.
+   * (o cargo Consulta abre Relatórios e não vê nenhum dos dois). O custo nem é pedido ao banco: o dado não
+   * chega ao navegador. Desde a 1.1e o custo vem do satélite (vendas_vendas_custos, junção que a RLS só abre com
+   * estoque.ver_custo), nunca de vendas_vendas.valor_custo/lucro; o lucro é calculado aqui.
    */
   const verCusto = temPermissao(ctx, 'estoque.ver_custo')
   const verFinanceiro = temPermissao(ctx, 'core.ver_financeiro')
@@ -61,7 +62,7 @@ export default async function RelatoriosPage({ searchParams }: {
 
   const [vendasRaw, { data: lancamentos }, { data: vendedoresRaw }, { data: trocasPendentes }, { data: abertasRaw }] = await Promise.all([
     vendasDoPeriodo(supabase, empresaId!,
-      `id, data_venda, concluida_em, valor_venda, ${verCusto ? 'valor_custo, lucro, ' : ''}desconto_valor, forma_pagamento, canal_venda, status, grupo_pdv, observacoes, clientes:contatos!cliente_id(nome), produtos:estoque_produtos!produto_id(nome), usuarios!vendedor_id(nome)`,
+      `id, data_venda, concluida_em, valor_venda, desconto_valor, forma_pagamento, canal_venda, status, grupo_pdv, observacoes, clientes:contatos!cliente_id(nome), produtos:estoque_produtos!produto_id(nome), usuarios!vendedor_id(nome)${verCusto ? `, ${JUNCAO_CUSTO_VENDA}` : ''}`,
       busca, fuso),
     verFinanceiro
       ? supabase
@@ -83,25 +84,33 @@ export default async function RelatoriosPage({ searchParams }: {
       .eq('empresa_id', empresaId).in('status', [...STATUS_EM_ABERTO]),
   ])
 
-  type VendaRow = Tables<'vendas_vendas'> & {
+  type VendaRow = {
+    id: number; data_venda: string | null; concluida_em: string | null; valor_venda: number
+    desconto_valor: number | null; forma_pagamento: string | null; canal_venda: string | null; status: string | null
+    grupo_pdv: string | null; observacoes: string | null
     clientes: Embed<{ nome: string | null }>
     produtos: Embed<{ nome: string | null }>
     usuarios: Embed<{ nome: string | null }>
+    /** Só com estoque.ver_custo (a junção nem é pedida sem ela). */
+    custo?: Embed<{ valor_custo: number | null }>
   }
   const gruposRetidos = new Set(
     ((trocasPendentes ?? []) as { grupo_pdv: string | null }[])
       .map((u) => u.grupo_pdv).filter((g): g is string => !!g),
   )
-  const vendas = ((vendasRaw ?? []) as unknown as VendaRow[]).map((v) => ({
-    ...v,
-    // sem a permissão as colunas nem vieram; null explícito para a tela não inventar margem
-    valor_custo: verCusto ? v.valor_custo : null,
-    lucro: verCusto ? v.lucro : null,
-    cliente_nome: one(v.clientes)?.nome ?? null,
-    produto_nome: one(v.produtos)?.nome ?? null,
-    vendedor_nome: one(v.usuarios)?.nome ?? null,
-    troca_pendente: !!v.grupo_pdv && gruposRetidos.has(v.grupo_pdv),
-  }))
+  const vendas = ((vendasRaw ?? []) as unknown as VendaRow[]).map(({ custo: juncao, clientes, produtos, usuarios, ...v }) => {
+    // Sem a permissão a junção nem veio: custo e lucro nulos, e a tela não inventa margem.
+    const custo = verCusto ? custoDaVenda({ custo: juncao }) : null
+    return {
+      ...v,
+      valor_custo: custo,
+      lucro: lucroDaVenda(v.valor_venda, custo),
+      cliente_nome: one(clientes)?.nome ?? null,
+      produto_nome: one(produtos)?.nome ?? null,
+      vendedor_nome: one(usuarios)?.nome ?? null,
+      troca_pendente: !!v.grupo_pdv && gruposRetidos.has(v.grupo_pdv),
+    }
+  })
 
   type VendedorRow = { usuarios: Embed<{ nome: string | null }> }
   const vendedores = [...new Set(

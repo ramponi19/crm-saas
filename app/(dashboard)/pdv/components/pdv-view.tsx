@@ -6,6 +6,7 @@ import {
   Package, Banknote, Zap, CreditCard, Link2, FileText,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { empresaAtualId } from '@/lib/empresa-atual'
 import { useRouter } from 'next/navigation'
 import { cn, formatCurrency } from '@/lib/utils'
@@ -33,7 +34,8 @@ interface ItemEstoque {
   id: number; produto_id: number | null; produto_nome: string; marca_nome: string
   imei: string | null; numero_serie: string | null; cor: string | null
   armazenamento: string | null; bateria: string | null; condicao: string | null
-  estado: string | null; preco_custo: number | null; preco_venda: number | null; status: string
+  // Sem custo (etapa 1.1e): o PDV não lê nem manda custo; o da venda é o gatilho do banco que grava, pela unidade.
+  estado: string | null; preco_venda: number | null; status: string
   /** Garantia do modelo; null cai no padrão da loja. */
   produto_garantia_dias?: number | null
   /** Referência do aviso de valor muito abaixo: preço do catálogo, ou a mediana das vendas (lib/valor-abaixo-do-catalogo). */
@@ -56,7 +58,7 @@ const fotoDoItem = (i: { fotos_urls?: string | null; produto_foto?: string | nul
   (i.fotos_urls ?? '').split(',').map((u) => u.trim()).find(Boolean) ?? i.produto_foto ?? null
 interface ClienteSimples { id: number; nome: string; telefone: string | null; cpf_cnpj: string | null }
 interface Taxa { id: number; forma_pagamento: string; bandeira: string | null; parcelas: number | null; percentual_taxa: number | null }
-interface VendaRecente { id: number; valor_venda: number; lucro: number | null; forma_pagamento: string | null; data_venda: string; status: string | null; cliente_nome: string; produto_nome: string }
+interface VendaRecente { id: number; valor_venda: number; forma_pagamento: string | null; data_venda: string; status: string | null; cliente_nome: string; produto_nome: string }
 interface CobrancaPix { qr_code: string | null; qr_code_base64: string | null; linha_digitavel: string | null; link_pagamento: string | null }
 // Unidade reservada para um lead (feita no modal do lead; vendida aqui).
 interface ReservaPDV extends ItemEstoque { lead_nome: string; reservado_lead_id: number; reservado_por: string | null; reserva_expira_em: string | null }
@@ -66,7 +68,10 @@ interface Props {
   usaComanda?: boolean
   /** Módulo Celulares ligado: troca de aparelho, bateria na vitrine, acessórios de celular. */
   celulares?: boolean
-  isAdmin?: boolean; documentos?: DocumentoDisponivel[]; tabelaPrecos?: PrecoRef[]; toleranciaTroca?: number; encomendas?: EncomendaPDV[]
+  isAdmin?: boolean
+  /** `estoque.ver_custo`: o custo da encomenda (lápis) e a "margem para a loja" da troca. Sem ela, nada de custo. */
+  verCusto?: boolean
+  documentos?: DocumentoDisponivel[]; tabelaPrecos?: PrecoRef[]; toleranciaTroca?: number; encomendas?: EncomendaPDV[]
   /** Mediana das vendas por produto (90 dias, 5+ vendas): referência do aviso de valor na encomenda nova. */
   medianas?: Record<number, MedianaVendas>
 }
@@ -91,7 +96,7 @@ const ACESSORIOS_GENERICOS = ['Acessório']
 const getInitials = (nome: string) => nome.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 const fmt = (v: number) => formatCurrency(v)
 
-export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, usaComanda = false, celulares = false, isAdmin = false, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO, encomendas = [], medianas = {} }: Props) {
+export default function PDVView({ itensDisponiveis, reservas = [], clientes, taxas, usaComanda = false, celulares = false, isAdmin = false, verCusto = false, documentos = [], tabelaPrecos = [], toleranciaTroca = TOLERANCIA_PADRAO, encomendas = [], medianas = {} }: Props) {
   const fuso = useFuso()
   // Comanda é comportamento (mesa/balcão): bar, cafeteria e qualquer atendimento
   // por mesa usam o mesmo campo. Vem pronta da página (capacidades dos módulos ligados: Cardápio).
@@ -286,17 +291,17 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
     // A venda VALE o preço cheio menos o desconto real. A troca NÃO abate daqui:
     // ela é pagamento em espécie (dação em pagamento), não desconto — o cliente
     // pagou o preço todo, só que parte dele em aparelho. É `valorVenda` que vai
-    // para `vendas.valor_venda`, e é dele que saem faturamento e lucro.
+    // para `vendas.valor_venda`, e é dele que saem faturamento e resultado.
     const valorVenda = Math.max(0, subtotal - descontoNum)
     // `total` é outra coisa: o DINHEIRO que o cliente ainda tem de pagar. Aqui a
     // troca abate, porque ela já foi paga em aparelho. É o valor do Pix, da
     // maquininha e do "Total a pagar" na tela.
     const total = Math.max(0, subtotal - abatimento)
-    const custo = carrinho.reduce((a, c) => a + (c.item.preco_custo ?? 0) * c.qtd, 0)
     // Juros agora saem das LINHAS de pagamento (cada cartão tem a sua taxa), não
     // de uma forma única — ver `resumoPag` logo abaixo.
-    // Lucro sai de `valorVenda`, não de `total`: senão a troca viraria prejuízo.
-    return { subtotal, valorVenda, total, custo, lucro: valorVenda - custo }
+    // Sem custo e resultado do carrinho (etapa 1.1e): a conta existia e nenhuma tela a mostrava; o PDV não lê
+    // mais o custo das unidades. O resultado da venda sai de `valorVenda` (não de `total`), lá no banco.
+    return { subtotal, valorVenda, total }
   }, [carrinho, abatimento, descontoNum, acessoriosTotal])
 
   const resumoPag = useMemo(
@@ -492,12 +497,11 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
            * tem nem isso. Sem o vínculo, nenhuma conferência de estoque fecha.
            */
           unidade_id: c.item.id,
-          valor_custo: (c.item.preco_custo ?? 0) * c.qtd,
+          // SEM CUSTO no insert (etapa 1.1e): com `unidade_id`, o gatilho do banco grava o custo da venda a partir
+          // do custo da unidade × quantidade (pendente se a unidade estiver pendente). O navegador não sabe o custo.
           // Quantas peças saíram nesta linha. Sem isto, vender 3 películas viraria
           // 3 vendas e o ranking contaria 3.
           quantidade: c.qtd,
-          // `lucro` NAO entra: e coluna gerada (valor_venda - valor_custo). Mandar
-          // valor faz o Postgres recusar o INSERT inteiro com 428C9.
           forma_pagamento: formaPagamento,
           parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null,
           canal_venda: 'loja_fisica',
@@ -542,7 +546,8 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         const valorAc = cent(preco - descAc)
         const { data: vAc, error: eAc } = await supabase.from('vendas_vendas').insert({
           empresa_id: empresaId, grupo_pdv: grupoPdv, cliente_id: clienteSelecionado?.id ?? null, vendedor_id: user.id, usuario_id: user.id,
-          valor_venda: valorAc, valor_custo: 0, forma_pagamento: formaPagamento, // sem `lucro`: coluna gerada
+          // Sem custo: acessório avulso não tem unidade, e o custo fica no padrão da coluna (como antes, 0).
+          valor_venda: valorAc, forma_pagamento: formaPagamento,
           parcelas: ['credito', 'link'].includes(formaPagamento) ? parcelas : null, canal_venda: 'loja_fisica',
           desconto_valor: descAc, status: vendaStatus, observacoes: `Acessório: ${ac.descricao.trim()}`, data_venda: new Date().toISOString(),
         } as never).select('id').single()
@@ -560,14 +565,20 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
       // Vender uma peça que não chegou é pior que não tê-la no estoque. Fica no
       // nome de quem fechou (`usuario_id`) e a comissão do fechamento espera a
       // confirmação de chegada.
+      // Pela RPC `estoque_unidade_criar` (etapa 1.1e): o navegador não grava custo direto; na troca o valor dado ao
+      // cliente É o custo, e a RPC aceita o `preco_custo` de quem não tem `estoque.ver_custo` só com `tipo: 'troca'`.
       for (const t of trocasValidas) {
-        await supabase.from('estoque_unidades').insert({
-          empresa_id: empresaId, produto_id: null, condicao: 'usado', tipo: 'troca', status: 'pendente',
-          grupo_pdv: grupoPdv, usuario_id: user.id,
-          preco_custo: t.num, imei: t.imei.trim() || null,
-          observacoes: TEXTOS_TROCA_PDV.observacaoUnidade(t, clienteSelecionado?.nome ?? null),
-          ativo: true,
+        const { error: eTroca } = await (supabase as unknown as SupabaseClient).rpc('estoque_unidade_criar', {
+          p: {
+            empresa_id: empresaId, produto_id: null, condicao: 'usado', tipo: 'troca', status: 'pendente',
+            grupo_pdv: grupoPdv, usuario_id: user.id,
+            preco_custo: t.num, imei: t.imei.trim() || null,
+            observacoes: TEXTOS_TROCA_PDV.observacaoUnidade(t, clienteSelecionado?.nome ?? null),
+            ativo: true,
+          },
         } as never)
+        // A venda já está feita e o aparelho está no balcão: avisa em vez de desfazer.
+        if (eTroca) notify.warn(TEXTOS_TROCA_PDV.naoEntrouTitulo, TEXTOS_TROCA_PDV.naoEntrouTexto(t, eTroca.message))
       }
 
       /**
@@ -615,13 +626,16 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
                 valor_com_juros: comJuros > p.valor ? comJuros : null,
               }
             }),
-          ...(trocaNum > 0.005 ? [{
+          // UMA linha de troca POR APARELHO, na ordem em que as unidades de troca são criadas (etapa 1.1e): o valor
+          // de cada aparelho fica num lugar público da venda (o termo e a lista de encomendas leem daqui — o custo da
+          // unidade é só de quem tem estoque.ver_custo). A soma é a mesma de antes (trocaNum).
+          ...trocasValidas.map((t) => ({
             empresa_id: empresaId,
             venda_id: primeiraVendaId!,
             forma_pagamento: 'troca',
-            valor_pago: trocaNum,
+            valor_pago: t.num,
             bandeira_cartao: null, parcelas: null, valor_com_juros: null,
-          }] : []),
+          })),
         ]
         if (linhas.length) {
           // Pagamento que não gravou desfaz a venda (catch abaixo): venda sem o
@@ -1010,7 +1024,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
         {aba === 'encomenda' ? (
           <div className="mx-auto max-w-[720px] space-y-4">
             <EncomendaForm clientes={clientes} taxas={taxas} celulares={celulares} medianas={medianas} />
-            <EncomendasAbertas encomendas={encomendas} taxas={taxas} isAdmin={isAdmin} documentos={documentos} celulares={celulares} />
+            <EncomendasAbertas encomendas={encomendas} taxas={taxas} isAdmin={isAdmin} verCusto={verCusto} documentos={documentos} celulares={celulares} />
           </div>
         ) : (
         <div className="grid grid-cols-1 items-start gap-5 lg:[grid-template-columns:1.55fr_1fr]">
@@ -1329,7 +1343,7 @@ export default function PDVView({ itensDisponiveis, reservas = [], clientes, tax
             </div>
 
             {/* #1 Troca: do módulo Celulares, só com ele ligado. */}
-            {celulares && <TrocaPdvBloco troca={troca} />}
+            {celulares && <TrocaPdvBloco troca={troca} verCusto={verCusto} />}
 
             {/* #2 Entrega pendente */}
             <label className="mb-2 flex items-center gap-2 rounded-control border border-line px-3 py-2 text-[12.5px] text-ink-2">

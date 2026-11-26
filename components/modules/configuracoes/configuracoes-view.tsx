@@ -39,6 +39,8 @@ interface Props {
    * como seção própria, com o menu lateral dela no lugar desta barra de abas.
    */
   aba?: string
+  /** `estoque.ver_custo`: só muda o texto de margem da seção Troca (etapa 1.1e). */
+  verCusto?: boolean
 }
 
 
@@ -60,7 +62,7 @@ const TABS = [
 
 const supabase = createClient()
 
-export function ConfiguracoesView({ taxas, slug, aba: abaFixa }: Props) {
+export function ConfiguracoesView({ taxas, slug, aba: abaFixa, verCusto = false }: Props) {
   /**
    * A aba pode vir na URL (`?aba=modelos`).
    *
@@ -325,7 +327,7 @@ export function ConfiguracoesView({ taxas, slug, aba: abaFixa }: Props) {
         {aba === 'agendamento' && <AgendamentoCard slug={slug ?? null} />}
         {aba === 'veiculos-portais' && <VeiculosPortalCard slug={slug ?? null} />}
         {aba === 'contrato' && <ContratoCard />}
-        {aba === 'troca' && <TrocaCard />}
+        {aba === 'troca' && <TrocaCard verCusto={verCusto} />}
 
       </div>
 

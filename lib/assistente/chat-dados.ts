@@ -60,7 +60,7 @@ function instrucoes(o: {
   const limites = [
     o.acesso.soMinhasVendas && 'só vê as próprias vendas',
     o.acesso.soMeusLeads && 'só vê os próprios leads e os sem responsável',
-    !o.acesso.verFinanceiro && 'não vê custo, lucro nem margem',
+    !o.acesso.verCusto && 'não vê custo, lucro nem margem',
   ].filter(Boolean)
 
   return `Você é o assistente do Nexus CRM da empresa "${o.empresa}"${o.modulos ? ` (módulos que ela usa no Nexus: ${o.modulos})` : ''}.

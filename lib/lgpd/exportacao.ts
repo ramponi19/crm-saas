@@ -39,6 +39,23 @@ export const TABELAS_LGPD = [
   'financeiro_cobrancas', 'financeiro_lancamentos',
 ] as const
 
+/**
+ * CUSTO FORA DO ZIP (etapa 1.1e, custo protegido; docs/etapa-1.1-plano.md §4.4). As tabelas com coluna de custo
+ * saem com a lista explícita de colunas, sem o custo: `vendas_vendas` sem `valor_custo` e sem `lucro` (a coluna
+ * gerada). O custo mora nos satélites, que esta exportação não lê. Coluna nova em vendas_vendas precisa entrar
+ * aqui para sair no arquivo (a lista é de propósito: `*` levaria junto qualquer coluna de custo).
+ * As outras tabelas de TABELAS_LGPD não têm custo (estoque_produtos só tem o preço de venda).
+ */
+export const COLUNAS_LGPD: Partial<Record<(typeof TABELAS_LGPD)[number], string>> = {
+  // nomes de coluna (sem espaço: não é texto para a loja ler)
+  vendas_vendas: [
+    'id', 'empresa_id', 'filial_id', 'cliente_id', 'produto_id', 'unidade_id', 'pedido_compra_id', 'vendedor_id',
+    'usuario_id', 'valor_venda', 'desconto_valor', 'desconto_motivo', 'desconto_aprovado_por', 'comissao',
+    'quantidade', 'forma_pagamento', 'parcelas', 'canal_venda', 'status', 'grupo_pdv', 'comanda', 'numero_serie',
+    'observacoes', 'data_venda', 'previsao_entrega', 'concluida_em', 'concluida_por', 'concluida_via', 'created_at',
+  ].join(','),
+}
+
 /** Todas as linhas da empresa, de mil em mil pelo id (o teto do PostgREST é mil por resposta). */
 export async function lerTudo(db: Db, tabela: string, empresaId: number, colunas = '*'): Promise<Linha[]> {
   const out: Linha[] = []
@@ -75,7 +92,7 @@ export async function gerarExportacao(svc: Db, empresaId: number, empresa: Linha
 
   const lidas: Record<string, Linha[]> = {}
   for (const tabela of TABELAS_LGPD) {
-    lidas[tabela] = await lerTudo(svc, tabela, empresaId)
+    lidas[tabela] = await lerTudo(svc, tabela, empresaId, COLUNAS_LGPD[tabela])
     contagens[tabela] = lidas[tabela].length
     entries.push({ nome: `${tabela}.csv`, conteudo: linhasParaCsv(lidas[tabela]) })
   }

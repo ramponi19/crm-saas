@@ -85,3 +85,25 @@ export function textoDoAceite(aparelho: string, a: AvaliacaoTroca): string {
     + `referência ${brl(a.referencia)} (${a.percentual.toFixed(1)}% acima, ${brl(a.excedente)} a mais). `
     + `O vendedor confirmou estar ciente ao fechar a venda.`
 }
+
+/**
+ * O VALOR DE CADA APARELHO RECEBIDO NA TROCA, a partir do que foi PAGO em troca (etapa 1.1e; roteiro C2).
+ *
+ * Antes o PDV, a lista de encomendas e o termo de garantia liam o `preco_custo` ATUAL da unidade de troca: é custo
+ * (só quem tem `estoque.ver_custo` lê) e muda depois (reparo, ajuste), mas o documento tem de dizer o que o cliente
+ * recebeu. O que ele recebeu está em `vendas_pagamentos` com `forma_pagamento = 'troca'`, valor público da venda.
+ *
+ * O PDV e a encomenda gravam UMA linha de troca com o total dos aparelhos. Então:
+ * - uma linha por aparelho (mesma quantidade): pareia pela ordem de gravação (unidades e pagamentos por id);
+ * - um aparelho só: ele vale o total pago em troca;
+ * - vários aparelhos numa linha só: o valor de cada um não foi guardado em lugar público. Reparte o total em partes
+ *   iguais (centavos no último) para o total do documento bater com o pago; o valor por aparelho é aproximado.
+ */
+export function valoresDaTroca(qtdUnidades: number, pagamentosTroca: number[]): number[] {
+  if (qtdUnidades <= 0) return []
+  if (pagamentosTroca.length === qtdUnidades) return pagamentosTroca.map((v) => Number(v) || 0)
+  const total = Math.round(pagamentosTroca.reduce((s, v) => s + (Number(v) || 0), 0) * 100)
+  const parte = Math.floor(total / qtdUnidades)
+  return Array.from({ length: qtdUnidades }, (_, i) =>
+    (i === qtdUnidades - 1 ? total - parte * (qtdUnidades - 1) : parte) / 100)
+}

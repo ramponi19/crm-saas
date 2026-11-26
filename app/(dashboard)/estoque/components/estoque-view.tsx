@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Package, ArrowDownLeft, History, LayoutDashboard, List, RefreshCw, PackageCheck, ArrowLeftRight, ScanSearch } from 'lucide-react'
+import { Search, Package, ArrowDownLeft, History, LayoutDashboard, List, RefreshCw, PackageCheck, ArrowLeftRight, ScanSearch, CircleDollarSign } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useFerramenta } from '@/components/layout/ferramentas-context'
 import { cn, formatCurrency } from '@/lib/utils'
@@ -18,7 +18,8 @@ import { CamposVeiculoEntrada } from '@/components/modules/veiculos/campos-veicu
 import {
   Card, StatCard, Table, Tabs, Badge, Button, Input, Select, Textarea, EmptyState, notify, ConfirmDialog, UploadFotos,
   Modal, type Column, BuscaSelect } from '@/components/ui'
-import type { TablesInsert } from '@/types/database'
+import { margem as margemDe, COLUNAS_UNIDADE } from '@/lib/custo'
+import { CustoPendente } from './custo-pendente'
 import { useFuso } from '@/components/fuso-provider'
 import { formatarDiaMes, formatarHora } from '@/lib/datas'
 
@@ -96,6 +97,14 @@ interface Props {
   filiais: FilialOpt[]
   /** Falso em empresa de uma loja, e para quem não é dono nem admin. */
   podeTransferir: boolean
+  /**
+   * Permissão "Ver custo, margem e lucro" (estoque.ver_custo; etapa 1.1e). Sem ela a página nem pede o custo ao
+   * banco: some a coluna Custo, a entrada não tem campo de custo (a unidade nasce com custo pendente) e não há aba
+   * de pendentes.
+   */
+  verCusto: boolean
+  /** Quantas unidades estão com custo pendente (só com verCusto; 0 sem a permissão). */
+  pendentes: number
 }
 
 export type FilialOpt = { id: number; nome: string; cidade: string | null }
@@ -187,7 +196,7 @@ const STATUS_FILTER = [
 const fmt = (v: number) => formatCurrency(v)
 const fmtDate = (s: string, fuso: string) => `${formatarDiaMes(s, '', fuso)} · ${formatarHora(s, '', fuso)}`
 
-type Tab = 'dashboard' | 'lista' | 'entrada' | 'historico'
+type Tab = 'dashboard' | 'lista' | 'entrada' | 'historico' | 'pendentes'
 
 const TABS: { value: Tab; label: React.ReactNode }[] = [
   { value: 'dashboard', label: <span className="flex items-center gap-2"><LayoutDashboard size={14} strokeWidth={1.7} />Dashboard</span> },
@@ -196,7 +205,7 @@ const TABS: { value: Tab; label: React.ReactNode }[] = [
   { value: 'historico', label: <span className="flex items-center gap-2"><History size={14} strokeWidth={1.7} />Histórico</span> },
 ]
 
-export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, clientes, tabelaPrecos, fornecedores, empresaId, usaPlaca = false, celulares = false, filiais, podeTransferir }: Props) {
+export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _marcas, categorias: _categorias, produtos, clientes, tabelaPrecos, fornecedores, empresaId, usaPlaca = false, celulares = false, filiais, podeTransferir, verCusto, pendentes }: Props) {
   // `usaPlaca` em vez de "é concessionária?": locadora e frota também pedem
   // placa/chassi/renavam, e ligariam a capacidade sem tocar neste arquivo.
   const isVeiculo = usaPlaca
@@ -416,10 +425,14 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
       key: 'loja', header: 'Loja', hideOnMobile: true,
       render: (u: Unidade) => <span className="text-ink-2">{u.filial_nome ?? '—'}</span>,
     } as Column<Unidade>] : []),
-    {
+    // Custo só para quem tem estoque.ver_custo (o servidor nem lê sem a permissão). Pendente aparece como tal.
+    ...(verCusto ? [{
       key: 'custo', header: 'Custo', align: 'right', hideOnMobile: true, className: 'num',
-      render: (u) => <span className="text-ink-2">{u.preco_custo ? fmt(u.preco_custo) : '—'}</span>,
-    },
+      // 0 = "sem custo" (o 0 antigo copiado na 1.1d): traço, como antes. Nulo = pendente (vai à aba).
+      render: (u: Unidade) => u.preco_custo == null
+        ? <span className="text-[12px] text-warn">pendente</span>
+        : Number(u.preco_custo) > 0 ? <span className="text-ink-2">{fmt(u.preco_custo)}</span> : <span className="text-ink-3">—</span>,
+    } as Column<Unidade>] : []),
     {
       key: 'venda', header: 'Venda', align: 'right', className: 'num',
       render: (u) => u.preco_venda ? <span className="font-semibold text-ink">{fmt(u.preco_venda)}</span> : <span className="text-ink-3">—</span>,
@@ -492,7 +505,12 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
               do menu lateral). A aba leva à tela dela, /estoque/imei, que tem o
               histórico de consultas carregado no servidor. */}
           <Tabs
-            items={imei ? [...TABS, { value: 'imei', label: <span className="flex items-center gap-2"><ScanSearch size={14} strokeWidth={1.7} />{imei.label}</span> }] : TABS}
+            items={[
+              ...TABS,
+              // Unidades com custo pendente: só para quem informa custo (estoque.ver_custo).
+              ...(verCusto ? [{ value: 'pendentes', label: <span className="flex items-center gap-2"><CircleDollarSign size={14} strokeWidth={1.7} />Custo pendente{pendentes > 0 ? ` (${pendentes})` : ''}</span> }] : []),
+              ...(imei ? [{ value: 'imei', label: <span className="flex items-center gap-2"><ScanSearch size={14} strokeWidth={1.7} />{imei.label}</span> }] : []),
+            ]}
             value={tab}
             onValueChange={(v) => (v === 'imei' && imei ? router.push(imei.rota) : setTab(v as Tab))}
           />
@@ -603,6 +621,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
                   isVeiculo={isVeiculo}
                   celulares={celulares}
                   preset={preset}
+                  verCusto={verCusto}
                   onSaved={(u) => {
                     setItens(prev => [u, ...prev])
                     setPreset(null)
@@ -613,6 +632,9 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
               </Card>
             </div>
           )}
+
+          {/* ── CUSTO PENDENTE (estoque.ver_custo) ── */}
+          {tab === 'pendentes' && verCusto && <CustoPendente filiais={filiais} />}
 
           {/* ── HISTÓRICO ── */}
           {tab === 'historico' && (
@@ -634,6 +656,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
           empresaId={empresaId}
           isVeiculo={isVeiculo}
           celulares={celulares}
+          verCusto={verCusto}
           onClose={() => { setModalOpen(false); setUnidadeSel(null) }}
         />
       )}
@@ -716,7 +739,7 @@ export default function EstoqueView({ itens: itensInit, movimentacoes, marcas: _
 }
 
 // ── Formulário inline de entrada ──
-function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, empresaId, isVeiculo, celulares, preset, onSaved }: {
+function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, empresaId, isVeiculo, celulares, preset, verCusto, onSaved }: {
   produtos: ProdutoOpt[]
   clientes: { id: number; nome: string; telefone?: string | null; cpf_cnpj?: string | null }[]
   tabelaPrecos: TabelaPrecoRef[]
@@ -725,6 +748,8 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
   isVeiculo: boolean
   celulares: boolean
   preset: Preset
+  /** Sem estoque.ver_custo o campo de custo some e a unidade nasce com custo pendente (decidido em 25/11, Q5). */
+  verCusto: boolean
   onSaved: (u: Unidade) => void
 }) {
   const supabase = createClient()
@@ -860,9 +885,10 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
     }))
   }, [modeloApple, produtoDoModelo])
 
+  // Fórmula única de margem (lib/custo): % sobre o preço de venda, custo = custo + reparo.
   const custoTotal = (Number(form.preco_custo) || 0) + (Number(form.custo_reparo) || 0)
-  const margem = form.preco_venda && form.preco_custo
-    ? (((Number(form.preco_venda) - custoTotal) / Number(form.preco_venda)) * 100).toFixed(1) : null
+  const margemNum = verCusto && form.preco_venda && form.preco_custo ? margemDe(Number(form.preco_venda), custoTotal) : null
+  const margem = margemNum != null ? margemNum.toFixed(1) : null
 
   // Sugestão de preço de venda a partir da Tabela de preços (modelo + condição + capacidade).
   const produtoNomeSel = produtos.find(p => p.id === Number(form.produto_id))?.nome ?? ''
@@ -900,7 +926,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
       notify.bad(TEXTOS_IMEI.reprovadoTitulo, TEXTOS_IMEI.reprovadoTexto(consultaImei.motivo))
       return
     }
-    if (!form.preco_custo) { notify.warn('Informe o preço de custo'); return }
+    if (verCusto && !form.preco_custo) { notify.warn('Informe o preço de custo'); return }
     if (!form.preco_venda) { notify.warn('Informe o preço de venda'); return }
     setSaving(true)
     /**
@@ -938,13 +964,21 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
       // Só item sem série entra em lote. Serializado é sempre 1 — mandar outro
       // valor ali criaria um "celular com saldo 3", que não existe.
       quantidade: campos.semSerie ? Math.max(1, Number(form.quantidade) || 1) : 1,
-      preco_custo: Number(form.preco_custo), preco_venda: Number(form.preco_venda),
-      custo_reparo: Number(form.custo_reparo) || null,
+      preco_venda: Number(form.preco_venda),
+      // Custo só com a permissão; sem ela a função do banco grava a unidade com custo pendente.
+      ...(verCusto ? { preco_custo: Number(form.preco_custo), custo_reparo: Number(form.custo_reparo) || null } : {}),
       cliente_id: form.cliente_id ? Number(form.cliente_id) : null,
       observacoes: form.observacoes || null, ativo: true,
     }
-    const { data, error } = await supabase.from('estoque_unidades').insert(payload as TablesInsert<'estoque_unidades'>).select().single()
-    if (error) { setSaving(false); notify.bad('Erro ao cadastrar', error.message); return }
+    // Etapa 1.1e: a unidade nasce pela função do banco (estoque_unidade_criar), que grava o custo no satélite e o
+    // deixa pendente para quem não tem a permissão. O app não lê nem grava mais as colunas antigas de custo.
+    const { data: novoId, error } = await supabase.rpc('estoque_unidade_criar' as never, { p: payload } as never)
+    if (error || novoId == null) { setSaving(false); notify.bad('Erro ao cadastrar', error?.message ?? 'Sem resposta do banco'); return }
+    const { data: linha } = await supabase.from('estoque_unidades').select(COLUNAS_UNIDADE).eq('id', Number(novoId)).single()
+    const data = { ...(linha as unknown as Omit<Unidade, 'preco_custo' | 'custo_reparo'>),
+      // custo 0 informado continua 0 (não vira "pendente" na linha nova); vazio = nulo
+      preco_custo: verCusto && form.preco_custo !== '' && form.preco_custo != null ? Number(form.preco_custo) : null,
+      custo_reparo: verCusto && form.custo_reparo !== '' && form.custo_reparo != null ? Number(form.custo_reparo) : null }
 
     /**
      * ESCRITA DUPLA, de propósito e por tempo limitado.
@@ -1141,7 +1175,7 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
                 placeholder="1"
                 className="num"
               />
-              {Number(form.quantidade) > 1 && Number(form.preco_custo) > 0 && (
+              {verCusto && Number(form.quantidade) > 1 && Number(form.preco_custo) > 0 && (
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[12px] font-medium text-ink-2">Custo do lote</label>
                   <div className="num rounded-control border border-line bg-raised px-3 py-2 text-[13px] text-ink-2">
@@ -1155,20 +1189,33 @@ function UnidadeInlineForm({ produtos, clientes, tabelaPrecos, fornecedores, emp
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <Input label="Preço de custo *" type="number" value={form.preco_custo} onChange={e => set('preco_custo', e.target.value)} placeholder="R$ 0,00" className="num" />
-        <Input label="Custo de reparo" type="number" value={form.custo_reparo} onChange={e => set('custo_reparo', e.target.value)} placeholder="R$ 0,00" className="num" />
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        {field('Custo total (auto)',
-          <div className="num rounded-control border border-ok/20 bg-ok-soft px-3 py-2 text-[13px] font-semibold text-ok">
-            {formatCurrency(custoTotal)}
-            {margem && <span className="ml-2 text-[11px] font-normal text-ok/70">· margem {margem}%</span>}
+      {/* Custo só para quem tem estoque.ver_custo. Sem a permissão o campo some e a unidade entra com custo
+          pendente: quem tem a permissão informa depois, na aba "Custo pendente" (etapa 1.1e). */}
+      {verCusto ? (
+        <>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Input label="Preço de custo *" type="number" value={form.preco_custo} onChange={e => set('preco_custo', e.target.value)} placeholder="R$ 0,00" className="num" />
+            <Input label="Custo de reparo" type="number" value={form.custo_reparo} onChange={e => set('custo_reparo', e.target.value)} placeholder="R$ 0,00" className="num" />
           </div>
-        )}
-        <Input label="Preço de venda *" type="number" value={form.preco_venda} onChange={e => set('preco_venda', e.target.value)} placeholder="R$ 0,00" className="num" />
-      </div>
+
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {field('Custo total (auto)',
+              <div className="num rounded-control border border-ok/20 bg-ok-soft px-3 py-2 text-[13px] font-semibold text-ok">
+                {formatCurrency(custoTotal)}
+                {margem && <span className="ml-2 text-[11px] font-normal text-ok/70">· margem {margem}%</span>}
+              </div>
+            )}
+            <Input label="Preço de venda *" type="number" value={form.preco_venda} onChange={e => set('preco_venda', e.target.value)} placeholder="R$ 0,00" className="num" />
+          </div>
+        </>
+      ) : (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <Input label="Preço de venda *" type="number" value={form.preco_venda} onChange={e => set('preco_venda', e.target.value)} placeholder="R$ 0,00" className="num" />
+          <p className="self-end rounded-control bg-raised px-3 py-2 text-[12px] leading-relaxed text-ink-2">
+            O custo fica <span className="font-semibold text-ink">pendente</span>: quem cuida do custo informa depois.
+          </p>
+        </div>
+      )}
 
       {sugestaoPreco != null && (
         <button type="button" onClick={() => set('preco_venda', String(sugestaoPreco))}

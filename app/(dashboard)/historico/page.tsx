@@ -2,7 +2,9 @@ import { createClient, getEmpresaId } from '@/lib/supabase/server'
 import { documentosDisponiveis } from '@/lib/contrato-emitir'
 import { Topbar } from '@/components/layout/topbar'
 import { HistoricoView } from '@/components/modules/historico/historico-view'
-import { permissoesDoVinculo, permsDoContexto } from '@/lib/sessao'
+import { contextoDaSessao, permissoesDoVinculo, permsDoContexto, temPermissao } from '@/lib/sessao'
+import { JUNCAO_CUSTO_VENDA, custoDaVenda, lucro as lucroDaVenda } from '@/lib/custo'
+import { temCusto } from '@/lib/painel/metricas'
 import { carregarConfigEmpresa, ligadosDaEmpresa } from '@/lib/empresa-config'
 import { HREF_CELULARES } from '@/components/modules/celulares/modulo'
 
@@ -33,15 +35,23 @@ export default async function HistoricoPage() {
   const soMinhas = !isAdmin && !!papel && !!user
     && !permsDoContexto(await permissoesDoVinculo(supabase, empresaId, user!.id)).verVendasOutros
 
+  /**
+   * CUSTO PROTEGIDO (etapa 1.1e). O lucro não sai mais da coluna gerada de vendas_vendas: vem do satélite
+   * (vendas_vendas_custos) e é calculado aqui. Sem estoque.ver_custo a junção nem é pedida — o custo não chega ao
+   * navegador e a tela esconde lucro e o card "Lucro bruto". O CSV só aparece com core.exportar.
+   */
+  const ctx = await contextoDaSessao()
+  const verCusto = temPermissao(ctx, 'estoque.ver_custo')
+  const podeExportar = temPermissao(ctx, 'core.exportar')
+
+  const colunasVenda =
+    'id, data_venda, concluida_em, valor_venda, forma_pagamento, ' +
+    'canal_venda, status, parcelas, cliente_id, produto_id, numero_serie, desconto_valor, observacoes, quantidade, grupo_pdv, ' +
+    'clientes:contatos!cliente_id(nome), produtos:estoque_produtos!produto_id(nome), usuarios!vendedor_id(nome)' +
+    (verCusto ? `, ${JUNCAO_CUSTO_VENDA}` : '')
   const baseVendas = supabase
     .from('vendas_vendas')
-    .select(`
-      id, data_venda, concluida_em, valor_venda, lucro, forma_pagamento,
-      canal_venda, status, parcelas, cliente_id, produto_id, numero_serie, desconto_valor, observacoes, quantidade, grupo_pdv,
-      clientes:contatos!cliente_id(nome),
-      produtos:estoque_produtos!produto_id(nome),
-      usuarios!vendedor_id(nome)
-    `)
+    .select(colunasVenda)
     .eq('empresa_id', empresaId)
     .order('data_venda', { ascending: false })
     .limit(500)
@@ -57,13 +67,15 @@ export default async function HistoricoPage() {
   const { data: vendasRaw } = soMinhas ? await baseVendas.eq('vendedor_id', user!.id) : await baseVendas
 
   type VendaRow = {
-    id: number; data_venda: string | null; concluida_em: string | null; valor_venda: number; lucro: number | null
+    id: number; data_venda: string | null; concluida_em: string | null; valor_venda: number
     forma_pagamento: string | null; canal_venda: string | null; status: string | null; parcelas: number | null
     cliente_id: number | null; produto_id: number | null; numero_serie: string | null; desconto_valor: number | null; observacoes: string | null
     quantidade: number | null; grupo_pdv: string | null
     clientes: Embed<{ nome: string | null }>
     produtos: Embed<{ nome: string | null }>
     usuarios: Embed<{ nome: string | null }>
+    /** Só com estoque.ver_custo (a junção nem é pedida sem ela). */
+    custo?: Embed<{ valor_custo: number | null }>
   }
   const linhasVenda = (vendasRaw ?? []) as unknown as VendaRow[]
 
@@ -88,12 +100,21 @@ export default async function HistoricoPage() {
     pagosPorGrupo.get(chave)!.push(p)
   }
 
+  /**
+   * Lucro só com custo lançado (> 0, a regra do painel em lib/painel/metricas): custo pendente ou o 0 das vendas
+   * antigas daria o preço cheio como lucro. Sem a permissão, a junção não veio e o lucro é nulo.
+   */
+  const lucroDe = (v: VendaRow): number | null => {
+    const custo = custoDaVenda(v)
+    return temCusto({ valor_custo: custo }) ? lucroDaVenda(Number(v.valor_venda), custo) : null
+  }
+
   const vendas = linhasVenda.map(v => ({
     id:            v.id,
     data_venda:    v.data_venda,
     concluida_em:  v.concluida_em,
     valor_venda:   Number(v.valor_venda),
-    lucro:         v.lucro != null ? Number(v.lucro) : null,
+    lucro:         lucroDe(v),
     forma_pagamento: v.forma_pagamento,
     canal_venda:   v.canal_venda,
     status:        v.status,
@@ -119,7 +140,8 @@ export default async function HistoricoPage() {
     <>
       <Topbar eyebrow="VENDAS · HISTÓRICO" title="Histórico de vendas" />
       <HistoricoView vendas={vendas} isAdmin={isAdmin} vendedores={vendedores} empresaId={empresaId!} documentos={documentos}
-        taxas={taxas ?? []} celulares={ligadosDaEmpresa(cfgEmpresa).has(HREF_CELULARES)} />
+        taxas={taxas ?? []} celulares={ligadosDaEmpresa(cfgEmpresa).has(HREF_CELULARES)}
+        verCusto={verCusto} podeExportar={podeExportar} />
     </>
   )
 }
