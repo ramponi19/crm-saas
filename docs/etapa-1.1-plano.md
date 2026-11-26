@@ -679,7 +679,11 @@ A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas 
 - **onde:** a notificação sai da própria função (mesma transação), pelo mecanismo de notificações já usado no app; e-mail fica de fora (decisão dos sócios, se quiserem);
 - **critério:** teste SQL (Dono A rebaixa Dono B → 1 notificação para B, nenhuma para A; Administrador continua recebendo `SO_DONO`); conferência na tela da Demonstração; nada muda para a JM até alguém trocar o cargo de um Dono.
 
-**Situação em 26/11/2026:** o item 1 (P2 + contador; migração `20261126000500`) e a primeira parte do item 3 (`core_horario` e `core_liberar_lotes_do_dia` na tabela nova; migração `20261126000600`) foram feitos e sobem juntos (commit `ebbffac3`). Detalhe da produção no `estado-atual`/§5.3.
+**Situação em 26/11/2026: EM PRODUÇÃO** o item 1 (P2 + contador) e a primeira parte do item 3 (`core_horario` e `core_liberar_lotes_do_dia` na tabela nova).
+- **Ordem do deploy:** 0500 (`20261126141756`, 14:17 UTC) → app `01aeda6d` (push 14:18; `dpl_WjE5f6w56Ymx8q5iQigkNxNvHn6A` READY 14:21) → 0600 (`20261126141823`, 14:18). Portões: build igual ao da Vercel, IOwait 0,11%, JM sem escrita em 10 min, fora dos minutos 05–15. Volta: app `dpl_21G6j38zyGj2CLopDy9DkseJviuB`; banco `volta-aviso-dono-e-contador-pendentes.sql` e `volta-horario-liberacao-tabela-nova.sql`.
+- **1.1h parte 1, antes = depois:** `core_horario` com o mesmo md5 nas 7 combinações empresa/loja (JM empresa, loja 3, loja 6; Demonstração; Aletrini); liberação percorrendo as mesmas empresas ([1]) com a mesma configuração por loja (`conciliacao-pedidos/etapa-1.1h-20261126/horario-liberacao-antes.json`). Rodadas reais seguintes ok na página Rotinas: liberação 15:05 UTC (1 empresa, 0 erro) e pós-venda 15:10 (2 empresas, 0 erro); "Com erro, não vistas (0)".
+- **Smoke:** contador da JM lido como o Dono = **16** (loja 3: 1; loja 6: 15). P2 na Demonstração (simulação desfeita): o Dono rebaixado recebe "Seu cargo foi alterado — Meta App Review mudou o seu cargo de Dono para Administrador", com a linha de Auditoria; quem mudou não vê aviso. Tela da Demonstração: sino abre sem erro; chamadas a `usuario_avisos` com 200.
+- **Logs 14:21–14:36:** Vercel sem erro; API 1.100 requisições, nenhum 4xx/5xx; Postgres sem erro.
 
 **2. 1.1g — remover as colunas antigas de custo** (detalhe no §4.6):
 - **coleta da evidência (começou em 26/11/2026):**
