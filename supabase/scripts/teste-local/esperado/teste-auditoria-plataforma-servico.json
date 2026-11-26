@@ -1,0 +1,14 @@
+{
+  "1_servico_com_superadmin": {
+    "acao": "plataforma_update", "tabela": "empresa_usuarios", "depois": { "campos": ["participa_roleta"] },
+    "origem": "gatilho servico", "empresa": 1, "usuario_e_plataforma": true
+  },
+  "2_empresas": { "entidade": "empresas:1", "empresa": 1, "tem_cidade": true, "so_nomes_de_campos": true },
+  "2b_usuarios": { "outra_pessoa": { "campos": ["nome"] }, "propria_linha": 0 },
+  "3_nao_superadmin": 0,
+  "4_cabecalho_de_navegador_ignorado": 0,
+  "5_servico_sem_cabecalho": 0,
+  "6_malformado": { "linhas": 0, "gravou": true },
+  "7_impersonacao_vencida": 0,
+  "8_sessao_direta": "gatilho"
+}

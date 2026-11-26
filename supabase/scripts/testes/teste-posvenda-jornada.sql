@@ -19,6 +19,11 @@ begin
   return v;
 end $f$;
 -- Os passos de uma venda: {dia_offset: status}
+-- O dia em que o pós-venda agenda: o próprio dia, se a loja 3 abre; senão o próximo dia aberto. Sem isto o teste
+-- dependia da data em que roda (26/11/2026: hoje - 20 + 330 caiu num sábado).
+create function pg_temp.dia_aberto(p_dia date) returns date language sql as $f$
+  select case when core_abre_no_dia(1::bigint, 3::bigint, p_dia) then p_dia else posvenda_proximo_dia_util(1, 3, p_dia) end
+$f$;
 create function pg_temp.passos(p_neg bigint) returns jsonb language sql as $f$
   select coalesce(jsonb_object_agg(pp.dia_offset::text, a.status order by pp.dia_offset), '{}')
     from posvenda_acompanhamentos a join posvenda_cadencia_passos pp on pp.id = a.passo_id
@@ -62,7 +67,7 @@ begin
     'passos', pg_temp.passos(n),
     'responsaveis', (select jsonb_agg(distinct case when a.responsavel_id = M1 then 'M1' else a.responsavel_id::text end) from posvenda_acompanhamentos a join posvenda_jornadas j on j.id = a.jornada_id where j.negocio_id = n),
     'origens', (select jsonb_agg(distinct a.origem_responsavel) from posvenda_acompanhamentos a join posvenda_jornadas j on j.id = a.jornada_id where j.negocio_id = n),
-    'datas_do_ganho', (select bool_and(posvenda_dia_local(1, a.previsto_para) = hoje + pp.dia_offset) from posvenda_acompanhamentos a
+    'datas_do_ganho', (select bool_and(posvenda_dia_local(1, a.previsto_para) = pg_temp.dia_aberto(hoje + pp.dia_offset)) from posvenda_acompanhamentos a
                          join posvenda_cadencia_passos pp on pp.id = a.passo_id join posvenda_jornadas j on j.id = a.jornada_id where j.negocio_id = n)));
   insert into contatos (empresa_id, filial_id, nome) values (1, 3, 'C3 caso 2b') returning id into ct;
   n := pg_temp.vender(ct, M1, meio_dia, 1, 'novo');
@@ -107,7 +112,7 @@ begin
   execute 'reset role';
   res := res || jsonb_build_object('4_corrigir_data', jsonb_build_object(
     'passos', (select jsonb_object_agg(pp.dia_offset::text, a.status || coalesce(':' || a.motivo, '')) from posvenda_acompanhamentos a join posvenda_cadencia_passos pp on pp.id = a.passo_id where a.negocio_id = n),
-    'pendentes_na_data_nova', (select bool_and(posvenda_dia_local(1, a.previsto_para) = (hoje - 20) + pp.dia_offset) from posvenda_acompanhamentos a
+    'pendentes_na_data_nova', (select bool_and(posvenda_dia_local(1, a.previsto_para) = pg_temp.dia_aberto((hoje - 20) + pp.dia_offset)) from posvenda_acompanhamentos a
                                  join posvenda_cadencia_passos pp on pp.id = a.passo_id where a.negocio_id = n and a.status = 'pendente'),
     'atrasados', (select count(*) from posvenda_acompanhamentos where negocio_id = n and status = 'pendente' and posvenda_dia_local(1, previsto_para) < hoje)));
 

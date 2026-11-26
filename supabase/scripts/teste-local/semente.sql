@@ -34,9 +34,16 @@ select '00000000-0000-0000-0000-000000000000', u.id::uuid, 'authenticated', 'aut
     ('0e5e0000-0000-4000-8000-000000000103', 'vendedor.semloja@teste.invalid', 'Vendedor Sem Loja'),
     ('0e5e0000-0000-4000-8000-000000000104', 'vendedor.jag2@teste.invalid', 'Vendedor Jaguariuna Dois'),
     ('0e5e0000-0000-4000-8000-000000000201', 'admin.a@teste.invalid', 'Administrador A'),
-    ('0e5e0000-0000-4000-8000-000000000202', 'admin.b@teste.invalid', 'Administrador B')
+    ('0e5e0000-0000-4000-8000-000000000202', 'admin.b@teste.invalid', 'Administrador B'),
+    -- superadmin fictício, sem vínculo com empresa (auditoria da plataforma pelas rotas, 1.1c)
+    ('0e5e0000-0000-4000-8000-000000000901', 'superadmin.local@teste.invalid', 'Superadmin local')
   ) u(id, email, nome)
 on conflict (id) do nothing;
+
+-- A trava de escalonamento só deixa um superadmin mudar is_super_admin; a semente roda como postgres, sem sessão.
+alter table usuarios disable trigger trg_prevent_privilege_escalation;
+update usuarios set is_super_admin = true where id = '0e5e0000-0000-4000-8000-000000000901';
+alter table usuarios enable trigger trg_prevent_privilege_escalation;
 
 insert into auth.identities (id, user_id, provider_id, provider, identity_data, last_sign_in_at, created_at, updated_at)
 select gen_random_uuid(), u.id, u.id::text, 'email', jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true), now(), now(), now()

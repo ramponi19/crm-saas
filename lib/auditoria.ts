@@ -25,6 +25,7 @@ const ROTULO_ENTIDADE: Record<string, string> = {
 const ROTULO_ACAO: Record<string, string> = {
   alterar: 'Alterou', criar: 'Criou', apagar: 'Apagou', preco: 'Preço',
   plataforma_entrou: 'Entrou (plataforma)', plataforma_saiu: 'Saiu (plataforma)', plataforma_acessou: 'Abriu tela (plataforma)',
+  plataforma_insert: 'Criou (plataforma)', plataforma_update: 'Alterou (plataforma)', plataforma_delete: 'Apagou (plataforma)',
 }
 export const rotuloEntidade = (e: string) => ROTULO_ENTIDADE[e] ?? e
 export const rotuloAcao = (a: string) => ROTULO_ACAO[a] ?? a

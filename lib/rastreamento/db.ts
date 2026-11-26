@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { fetchComUsuario } from '@/lib/supabase/usuario-na-escrita'
 
 /**
  * Cliente de serviço para as tabelas rastreamento_*.
@@ -15,6 +16,7 @@ export function rastrDb(): SupabaseClient {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
+    // Mesmo `fetch` do createServiceClient: escrita da plataforma pelo painel vai para a Auditoria (1.1c).
+    { auth: { autoRefreshToken: false, persistSession: false }, global: { fetch: fetchComUsuario } },
   )
 }

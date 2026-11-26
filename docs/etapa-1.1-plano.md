@@ -278,17 +278,56 @@ Gravação na JM: **só com ok explícito** (regra de 25/11). Script único com 
 
 | # | Pendência | Estado |
 |---|---|---|
-| P1 | **Pós-venda: responsável de reserva configurável por loja**, que pula ausentes, em vez de cair em `posvenda_administradores` (Administradores, senão Donos). Parâmetro por loja via `config_valor`, sem nome de pessoa no código | a fazer |
-| P2 | **Troca de cargo de um Dono por outro Dono:** fica na Auditoria (já fica: `usuario_cargo_trocar` audita) **e gera aviso ao Dono afetado** (falta o aviso) | a fazer |
-| P2-D | **Decisão dos sócios:** só o superadmin pode mudar o cargo de um Dono? | decisão pendente (Matheus e Eduardo) |
-| P3 | **ZapIntel exclui `owner` do reconhecimento pelo nome** (`zapintel_conversa_calc`, CTE `US`: `eu.role <> 'owner'`, herdado do baseline). Depois do passo 1, as apresentações de Eduardo e Matheus pelo celular ("aqui é o Eduardo") deixam de identificá-los: nos 30 dias até 25/11 foram 100 mensagens em 95 conversas (Eduardo) e 19 em 16 (Matheus). Essas mensagens e as seguintes passam ao apresentador anterior (até 72 h), ao responsável do negócio ou a "Não identificado". Direção, contagem do cliente e casamento venda × conversa não mudam. Trocar o critério por um explícito (ex.: excluir só contas de Consulta ou uma marca "não atende") | decisão do Lucas |
-| P4 | **Esteira grava em nome de quem abre `/leads`:** com a JM Store em Consulta, a varredura dela passa a ser recusada pela RLS; a devolução continua quando um vendedor ou Dono abrir a tela. **Observação do Lucas (25/11):** a esteira de devolução deveria rodar como **rotina do sistema** (pg_cron, com registro em `rotinas_execucoes` da 1.1r), não em nome de quem abre a tela de Leads. Avaliar na etapa em que a esteira for revisada | avaliar na revisão da esteira |
+| P1 | **Pós-venda: responsável de reserva configurável por loja**, que pula ausentes, em vez de cair em `posvenda_administradores` (Administradores, senão Donos). Parâmetro por loja via `config_valor`, sem nome de pessoa no código | **pendente** (confirmado em 26/11) |
+| P2 | **Troca de cargo de um Dono por outro Dono:** fica na Auditoria (já fica: `usuario_cargo_trocar` audita) **e gera aviso ao Dono afetado** (falta o aviso) | a fazer na entrega mais natural (notificações da equipe ou a próxima que mexer em Cargos) |
+| P2-D | **Decisão (26/11): "dono é dono".** Um Dono pode mudar o cargo de outro Dono (como já está no banco: SO_DONO e PROPRIO_CARGO). A troca fica na Auditoria e o Dono afetado recebe aviso (P2) | **decidido** |
+| P3 | **ZapIntel exclui `owner` do reconhecimento pelo nome** (`zapintel_conversa_calc`, CTE `US`: `eu.role <> 'owner'`, herdado do baseline). Depois do passo 1, as apresentações de Eduardo e Matheus pelo celular ("aqui é o Eduardo") deixam de identificá-los: nos 30 dias até 25/11 foram 100 mensagens em 95 conversas (Eduardo) e 19 em 16 (Matheus). Essas mensagens e as seguintes passam ao apresentador anterior (até 72 h), ao responsável do negócio ou a "Não identificado". Direção, contagem do cliente e casamento venda × conversa não mudam. Trocar o critério por um explícito (ex.: excluir só contas de Consulta ou uma marca "não atende") | **resolvida** (marca "atende clientes", migração `20261125234314`, app `c6df8245`, 25/11; §3.3) |
+| P4 | **Esteira grava em nome de quem abre `/leads`:** com a JM Store em Consulta, a varredura dela passa a ser recusada pela RLS; a devolução continua quando um vendedor ou Dono abrir a tela. **Observação do Lucas (25/11):** a esteira de devolução deveria rodar como **rotina do sistema** (pg_cron, com registro em `rotinas_execucoes` da 1.1r), não em nome de quem abre a tela de Leads. Avaliar na etapa em que a esteira for revisada | **pendente**: a devolução vira rotina do sistema, com registro na 1.1r, na etapa em que a esteira for revisada |
+| P5 | **ZapIntel com muito "Não identificado":** 15.943 mensagens enviadas em 30 dias sem autor (mais da metade das 28.432; cache de 25/11 23:43 UTC). Avaliar na revisão do ZapIntel como reduzir: autor pelo CRM (mandar pelo Nexus grava `usuario_id`), apresentação ("aqui é o …"), responsável do negócio no momento, eco do celular por número | **pendente** (revisão do ZapIntel) |
 
 ### 3.3 Decisões do Lucas antes do passo 3 (25/11/2026)
 
 1. **ZapIntel: marca "atende clientes" por pessoa** (resolve a P3). Migração `20261125000800_atende_clientes`: `empresa_usuarios.atende_clientes` (padrão ligada, inclusive Donos); o gatilho do cargo força desligada em cargo de Consulta (como já fazia com a roleta), e sair da Consulta não religa sozinho; `zapintel_conversa_calc` reconhece pelo nome quem está ativo e com a marca, em vez de "todos menos `owner`". Tela de Equipe: caixa "Atende clientes" no bloco "Distribuição e atendimento" e selo "Não atende clientes"; grava por `/api/equipe/roleta`. A atribuição do ZapIntel é calculada na hora; o que fica guardado é só o cache `zapintel_conversa_cache` (6 chaves da JM, gerado às 05:00 UTC de 25/11, **antes** da promoção, e não recalculado depois). "Reatribuir" = recalcular o cache depois da migração, com backup das 6 linhas e conferência por pessoa antes e depois. Teste: `teste-atende-clientes.sql`. Volta: `supabase/scripts/volta/volta-atende-clientes.sql`.
 2. **JM Store: cargo temporário "Balcão compartilhado (temporário)"**, não Consulta ainda: papel_base `vendedor` (escreve em leads, negócios e mensagens como o Vendedor), permissão só `lojas.ver_rede` (atende nas duas lojas), sem custo, financeiro, cargos e exportação; `participa_roleta = false`; sai da reserva do pós-venda (que só olha admin e owner). Script `conciliacao-pedidos/etapa-1.1c-20261125/2-balcao-compartilhado.sql` (+ simulação e volta). **Consulta só quando cada pessoa que usa a conta tiver login próprio; nesse momento, trocar também a senha da JM Store.**
 3. **Meta Reviewer:** negócios 2628 (ganho) e 7266 (aberto, inativo) e a conversa 2958 ao Matheus (`negocio_atribuir('transferir')`, histórico e auditoria); vínculo desativado. O pós-venda do 2628 (jornada 1330, passo 1882 em 09/08/2027) está com o Pedro pela roleta, porque ela é conta de serviço, e não muda. Script `3-meta-reviewer.sql` (+ simulação e volta).
+
+---
+
+### 3.4 Auditoria da plataforma nas rotas com chave de serviço (26/11/2026)
+
+**Achado do smoke de 25/11:** as gravações da plataforma por rota com chave de serviço não geravam linha de escrita na Auditoria. Exemplo: superadmin mudando a distribuição e atendimento de alguém. Só apareciam entrou, acessou e saiu. Motivo: com a chave de serviço, `auth.uid()` chega nulo ao gatilho.
+
+**Correção, num ponto só:**
+- **No app:** `createServiceClient()` e `rastrDb()` usam o `fetch` de `lib/supabase/usuario-na-escrita.ts`.
+  - Nas escritas (POST, PATCH, PUT, DELETE) feitas dentro de uma requisição com sessão e com o cookie de impersonação, ele manda o id do usuário no cabeçalho `x-nexus-usuario`.
+  - O cookie é só uma pista para não custar nada à equipe. O id é conferido em `auth.getUser()`, uma vez por requisição.
+- **No banco:** a função `plataforma_auditar_escrita`, migração `20261126000100`, aceita o cabeçalho só de `service_role` e só se o id for de um superadmin com impersonação ativa.
+  - Grava como antes: tabela, id e nomes de campos (D-A1), com origem `gatilho servico`.
+  - Ignora a própria linha do superadmin em `usuarios`.
+- **Gatilho novo:** em `empresas`, `diagnostico_canais` e `assistente_config` (0100), e em `usuarios` (0200, separada pela lição do deadlock).
+- **Trava:** `npm run check` (`check:servico`) recusa cliente com a chave de serviço criado fora desses dois pontos.
+
+**Inventário completo das rotas e funções:** `docs/etapa-1.1-auditoria-plataforma-rotas.md`.
+
+**Testes:**
+- `teste-auditoria-plataforma-servico.sql`;
+- `tests/usuario-na-escrita.test.ts`;
+- `tests/integracao/plataforma-servico-local.test.ts`: rotas reais `/api/equipe/roleta`, `/api/empresa/fuso` e `/api/empresa`, mais os negativos.
+
+**Limite conhecido:** sem o cookie de impersonação (o navegador o apagou, mas o banco ainda está impersonando), a escrita não é auditada. Os dois caminhos de entrada (impersonar e laboratório) gravam o cookie com o mesmo prazo do banco.
+
+### 3.5 Decisões e pendências de 26/11/2026
+
+- **Conta "JM Store":** fica como está, Dono e com "atende clientes" ligada. É usada só pelo Lucas, para acessar a JM sem impersonação. O item 2 (Balcão compartilhado) foi **cancelado** e arquivado em `conciliacao-pedidos/etapa-1.1c-20261125/cancelado-item2-balcao/`, sem nada gravado. Os negócios 5933 e 6047 continuam com ela.
+- **Meta Reviewer:** gravado em 26/11 às 09:32 UTC.
+  - Os negócios 2628 e 7266 e a conversa 2958 foram para o Matheus, com histórico "transferir" e auditoria. O vínculo foi desativado.
+  - Os totais da JM ficaram iguais (4.006 negócios e 4.462 conversas).
+  - A jornada 1330 continua com o Pedro.
+  - Backup: `public._backup_meta_reviewer_1_1c_20261125`. Volta: `3-meta-reviewer-volta.sql`.
+- **"Dono é dono":** um Dono pode mudar o cargo de outro Dono. A troca fica na Auditoria e o Dono afetado recebe aviso (P2, na entrega mais natural).
+- **Etiqueta (Niimbot B2 Pro):** impressora testada pelo Lucas e funcionando com a branch `spike/niimbot-b2pro`. A etiqueta entra **logo depois da 1.2**, porque depende do preço efetivo.
+- **P1** continua pendente. **P3** está resolvida. **P4** fica pendente para a revisão da esteira. **P5** é nova (tabela da §3.2).
+- **Conciliação de vendas antigas:** plano curto em `docs/conciliacao-vendas-antigas-plano.md`. A implementação será liberada depois.
 
 ---
 
