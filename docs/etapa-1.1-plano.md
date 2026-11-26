@@ -792,6 +792,27 @@ A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas 
 - H1: restaurar o envelope e o formato antigo do backup e religar a ponte (antes de remover a coluna de permissões; a remoção da coluna só depois de 1 dia sem leitor);
 - H2: devolver as políticas anteriores.
 
+### 5.3.1 1.1i EM PRODUÇÃO em 26/11/2026 (deploy aprovado; com o preenchimento das empresas existentes)
+
+- **Leitura antes:**
+  - JM: faltavam condição na venda, "sem ofertas" e os 7 do pós-venda (tinha horário, liberação e sem dono);
+  - Demonstração: faltavam as 5 do núcleo e as 7 do pós-venda;
+  - Aletrini: faltavam as 5 do núcleo (sem pós-venda).
+- **Portões:** build igual ao da Vercel em `c412db67`, IOwait 0,05%, JM sem escrita em 10 min, backup `_backup_empresa_config_1_1i_20261126` (3 linhas).
+- **Migração** `20261126153742` (0700), às 15:37 UTC; não gravou nada nas empresas existentes.
+- **Preenchimento** (`conciliacao-pedidos/etapa-1.1i-20261126/preencher-padroes-existentes.sql`):
+  - simulação primeiro; depois **26 chaves** gravadas (JM 9, Demonstração 12, Aletrini 5), cada uma auditada (`script 1.1i`);
+  - backup `_backup_preencher_padroes_20261126` e volta `preencher-padroes-existentes-volta.sql`;
+  - horário = o que `core_horario` devolvia (nunca sobrescreveu: as 3 linhas antigas ficaram iguais).
+- **Antes = depois:** digital dos efetivos (`efetivos.sql`: horário, sem dono, liberação, condição, "sem ofertas" e os 7 do pós-venda, por empresa e loja) `bcda4935` antes e depois.
+- **App:** `c412db67` = `dpl_HEzKZEMXBMaaw98cGTKpYfFHhvcP`, no ar às 15:41 UTC. Volta: promover `dpl_WjE5f6w56Ymx8q5iQigkNxNvHn6A`; banco: a volta do preenchimento e depois `volta-config-padroes-semente.sql`.
+- **Telas na Demonstração** (impersonando; saí e fechei a aba): Horário seg–sex 09–18, sábado fechado; Pós-venda › Parâmetros com Utilidade, teto 30, nota 6, janela 3 e os textos do "sem ofertas"; sem erro no console.
+- **Logs 15:41–15:56:** Vercel sem erro; API 1.189 requisições, nenhum 4xx/5xx; Postgres sem erro.
+- **Rodadas reais seguintes:**
+  - liberação às 16:05 ok, agora com **3 empresas** (Demonstração e Aletrini passam a ter a chave, desligada) e nenhuma atribuição nova; as 25 de hoje da JM são do lote da manhã;
+  - pós-venda às 16:10 ok (2 empresas);
+  - página Rotinas: "Com erro, não vistas (0)".
+
 ### 5.3 1.1i detalhada: PRONTA NO LOCAL em 26/11/2026 (commit `347ee7c5`), PARADA antes do deploy
 
 **Mapa (levantado antes do código):**
