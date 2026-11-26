@@ -8,8 +8,8 @@ Este documento manda na **ordem**. O conteúdo de cada frente está em:
 |---|---|---|
 | Hotfix | commits `c21eca3a`, `e3cdf2cf` | branch `fix/entregar-sem-pagamento` |
 | PDV v2 | [pdv-v2-especificacao.md](pdv-v2-especificacao.md) (revisão 3), [auditoria-pdv.md](auditoria-pdv.md), [reconciliacao-encomendas.md](reconciliacao-encomendas.md) | esta branch (`docs/roteiro-reconstrucao`) e a do hotfix |
-| Variante | [unificacao-preco-proposta.md](unificacao-preco-proposta.md) (com o adendo de 24/11) | esta branch |
-| Precificação | [precificacao-fornecedores-proposta.md](precificacao-fornecedores-proposta.md) (com o adendo) | esta branch |
+| Variante | [unificacao-preco-proposta.md](unificacao-preco-proposta.md) (com o adendo de 24/11); plano de execução [etapa-1.2-variante-plano.md](etapa-1.2-variante-plano.md) (revisão 2, 26/11: opção + versão) | esta branch |
+| Precificação | [precificacao-fornecedores-proposta.md](precificacao-fornecedores-proposta.md) (com o adendo); plano [precificacao-fase1-plano.md](precificacao-fase1-plano.md) (26/11) | esta branch |
 | Pós-venda | `docs/design-pos-venda.md`, `docs/pos-venda-modelos-proposta-jm.md` | branch `feat/pos-venda` |
 
 ---
@@ -23,8 +23,8 @@ Este documento manda na **ordem**. O conteúdo de cada frente está em:
 | **Etapa 1.1** | **Não começou.** Não existe branch. A configuração provisória (`config_valor`/`config_salvar` sobre `configuracoes_sistema`, migração `config_provisoria`) está na produção e foi feita para ter o corpo trocado pelo `empresa_config` definitivo, mantendo a assinatura | migração `20261123000500_config_provisoria` |
 | **spike/niimbot-b2pro** | Página de teste da etiqueta pronta e compilando (biblioteca `@mmote/niimbluelib` 0.49.1, só dono/admin, em `/estoque/imei/etiqueta-teste`). **Não testada na impressora real.** Não vai para a `main` | `docs/spike-niimbot.md` na branch |
 | **Pós-venda** | **Banco em produção** (todas as `posvenda_*`, mais `venda_exigida`, `sem_ofertas`, `condicao_usado`, `posvenda_ativar_existentes`). **App na `main`**, módulo "em preparação", **não ligado na JM**. A branch `feat/pos-venda` segue com os 8 itens do "100% pronto" (categorias próprias, calendário, repetição, campos da venda, uso estimado…) | lista de migrações; `core/modulos.ts`; memória do modo autônomo |
-| **Variante** | Proposta com D1–D11 aprovadas | [unificacao-preco-proposta.md](unificacao-preco-proposta.md) |
-| **Precificação** | Proposta; espera a variante | [precificacao-fornecedores-proposta.md](precificacao-fornecedores-proposta.md) |
+| **Variante** | Proposta com D1–D11 aprovadas. **26/11:** plano de execução na revisão 2, com a D2 revista (eixo "opção" + eixo "versão", cor agregada, preço por cor pendente dos sócios) | [unificacao-preco-proposta.md](unificacao-preco-proposta.md), [etapa-1.2-variante-plano.md](etapa-1.2-variante-plano.md) |
+| **Precificação** | Proposta; espera a variante. **26/11:** plano da fase 1 (XLSX do PXT com chip e região) e da fase 2 (adapter MCP, condicionado ao ok escrito do PXT) | [precificacao-fornecedores-proposta.md](precificacao-fornecedores-proposta.md), [precificacao-fase1-plano.md](precificacao-fase1-plano.md) |
 
 ### 1.1 O hotfix pronto para entrar?
 
@@ -44,14 +44,14 @@ Este documento manda na **ordem**. O conteúdo de cada frente está em:
 flowchart TD
     E0[E0 · Hotfix<br/>concluir_* atômicas + H1–H3] --> E11
     E11[E1.1 · Base<br/>configuração definitiva, cargos e permissões,<br/>custo protegido no banco, auditoria, empresa ativa] --> E12
-    E12[E1.2 · Variante<br/>estoque_variantes, herança, encomenda com variante,<br/>migração com dump novo] --> E13
+    E12[E1.2 · Variante<br/>estoque_variantes com opção + versão, herança,<br/>encomenda com variante, migração com dump novo] --> E13
     E13[E1.3 · Meios de pagamento] --> E14
     E14[E1.4 · Venda única + migração M<br/>evento de conclusão → negócio ganho → Pós-venda] --> E15
     E15[E1.5 · Caixa] --> E16
     E16[E1.6 · Fim do papel legado<br/>checagens por permissão, sai empresa_usuarios.role] --> F2
     F2[Fase 2 · calendário, devolução/troca/garantia,<br/>comissão, desconto, impressão, crediário] --> F3[Fase 3 · integrações]
-    E12 --> P1[P1 · Precificação por planilha<br/>em paralelo]
-    P1 --> P2[P2 · IA, endpoint, saída] --> P3[P3 · agendamento, API do PXT]
+    E12 --> P1[P1 · Precificação fase 1<br/>XLSX do PXT com chip e região, em paralelo]
+    P1 --> P2[P2 · Fase 2: adapter MCP agendado<br/>só com o ok escrito do PXT] --> P3[P3 · depois: IA no casamento,<br/>itens externos, saída, exceção por cor]
     PV[Pós-venda · termina na feat/pos-venda<br/>e liga na JM quando aprovado] -. integra em .-> E14
     E11 -. cargos e auditoria .-> PV
 ```
@@ -61,7 +61,8 @@ flowchart TD
 | **E0 Hotfix** | nada | Pós-venda (não tocam nas mesmas tabelas) |
 | **E1.1 Base** | E0 em produção (a 1.1 generaliza a guarda do hotfix) | Pós-venda |
 | **E1.2 Variante** | E1.1: permissões de preço, auditoria e custo já fora da unidade | Pós-venda |
-| **P1 Precificação** | E1.2 em produção | E1.3, E1.4, E1.5 e Fase 2 (só toca na variante e nas suas tabelas `precificacao_*`) |
+| **P1 Precificação** | E1.2 em produção até a 1.2c (variantes com preço e lista de versões da JM gravada) | E1.3, E1.4, E1.5 e Fase 2 (só toca no preço da variante, pela RPC da 1.2, e nas suas tabelas `precificacao_*`; a única mudança fora disso é a leitura protegida das chaves `precificacao.*` em `empresa_config` e `auditoria_eventos`, [precificacao-fase1-plano.md §8.3](precificacao-fase1-plano.md)) |
+| **P2 Precificação (MCP)** | P1 e a **confirmação por escrito do PXT** de que o uso automatizado é permitido; `rotinas_execucoes` da 1.1r | tudo |
 | **E1.3 Meios de pagamento** | E1.1 | P1 |
 | **E1.4 Venda única + M** | E1.2 (`vendas_itens.variante_id`), E1.3 | P1. **Pós-venda precisa estar estável**: a 1.4 passa a ganhar o negócio pela conclusão |
 | **E1.5 Caixa** | E1.4 | P1 |
@@ -92,8 +93,9 @@ flowchart TD
 | **E0** | Prova SQL `prova-concluir-encomenda.sql` (18 casos) verde no replay local; e2e `entregar-pagamento-e2e` verde; H1–H3 com teste; na produção, uma encomenda real entregue pelo Histórico com saldo zero e `concluida_via = historico`; **nenhuma linha antiga de `vendas_vendas` alterada** (contagem e soma de `valor_venda`/`valor_custo`/`data_venda` iguais antes e depois da migração) |
 | **E1.1i** | Todo padrão de configuração no catálogo (nenhum `padraoNoChamador`); empresa nova criada no local recebe as chaves materializadas e se comporta igual a uma empresa sem configuração gravada; teste que compara o padrão do catálogo com o das funções do banco |
 | **E1.1** | Matriz de RLS cargos × ações verde; usuário **Vendedor** e **Consulta** não recebem custo em **nenhuma** rota, tela ou consulta (teste que procura `preco_custo`/`valor_custo`/`lucro`/`custo` nas respostas JSON de todas as rotas da lista do §B.1); **custo pendente** (PDV v2 §B.1): entrada sem a permissão, troca com custo automático = valor oferecido, lista "Unidades com custo pendente", venda com custo pendente preenchida **uma única vez** e auditada, segunda alteração sem efeito na venda; a conta "JM Store" no cargo Consulta, sem escrita; Matheus e Eduardo Dono; empresa nunca sem Dono; **conta "Meta Reviewer" desativada, com os 3 negócios e a conversa repassados ao Matheus na mesma migração do mapeamento de cargos**; `get_empresa_id()` determinístico; `auditoria_eventos` sem UPDATE/DELETE possível; impersonação registrada |
-| **E1.2** | Diagnóstico com **dump do dia** refeito; prova "**0 unidades com preço efetivo diferente**" antes e depois da M2; propagação só em disponíveis que herdam (reservadas e vendidas intactas); veículos sem variante e sem mudança (§4.1); encomenda nova exige variante; histórico de preço visível na Auditoria; nenhuma venda, encomenda ou orçamento antigo alterado |
-| **P1** | O critério da proposta (lista-24-11.xlsx → 150 linhas, 38 chaves, vínculos exatos, sugestões, aprovação em lote, preço da variante atualizado e auditado, reimportação recusada pelo hash) |
+| **E1.2** | Diagnóstico com **dump do dia** refeito; prova "**0 unidades com preço efetivo diferente**" antes e depois da M2; propagação só em disponíveis que herdam (reservadas e vendidas intactas); veículos sem variante e sem mudança (§4.1); encomenda nova exige variante (com versão definida nas categorias que usam versão, se os sócios aprovarem); **variantes que diferem só na versão com preços independentes; versão fora da lista da categoria recusada no banco**; histórico de preço visível na Auditoria, sem custo; nenhuma venda, encomenda ou orçamento antigo alterado ([etapa-1.2-variante-plano.md §6](etapa-1.2-variante-plano.md)) |
+| **P1** | XLSX real do PXT **com chip e região**: linhas lidas = arquivo, descartadas com motivo; nenhuma oferta em variante de outra versão; base = média das 3 menores com 2+ fornecedores conferida à mão em 3 variantes (inclusive "sem sugestão"); aprovação em lote grava só o preço da variante, auditado sem custo, herdeiras acompanham, reservadas e próprias intactas; reimportação recusada pelo hash; Vendedor e Consulta sem nenhum dado do módulo ([precificacao-fase1-plano.md §14](precificacao-fase1-plano.md)) |
+| **P2** | Confirmação escrita do PXT guardada; captura agendada criando importação e registrando execução em `rotinas_execucoes`; adapter só com ferramentas de leitura; credencial só em variável de ambiente ([precificacao-fase1-plano.md §12](precificacao-fase1-plano.md)) |
 | **E1.3** | Formas, maquininhas e taxas por empresa; Pix estático; taxas migradas de `financeiro_taxas` sem diferença |
 | **E1.4** | Prova de totais do §M (inclusive R$ 596.707,50 das 92 da reconciliação como `pendencia_legado`); 23 leitores trocados no mesmo deploy; preço relido no servidor; **cada conclusão ganha o negócio com `dados.venda` e abre a jornada do Pós-venda uma vez só** (sem duplicar quando o negócio já estava ganho); smoke com empresa sem PDV |
 | **E1.5** | Caixa abrir/sangrar/fechar cego; movimentos imutáveis |
@@ -105,10 +107,12 @@ flowchart TD
 
 ## 3. Onde entram a precificação e o pós-venda
 
-**Precificação:**
-- P1 começa no dia seguinte à variante (E1.2) em produção.
-- Só escreve **na variante** (pela mesma RPC de preço, que audita) e nas suas tabelas `precificacao_*`. Por isso corre em paralelo com o resto da Fase 1 e da Fase 2 sem disputar arquivos, com uma exceção: a tela de Produtos → Preços, que a E1.2 cria e a P1 só acrescenta.
-- A P3 (agendamento) usa o mesmo relógio do pg_cron → `/api/cron/[job]` que o `entrada-parada` já usa.
+**Precificação** (plano: [precificacao-fase1-plano.md](precificacao-fase1-plano.md), 26/11):
+- P1 começa quando a 1.2c estiver em produção (variantes com preço e a lista de versões da JM gravada). Entregas P1a (banco) → P1b (regras, equivalências, fontes) → P1c (importação do XLSX do PXT com chip e região, casamento, "Não encontrados") → P1d (cálculo, fila, aplicação) → P1e (automático e ligar na JM, com as decisões dos sócios) e P1f (XLSX genérico, JSON, retenção).
+- **A regra de preço é do Nexus:** base = média das 3 menores ofertas com 2+ fornecedores (`costPrice`, `supplierCount`); margem em R$ ou % por categoria > subcategoria > marca > modelo > versão; arredondamento e variação máxima no motor de configuração da 1.1; o `sellingPrice` do PXT (regra + R$ 700 da própria conta da JM) só como comparação.
+- Só escreve **na variante** (pela mesma RPC de preço, que audita, sem custo no `depois`) e nas suas tabelas `precificacao_*`. Por isso corre em paralelo com o resto da Fase 1 e da Fase 2 sem disputar arquivos, com duas exceções: o selo "sugestão pendente" na aba Produtos → Preços, que a E1.2 cria, e a leitura protegida das chaves `precificacao.*` (§8.3 do plano), que muda a política de leitura de `empresa_config` e `auditoria_eventos` sem efeito para o resto.
+- A P2 (adapter MCP) só começa com a confirmação por escrito do PXT; usa o relógio do pg_cron → `/api/cron/[job]` (como o `entrada-parada`) e registra cada captura em `rotinas_execucoes` (1.1r). Credencial só em variável de ambiente.
+- As decisões que dependem dos sócios estão no §13 do plano (margem sobre a base nova, arredondamento, mínimo de fornecedores, modo, preço por cor, versões, produto fora do catálogo, acesso).
 
 **Pós-venda:**
 - Termina na própria branch, sem esperar nada.
@@ -240,6 +244,8 @@ Na E1.4, isso vira a releitura de preço dentro de `venda_fechar` (PDV v2 §C).
 | D14 | Variante (proposta) × D5 | reservadas como decisão aberta | Reservadas não mudam |
 | D15 | PDV v2 §B × cargos da JM | `owner` único hoje é a conta "JM Store" | Sócios viram Dono **antes** de a conta "JM Store" ir para Consulta; a empresa nunca fica sem Dono |
 | D16 | PDV v2 §0.2 princípio 2 ("veículos não usam o PDV") × `estoque_unidades` compartilhada | variante e herança poderiam alcançar veículos | §4.1 |
+| D17 | Variante D2 (um eixo) × achados do MCP do PXT (26/11) | a versão do aparelho (chip, origem, ANATEL) muda o preço até 21% no mesmo modelo, capacidade e cor | D2 revista: eixo "opção" + eixo "versão", opcionais por categoria; cor agregada, preço por cor pendente dos sócios ([etapa-1.2-variante-plano.md §2.2–2.3](etapa-1.2-variante-plano.md)) |
+| D18 | Precificação (proposta) × 1.1 | `precificacao_regras` e o "+ R$ 700" como base | regras no motor de configuração da 1.1; o + R$ 700 é regra da conta da JM no PXT, não do PXT: o Nexus calcula pelo custo e mostra o `sellingPrice` só como comparação |
 
 ---
 
