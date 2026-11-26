@@ -283,7 +283,7 @@ Gravação na JM: **só com ok explícito** (regra de 25/11). Script único com 
 | P2-D | **Decisão (26/11): "dono é dono".** Um Dono pode mudar o cargo de outro Dono (como já está no banco: SO_DONO e PROPRIO_CARGO). A troca fica na Auditoria e o Dono afetado recebe aviso (P2) | **decidido** |
 | P3 | **ZapIntel exclui `owner` do reconhecimento pelo nome** (`zapintel_conversa_calc`, CTE `US`: `eu.role <> 'owner'`, herdado do baseline). Depois do passo 1, as apresentações de Eduardo e Matheus pelo celular ("aqui é o Eduardo") deixam de identificá-los: nos 30 dias até 25/11 foram 100 mensagens em 95 conversas (Eduardo) e 19 em 16 (Matheus). Essas mensagens e as seguintes passam ao apresentador anterior (até 72 h), ao responsável do negócio ou a "Não identificado". Direção, contagem do cliente e casamento venda × conversa não mudam. Trocar o critério por um explícito (ex.: excluir só contas de Consulta ou uma marca "não atende") | **resolvida** (marca "atende clientes", migração `20261125234314`, app `c6df8245`, 25/11; §3.3) |
 | P4 | **Esteira grava em nome de quem abre `/leads`:** com a JM Store em Consulta, a varredura dela passa a ser recusada pela RLS; a devolução continua quando um vendedor ou Dono abrir a tela. **Observação do Lucas (25/11):** a esteira de devolução deveria rodar como **rotina do sistema** (pg_cron, com registro em `rotinas_execucoes` da 1.1r), não em nome de quem abre a tela de Leads. Avaliar na etapa em que a esteira for revisada | **pendente**: a devolução vira rotina do sistema, com registro na 1.1r, na etapa em que a esteira for revisada |
-| P5 | **ZapIntel com muito "Não identificado":** 15.943 mensagens enviadas em 30 dias sem autor (mais da metade das 28.432; cache de 25/11 23:43 UTC). Avaliar na revisão do ZapIntel como reduzir: autor pelo CRM (mandar pelo Nexus grava `usuario_id`), apresentação ("aqui é o …"), responsável do negócio no momento, eco do celular por número | **pendente** (revisão do ZapIntel) |
+| P5 | **ZapIntel com muito "Não identificado":** 15.943 mensagens enviadas em 30 dias sem autor (mais da metade das 28.432; cache de 25/11 23:43 UTC). **Causa:** uso do WhatsApp pelo celular em coexistência (cerca de 95% das conversas), que chega sem autor. **Tratamento:** adoção do CRM (incentivo pelo painel do vendedor na fase 2) e orientação à equipe para se apresentar no início das conversas. Não é correção técnica. **Enquanto isso,** os números do ZapIntel por vendedor não servem para avaliação individual; os totais por loja e da empresa são confiáveis (26/11) | **pendente**: adoção do CRM e orientação à equipe |
 
 ### 3.3 Decisões do Lucas antes do passo 3 (25/11/2026)
 
@@ -342,6 +342,7 @@ Gravação na JM: **só com ok explícito** (regra de 25/11). Script único com 
 - **"Dono é dono":** um Dono pode mudar o cargo de outro Dono. A troca fica na Auditoria e o Dono afetado recebe aviso (P2, na entrega mais natural).
 - **Etiqueta (Niimbot B2 Pro):** impressora testada pelo Lucas e funcionando com a branch `spike/niimbot-b2pro`. A etiqueta entra **logo depois da 1.2**, porque depende do preço efetivo.
 - **P1** continua pendente. **P3** está resolvida. **P4** fica pendente para a revisão da esteira. **P5** é nova (tabela da §3.2).
+- **Correção (26/11):** são **7** encomendas abertas na JM, não 8. A 173 foi entregue em 25/11, com o pagamento. Ficam as 31, 37, 43, 54 e 92, sem pagamento, e as 121 e 122, com sinal.
 - **Conciliação de vendas antigas:** plano curto em `docs/conciliacao-vendas-antigas-plano.md`. A implementação será liberada depois.
 
 ---
@@ -455,8 +456,14 @@ A primeira versão deste plano esvaziava a coluna antiga já no tempo 1, e as te
 - **e2e do app antigo, local:** `entregar-pagamento-e2e` passou inteiro, **sem ajuste**, com a 1.1d aplicada.
   - Na primeira rodada falhou por tempo, com a tela compilando a frio. Para isolar, rodei sem a 1.1d (passou) e de novo com ela e o app aquecido (passou).
   - `pdv-valor-catalogo-e2e` e `lote2-e2e` estão presos à cópia local da produção (porta 54322, senha `teste-local-22`, `montar-local.sh`, que precisa de um dump com a senha do Lucas). Eles rodam na preparação do deploy.
+- **Cópia local da produção (26/11/2026):**
+  - **Dump:** `tools/banco/dump-unico.ps1` às 10:5x UTC, com o Lucas digitando as duas senhas. Saída em `dumps/2026-11-26-unico/` (`.7z` cifrado, 34 MiB).
+  - **Montagem:** `montar-local.sh` da worktree, com todas as migrações da branch. O restore do `public` foi refeito sem as tabelas `_backup_*` (que só existem na produção) e com o `truncate` em modo réplica, por causa da trava da Auditoria.
+  - **A 1.1d aplicada sobre os dados reais:** a prova da migração passou, e os satélites da JM ficaram idênticos à coluna antiga (57 unidades com R$ 84.259 de custo e R$ 600 de reparo, 131 vendas com R$ 12.400, 127 compras com R$ 7.920). `itens` com custo foi de 57 para 0.
+  - **`pdv-valor-catalogo-e2e`:** **tudo ok, sem ajuste**.
+  - **`lote2-e2e`:** **tudo ok**, mas o teste está desatualizado desde a remoção das views (consulta `vendas` e `pedidos_compra`, que não existem mais nem na produção). Rodei uma cópia temporária com só esses nomes trocados nas consultas SQL do próprio teste; a parte de tela é idêntica, e a cópia foi apagada. **Pendência:** atualizar o `lote2-e2e` no repositório.
+  - **Ao fim:** apaguei a cópia (`supabase stop --no-backup`, nenhum volume), a pasta `_claro` (o dump aberto), a cópia local do `usuarios.local.json` e o script com as chaves locais. Fica só o `.7z` cifrado.
 - **Falta, no deploy, com o ok do Lucas:**
-  - e2e `pdv-valor-catalogo-e2e` e `lote2-e2e`, na cópia local da produção;
   - leitura de produção com sessão simulada e desfeita (o vendedor da JM);
   - somas por empresa antes e depois;
   - contagens da Aletrini;
