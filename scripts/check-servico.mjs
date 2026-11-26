@@ -22,6 +22,13 @@ for (const f of arquivos) {
 for (const f of PERMITIDOS) {
   if (!readFileSync(f, 'utf8').includes('fetchComUsuario')) fora.push(`${f} (sem o fetchComUsuario)`)
 }
+// o gancho que descobre o usuário: só o instrumentation.ts o carrega (next/headers fora do grafo do navegador)
+for (const f of arquivos) {
+  if (f === 'lib/supabase/usuario-da-requisicao.ts') continue
+  if (/(from\s+|import\(\s*)['"][^'"]*usuario-da-requisicao['"]/.test(readFileSync(f, 'utf8'))) fora.push(`${f} (importa usuario-da-requisicao: só o instrumentation.ts pode)`)
+}
+if (!/registrarUsuarioNaEscrita\(\)/.test(readFileSync('instrumentation.ts', 'utf8'))) fora.push('instrumentation.ts (não liga o gancho registrarUsuarioNaEscrita)')
+if (/(from\s+|import\(\s*)['"](next\/headers|\.\/server|@\/lib\/supabase\/server)['"]/.test(readFileSync('lib/supabase/usuario-na-escrita.ts', 'utf8'))) fora.push('lib/supabase/usuario-na-escrita.ts (tem de ser puro: o navegador alcança este arquivo)')
 if (fora.length) {
   console.error('✗ check-servico: cliente com a chave de serviço fora de lib/supabase/service.ts — a escrita da plataforma não iria para a Auditoria:')
   for (const f of fora) console.error(`  - ${f}`)

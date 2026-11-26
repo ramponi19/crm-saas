@@ -28,6 +28,9 @@ const COOKIES_PLATAFORMA = [{ name: 'sb-local-auth-token', value: 'x' }, { name:
 
 mock.module('next/headers', { namedExports: { cookies: async () => loja, headers: async () => new Headers() } })
 mock.module('@/lib/supabase/server', { namedExports: { createClient: async () => sessao, getEmpresaId: async () => EMPRESA } })
+// o servidor liga o gancho no instrumentation.ts; aqui, à mão
+const { registrarUsuarioNaEscrita } = await import('@/lib/supabase/usuario-da-requisicao')
+registrarUsuarioNaEscrita()
 const { PATCH: roleta } = await import('@/app/api/equipe/roleta/route')
 const { POST: fuso } = await import('@/app/api/empresa/fuso/route')
 const { PATCH: empresa } = await import('@/app/api/empresa/route')

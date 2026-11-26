@@ -9,13 +9,16 @@
  * Quem decide se vira linha de Auditoria é o banco (plataforma_auditar_escrita): aceita o cabeçalho só de
  * service_role e só se o id for de um superadmin com impersonação ativa. Escrita da equipe continua sem linha nova.
  *
- * O id vem do servidor de autenticação (`auth.getUser()`), nunca do cookie lido cru: um cookie forjado não consegue
- * pôr a escrita na conta de outra pessoa. Só pergunta com o cookie de impersonação presente (pista; ver
- * `vaiPerguntarUsuario`), uma vez por requisição (memória ligada ao objeto de cookies dela).
- * Fora de requisição (rotina, `after()`, script) não há cookies: segue sem cabeçalho, como antes.
+ * ESTE MÓDULO É PURO (nada de next/headers): o cliente de serviço é alcançado por arquivos que componentes do
+ * navegador também importam (ex.: lib/esteira → lib/sem-dono), e o Turbopack recusa next/headers nesse grafo.
+ * Quem sabe descobrir o usuário da requisição é lib/supabase/usuario-da-requisicao.ts, registrado UMA vez no
+ * servidor pelo instrumentation.ts (runtime nodejs). Sem o registro (edge, script, teste), segue sem cabeçalho.
  */
 
 export const CABECALHO_USUARIO = 'x-nexus-usuario'
+
+/** Cookie que as duas entradas da plataforma gravam (impersonar e laboratório), com o mesmo prazo do banco. */
+export const COOKIE_IMPERSONACAO = 'impersonating_empresa_id'
 
 const LEITURA = new Set(['GET', 'HEAD', 'OPTIONS'])
 
@@ -42,12 +45,6 @@ export function comUsuarioNasEscritas(
   }
 }
 
-/** Uma verificação por requisição: a chave é o objeto de cookies da própria requisição. */
-const porRequisicao = new WeakMap<object, Promise<string | null>>()
-
-/** Cookie que as duas entradas da plataforma gravam (impersonar e laboratório), com o mesmo prazo do banco. */
-export const COOKIE_IMPERSONACAO = 'impersonating_empresa_id'
-
 /**
  * Vale a pena perguntar quem é o usuário? Só com sessão do Supabase (`sb-<projeto>-auth-token`, às vezes em pedaços)
  * E com o cookie de impersonação. É só uma pista para não custar uma ida ao servidor de autenticação em toda escrita
@@ -60,27 +57,18 @@ export function vaiPerguntarUsuario(cookies: { name: string; value: string }[]):
   return sessao && plataforma
 }
 
-export async function usuarioDaRequisicao(): Promise<string | null> {
-  let loja: { getAll(): { name: string; value: string }[] }
-  try {
-    const { cookies } = await import('next/headers')
-    loja = await cookies()
-  } catch {
-    return null   // fora de requisição
-  }
-  if (!vaiPerguntarUsuario(loja.getAll())) return null
-  let p = porRequisicao.get(loja)
-  if (!p) {
-    p = (async () => {
-      const { createClient } = await import('./server')
-      const sb = await createClient()
-      const { data } = await sb.auth.getUser()
-      return data.user?.id ?? null
-    })().catch(() => null)
-    porRequisicao.set(loja, p)
-  }
-  return p
+type ObterUsuario = () => Promise<string | null>
+const GANCHO = '__nexusUsuarioNaEscrita'
+
+/** O servidor registra aqui quem sabe descobrir o usuário da requisição (instrumentation.ts). */
+export function registrarObterUsuario(fn: ObterUsuario | null): void {
+  ;(globalThis as unknown as Record<string, ObterUsuario | null>)[GANCHO] = fn
+}
+
+function usuarioRegistrado(): Promise<string | null> {
+  const fn = (globalThis as unknown as Record<string, ObterUsuario | undefined>)[GANCHO]
+  return fn ? fn() : Promise.resolve(null)
 }
 
 /** O `fetch` que o cliente de serviço usa. */
-export const fetchComUsuario: typeof fetch = comUsuarioNasEscritas((input, init) => fetch(input, init), usuarioDaRequisicao)
+export const fetchComUsuario: typeof fetch = comUsuarioNasEscritas((input, init) => fetch(input, init), usuarioRegistrado)
