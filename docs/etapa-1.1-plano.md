@@ -468,7 +468,7 @@ A primeira versão deste plano esvaziava a coluna antiga já no tempo 1, e as te
 - **Somas antes = depois, por empresa** (coluna antiga × satélite): JM 57 unidades, R$ 84.259 de custo e R$ 600 de reparo; 131 vendas, R$ 12.400; 127 compras, R$ 7.920; md5 das vendas igual (`ac785464…`); `itens.custo` 57 → 0. Aletrini: nenhuma linha de custo, antes e depois. Releitura às 11:33: 0 divergências, 0 linhas sem satélite.
 - **Fixes no caminho** (pegos pelo ritual antes do push): data do pedido sem `current_date` (`3681ac27`); `compras_pedido_salvar` como SECURITY DEFINER com as travas da RLS explícitas, porque `empresa_fuso` não é executável pelo navegador (`51768bfa`).
 - **Smoke:** na JM, simulação com rollback (Vendedor e Consulta: satélites 0 e `SEM_PERMISSAO`; Dono: 57/131/127). Na Demonstração, também com rollback: três usuários temporários (Dono, Vendedor, Consulta) e uma unidade com custo de R$ 1.234 criada pela `estoque_unidade_criar` — o Dono lê 1.234 na unidade e na venda, e `venda_resultado` passa; Vendedor e Consulta leem 0 linhas e recebem `SEM_PERMISSAO`. Conferido depois: nada ficou gravado.
-- **Logs de 15 min** (11:31–11:46): Vercel sem nenhum erro ou aviso; Postgres sem ERROR além das duas simulações (que terminam com `raise` de propósito); API do Supabase com 63 requisições e nenhum 4xx/5xx. Tráfego baixo (antes da abertura da loja).
+- **Logs de 15 min** (11:31–11:46): Vercel sem nenhum erro ou aviso; Postgres sem ERROR além das duas simulações (que terminam com `raise` de propósito); API do Supabase com 58 requisições e nenhum 4xx/5xx (recontado em 26/11 às 12:58 pelo campo certo, `response.status_code`; a primeira leitura usou um campo que não existe e não provava nada). Tráfego baixo (antes da abertura da loja).
 
 ### 4.4 Tempo 2 (entrega 1.1e): o app só no satélite
 
@@ -590,6 +590,24 @@ A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas 
   - Linha nova da entrada mostra a loja "—" até recarregar (já era assim).
   - `lote2-e2e` desatualizado (views removidas).
 
+### 4.5.3 1.1e + 1.1f EM PRODUÇÃO em 26/11/2026 (deploy aprovado pelo Lucas, roteiro §4.5.1)
+
+- **Portões:** retrato "antes" (12:49 UTC, `conciliacao-pedidos/etapa-1.1ef-20261126/custo-1.1ef-antes.json`); backups `_backup_custo_1_1f_{unidades,vendas,compras,sat_unidades,sat_vendas,sat_compras}_20261126` (57/131/127/57/131/127); IOwait 0,15%; JM sem escrita em 10 min (antes do push e antes da 0400); build igual ao da Vercel em `1f6bfb46`; ponto de volta do app `dpl_CWqjShg849MSpmZzqx9ecqpLkjiY` (`51768bfa`).
+- **1.1e (app):** push fast-forward `51768bfa..afc457be` às 12:51 UTC; `dpl_21G6j38zyGj2CLopDy9DkseJviuB` READY 12:55:20.
+  - **entre app e banco:** somas coluna = satélite (0 divergência; JM igual ao retrato, md5 `e29d5f6e…`); simulação na Demonstração com rollback (Vendedor e Consulta: satélites 0, `SEM_PERMISSAO`; coluna antiga ainda respondia, como esperado no tempo 2); Dono na tela da Demonstração: Estoque com custo, "pendente" e aba, Histórico e Relatórios com lucro; 5 min de logs: Vercel sem erro, API 558 requisições sem 4xx/5xx, Postgres sem erro do app (os 401 das 12:52 são de um navegador sem sessão, antes do READY).
+- **1.1f (banco):** `apply_migration` às 13:16 UTC (adiada de 13:01 para não cair nos minutos 05–15), registrada como `20261126131651`; prova interna ok.
+  - **somas depois = retrato antes, por empresa:** JM 57 unidades, R$ 84.259 de custo e R$ 600 de reparo; 131 vendas, R$ 12.400; 127 compras, R$ 7.920; md5 das vendas igual; colunas antigas com 0 valores; `itens.custo` 0. Aletrini sem nada antes e depois (`custo-1.1ef-depois.json`).
+- **16 unidades de custo 0 → pendente** (logo depois da 0400): simulação às 12:49, gravação às 13:17; soma R$ 84.259 sem mudança, 41 unidades com valor e 16 pendentes, 16 auditorias `script 1.1f`, backup de 16 linhas.
+- **Smoke final na Demonstração** (cenário criado e apagado no fim; superadmin impersonando; impersonação nula e loja 6 preservada ao sair; aba fechada):
+  - **API, tempo 3:** Vendedor e Consulta leem a coluna antiga **nula** (unidade, venda e lucro), satélites 0 linhas, `venda_resultado` e `estoque_custos_pendentes` com `SEM_PERMISSAO`; o Dono lê R$ 1.234 no satélite;
+  - **entrada como Vendedor** (a conta de apresentação da Demonstração vira Vendedor só dentro da transação e volta a Administrador): mandou 888 de custo e nasceu **pendente**; uma gravação direta de 777 na coluna antiga foi ignorada; apareceu na aba "Custo pendente" do Dono, que informou R$ 1.500 pela tela ("Custo informado."; satélite 1.500, origem `informado`, 1 auditoria; coluna antiga nula);
+  - **telas do Dono:** Estoque, Histórico (lucro R$ 766), Relatórios (lucro total R$ 766), Catálogo, PDV e Dashboard, sem erro no console;
+  - **Vendedor e Consulta nas telas da produção:** não há login de Vendedor nem de Consulta na Demonstração (e criar conta na produção não se faz). A prova de tela sem custo é o varredor local `custo-oculto-e2e` (28/28) mais a API acima.
+- **Logs de 15 min depois da 0400 (13:16:51–13:32):** Vercel sem erro nem aviso; API do Supabase com 1.927 requisições e nenhum 4xx/5xx; Postgres só com o `raise` da simulação do smoke (prova de que o filtro `parsed.error_severity` enxerga erro).
+- **JM depois do deploy (só leitura, 13:32):** somas = retrato (salvo a mudança autorizada das 16 unidades: 41 com valor + 16 pendentes, mesma soma); md5 das vendas igual; nenhum valor nas colunas antigas; rotinas depois do deploy todas `ok` (liberação 13:05, pós-venda 13:10, automações 13:17); página Rotinas com "Com erro, não vistas (0)" e tudo "em dia".
+- **Defeito achado no smoke (não corrigido em produção):** `estoque_custos_pendentes_resumo().total` conta **lojas**, não unidades (`count(*)` sobre o agrupamento por loja). Só o número da aba erra; a lista está certa. Na JM, a aba mostra "(2)" com 16 pendentes. Correção: `sum(n)`, numa migração com teste (`teste-custo-satelites` com pendentes em duas lojas), na próxima entrega (junto com a P2, §5.2).
+- **Volta, se precisar:** primeiro o banco (`volta-custo-coluna-antiga-vazia.sql`; se quiser desfazer as 16, `custo-zero-pendente-volta.sql` antes), depois o app (promover `dpl_CWqjShg849MSpmZzqx9ecqpLkjiY`).
+
 ### 4.6 Tempo 4 (entrega 1.1g): remover as colunas antigas
 
 **Só roda quando, nesta ordem:**
@@ -646,7 +664,7 @@ A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas 
 
 | Ordem | Entrega | Começa quando | Critério de pronto |
 |---|---|---|---|
-| 1 | **Aviso ao Dono afetado (P2)** | já (pequena, só app + uma função) | o Dono que tem o cargo trocado por outro Dono recebe aviso |
+| 1 | **Aviso ao Dono afetado (P2)** + correção do contador da aba "Custo pendente" (§4.5.3) | já (pequena: uma migração de funções + app) | o Dono que tem o cargo trocado por outro Dono recebe aviso; a aba mostra o número de unidades (JM: 16), não de lojas |
 | 2 | **1.1g** remover as colunas antigas de custo | 1.1f com **um dia inteiro de loja aberta** sem leitor | os 4 critérios do §4.6 |
 | 3 | **1.1h** contração da configuração e das permissões + leitura protegida (§5.1) | P0 abaixo resolvido | aceite do §5 e teste do §5.1; **antes da P1a da precificação** |
 | 4 | **1.1i** gerador de valores padrão | 1.1h em produção (o gerador escreve só na tabela nova) | **antes de qualquer cliente novo e antes de a Aletrini ligar módulo com configuração** |
