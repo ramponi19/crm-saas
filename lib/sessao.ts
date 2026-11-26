@@ -40,3 +40,25 @@ export async function exigirPermissaoApi(p: Permissao): Promise<{ ctx: ContextoS
   return { ctx }
 }
 
+/**
+ * LOJAS EM QUE A PESSOA PODE ATUAR (gravar) — correção de segurança de 26/11/2026. Mesma regra do banco
+ * (`filiais_atuacao()`, migração 20261126000900): com menos de 2 lojas, todas; quem vê a rede (Dono, Administrador,
+ * superadmin, `lojas.ver_rede`), todas; os demais, a loja do vínculo (vazia = a matriz). Na 5a, a lista de "lojas que
+ * enxerga". As rotas que gravam com a chave de serviço (que não passa pelo gatilho do banco) conferem por aqui.
+ */
+export const lojasDeAtuacao = cache(async (): Promise<number[]> => {
+  const supabase = await createClient()
+  const { data, error } = await (supabase as unknown as SupabaseClient).rpc('filiais_atuacao')
+  if (error || !Array.isArray(data)) return []
+  return (data as unknown[]).map(Number).filter((n) => Number.isFinite(n))
+})
+
+/** Rota: a loja pedida tem de ser de atuação (nula passa: o servidor escolhe a loja de gravação). Devolve a resposta 403 ou null. */
+export async function exigirLojaDeAtuacao(filialId: number | string | null | undefined): Promise<NextResponse | null> {
+  if (filialId == null || filialId === '') return null
+  const id = Number(filialId)
+  if (!Number.isFinite(id) || !(await lojasDeAtuacao()).includes(id)) {
+    return NextResponse.json({ error: 'Você não pode gravar nesta loja.', codigo: 'LOJA_SEM_ATUACAO' }, { status: 403 })
+  }
+  return null
+}

@@ -1,0 +1,13 @@
+{
+  "1_atuacao": {"dono": [3, 6], "admin": [3, 6], "sem_loja": [3], "vendedor_jag": [6], "demo_uma_loja": [1], "vendedor_mogi": [3]},
+  "2_vendedor_topo_outra": "LOJA_SEM_ATUACAO",
+  "2_vendedor_topo_dele": "passou",
+  "2_admin_topo_qualquer": "passou",
+  "2_topo_nulo": "passou",
+  "3_selecao_velha": {"filial_atual": null, "loja_gravacao": 3},
+  "4_contato_outra_loja": "LOJA_SEM_ATUACAO",
+  "4_contato_sem_loja_vai_pra_dele": "loja 3",
+  "4_tarefa_outra_loja": "LOJA_SEM_ATUACAO",
+  "4_tarefa_loja_dele": "passou",
+  "5_dono_qualquer_loja": "passou"
+}

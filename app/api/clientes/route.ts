@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { exigirLojaDeAtuacao } from '@/lib/sessao'
 import { requireEmpresaRoleApi } from '@/lib/owner'
 import { createServiceClient } from '@/lib/supabase/service'
 import { criarCliente, entradaDoCorpo } from '@/lib/clientes'
@@ -15,6 +16,9 @@ export async function POST(req: Request) {
   const auth = await requireEmpresaRoleApi(['owner', 'admin', 'vendedor', 'tecnico', 'member'])
   if (auth.error) return auth.error
   const entrada = entradaDoCorpo(await req.json().catch(() => null))
+  // A loja do corpo só vale se a pessoa puder atuar nela (gravação com a chave de serviço não passa pelo gatilho do banco).
+  const negado = await exigirLojaDeAtuacao((entrada as { filial_id?: number | null }).filial_id)
+  if (negado) return negado
   // A loja de gravação de quem cadastra (a escolhida no topo, ou a dele), como o gatilho de contatos faria.
   const { data: filial } = await auth.supabase.rpc('filial_gravacao', { p_empresa: auth.empresaId })
   const r = await criarCliente(createServiceClient(), auth.empresaId, typeof filial === 'number' ? filial : null, entrada)

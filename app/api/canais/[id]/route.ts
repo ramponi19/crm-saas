@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { exigirLojaDeAtuacao } from '@/lib/sessao'
 import { requireOwnerOrAdminApi } from '@/lib/owner'
 import { createServiceClient } from '@/lib/supabase/service'
 
@@ -58,6 +59,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const svc = createServiceClient()
 
     if (filialId != null) {
+      const semAtuacao = await exigirLojaDeAtuacao(filialId)
+      if (semAtuacao) return semAtuacao
       const { data: filial } = await svc
         .from('filiais')
         .select('id')

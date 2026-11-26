@@ -23,6 +23,7 @@ type Escolha = number | null
 
 export function SeletorFilial() {
   const [filiais, setFiliais] = useState<Filial[]>([])
+  const [oferecidas, setOferecidas] = useState<Filial[]>([])
   const [selecionada, setSelecionada] = useState<Escolha>(null)
   const [minhaLoja, setMinhaLoja] = useState<number | null>(null)
   const [podeTrocar, setPodeTrocar] = useState(false)
@@ -39,15 +40,21 @@ export function SeletorFilial() {
 
       // Etapa 1.1b: loja da pessoa, loja escolhida e permissão vêm do contexto da sessão (empresa ativa), não
       // de um vínculo qualquer; quem vê a rede é quem tem lojas.ver_rede (o mesmo que filiais_visiveis usa).
-      const [{ data: lojas }, { data: ctx }] = await Promise.all([
+      const [{ data: lojas }, { data: ctx }, { data: atuacao }] = await Promise.all([
         // A RLS de `filiais` deixa qualquer membro LER a lista; só admin escreve.
         supabase.from('filiais').select('id, nome, cidade').eq('ativo', true).order('matriz', { ascending: false }).order('nome'),
         supabase.rpc('sessao_contexto' as never),
+        // Correção de segurança de 26/11: o seletor só oferece loja em que a pessoa pode atuar (a mesma lista que o
+        // banco confere ao gravar a loja do topo e os registros; migrações 20261126000900/0910).
+        supabase.rpc('filiais_atuacao' as never),
       ])
       if (!vivo) return
 
       const c = ctx as { loja_da_pessoa: number | null; filial_atual: number | null; superadmin: boolean; permissoes: string[] } | null
-      setFiliais((lojas ?? []) as unknown as Filial[])
+      const podeAtuar = Array.isArray(atuacao) ? new Set((atuacao as unknown[]).map(Number)) : null
+      const todas = (lojas ?? []) as unknown as Filial[]
+      setFiliais(todas)
+      setOferecidas(podeAtuar ? todas.filter((f) => podeAtuar.has(Number(f.id))) : [])
       setMinhaLoja(c?.loja_da_pessoa ?? null)
       setSelecionada(c?.filial_atual ?? null)
       setPodeTrocar(!!c && (c.superadmin || c.permissoes.includes('lojas.ver_rede')))
@@ -124,7 +131,7 @@ export function SeletorFilial() {
               {selecionada === null && <Check size={14} strokeWidth={2} className="text-accent" />}
             </button>
             <div className="my-1 h-px bg-line-soft" />
-            {filiais.map((f) => (
+            {oferecidas.map((f) => (
               <button
                 key={f.id}
                 onClick={() => escolher(f.id)}

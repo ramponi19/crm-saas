@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { exigirLojaDeAtuacao } from '@/lib/sessao'
 import { requireEmpresaRoleApi } from '@/lib/owner'
 import { createServiceClient } from '@/lib/supabase/service'
 import { rotuloDaFilial } from '@/lib/filiais'
@@ -47,6 +48,8 @@ export async function POST(req: NextRequest) {
 
   const ids = Array.isArray(body.ids) ? body.ids.map(Number).filter(n => Number.isFinite(n) && n > 0) : []
   const destinoId = Number(body.filialDestino)
+  const semAtuacao = await exigirLojaDeAtuacao(destinoId)
+  if (semAtuacao) return semAtuacao
   const observacoes = typeof body.observacoes === 'string' ? body.observacoes.trim().slice(0, 300) : ''
 
   if (ids.length === 0) return NextResponse.json({ error: 'Nenhuma unidade selecionada.' }, { status: 400 })

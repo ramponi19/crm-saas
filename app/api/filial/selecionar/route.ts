@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { exigirPermissaoApi } from '@/lib/sessao'
+import { exigirLojaDeAtuacao, exigirPermissaoApi } from '@/lib/sessao'
 import { filialEscolhida } from '@/lib/filial-escolha'
 
 /**
@@ -33,6 +33,9 @@ export async function POST(req: Request) {
   const svc = createServiceClient()
 
   if (filialId != null) {
+    // só loja em que a pessoa pode atuar (o banco também confere: gatilho usuarios_loja_topo_confere, 0910)
+    const semAtuacao = await exigirLojaDeAtuacao(filialId)
+    if (semAtuacao) return semAtuacao
     const { data: filial } = await svc.from('filiais')
       .select('id').eq('id', filialId).eq('empresa_id', empresaId).eq('ativo', true).maybeSingle()
     if (!filial) {
