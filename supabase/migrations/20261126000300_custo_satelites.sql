@@ -477,18 +477,24 @@ end $$;
 revoke all on function public.estoque_unidade_criar(jsonb) from public, anon;
 grant execute on function public.estoque_unidade_criar(jsonb) to authenticated;
 
--- Salvar pedido de compra (tempo 2). INVOKER. O valor só entra com a permissão.
+-- Salvar pedido de compra (tempo 2). DEFINER (o dia da loja vem de empresa_fuso, que o navegador não chama), com as
+-- travas da RLS repetidas aqui: empresa da sessão, loja visível, escrita permitida. O valor só entra com a permissão.
 create or replace function public.compras_pedido_salvar(p jsonb)
-returns bigint language plpgsql security invoker set search_path to 'public', 'pg_temp' as $$
+returns bigint language plpgsql security definer set search_path to 'public', 'pg_temp' as $$
 declare v_emp bigint := public.get_empresa_id(); v_id bigint := nullif(p ->> 'id', '')::bigint;
   v_ve boolean := coalesce(public.tem_permissao('estoque.ver_custo'), false);
+  v_filial bigint := nullif(p ->> 'filial_id', '')::bigint;
   v_hoje date;
 begin
-  if v_emp is null then raise exception 'SEM_EMPRESA' using errcode = '42501'; end if;
+  if v_emp is null or auth.uid() is null then raise exception 'SEM_EMPRESA' using errcode = '42501'; end if;
+  if not public.sessao_pode_escrever() then raise exception 'SOMENTE_LEITURA' using errcode = '42501'; end if;
+  if v_filial is not null and not (public.filiais_visiveis() @> array[v_filial]) then
+    raise exception 'LOJA_NAO_VISIVEL' using errcode = '42501';
+  end if;
   v_hoje := (now() at time zone coalesce(public.empresa_fuso(v_emp), 'America/Sao_Paulo'))::date;   -- o dia da loja
   if v_id is null then
     insert into public.compras_pedidos (empresa_id, filial_id, fornecedor_id, descricao, valor_total, status, observacoes, usuario_id, data_pedido)
-    values (v_emp, nullif(p ->> 'filial_id', '')::bigint, nullif(p ->> 'fornecedor_id', '')::bigint, p ->> 'descricao',
+    values (v_emp, v_filial, nullif(p ->> 'fornecedor_id', '')::bigint, p ->> 'descricao',
             case when v_ve then nullif(p ->> 'valor_total', '')::numeric end, coalesce(p ->> 'status', 'pendente'), p ->> 'observacoes',
             auth.uid(), coalesce(to_date(nullif(p ->> 'data_pedido', ''), 'YYYY-MM-DD'), v_hoje))
     returning id into v_id;
@@ -498,7 +504,7 @@ begin
            descricao = coalesce(p ->> 'descricao', descricao),
            valor_total = case when v_ve and p ? 'valor_total' then nullif(p ->> 'valor_total', '')::numeric else valor_total end,
            status = coalesce(p ->> 'status', status), observacoes = coalesce(p ->> 'observacoes', observacoes)
-     where id = v_id and empresa_id = v_emp;
+     where id = v_id and empresa_id = v_emp and public.filiais_visiveis() @> array[coalesce(filial_id, 0)];
     if not found then raise exception 'PEDIDO_NAO_ENCONTRADO' using errcode = 'P0002'; end if;
   end if;
   return v_id;
