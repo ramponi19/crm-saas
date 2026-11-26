@@ -607,6 +607,11 @@ A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas 
 - **JM depois do deploy (só leitura, 13:32):** somas = retrato (salvo a mudança autorizada das 16 unidades: 41 com valor + 16 pendentes, mesma soma); md5 das vendas igual; nenhum valor nas colunas antigas; rotinas depois do deploy todas `ok` (liberação 13:05, pós-venda 13:10, automações 13:17); página Rotinas com "Com erro, não vistas (0)" e tudo "em dia".
 - **Defeito achado no smoke (não corrigido em produção):** `estoque_custos_pendentes_resumo().total` conta **lojas**, não unidades (`count(*)` sobre o agrupamento por loja). Só o número da aba erra; a lista está certa. Na JM, a aba mostra "(2)" com 16 pendentes. Correção: `sum(n)`, numa migração com teste (`teste-custo-satelites` com pendentes em duas lojas), na próxima entrega (junto com a P2, §5.2).
 - **Volta, se precisar:** primeiro o banco (`volta-custo-coluna-antiga-vazia.sql`; se quiser desfazer as 16, `custo-zero-pendente-volta.sql` antes), depois o app (promover `dpl_CWqjShg849MSpmZzqx9ecqpLkjiY`).
+- **As 16 VENDAS dessas unidades também ficaram pendentes** (ok do Lucas, 26/11 ~13h50 UTC): 51, 84, 85, 87, 89, 90, 93, 94, 98, 100, 102, 104, 108, 111, 115 (concluídas) e 121 (encomenda). Script `conciliacao-pedidos/etapa-1.1ef-20261126/vendas-custo-zero-pendente.sql` (simulação, backup `_backup_vendas_custo_zero_pendente_20261126`, volta `vendas-custo-zero-pendente-volta.sql`); só `vendas_vendas_custos` mudou (0 → nulo, com a marca de script na guarda), 16 auditorias.
+  - **Antes = depois:** digital das vendas da JM (id, valor, desconto, comissão, situação, datas, unidade, loja) `ec11033c…` igual; faturamento concluído R$ 857.058, comissão 0, desconto 0, iguais; soma de custo R$ 12.400 igual (115 vendas com valor + 16 pendentes).
+  - **Regra (já aprovada, agora valendo para elas):** quando o Dono informar o custo da unidade, a venda recebe UMA vez (`estoque_custo_informar`, auditoria `custo_preenchido_pos_venda`); nenhuma outra mudança de custo atinge venda concluída (guarda `CUSTO_CONGELADO`).
+  - **Teste na Demonstração** (simulação desfeita): unidade pendente vendida por R$ 3.000 com comissão R$ 150; Dono informa R$ 1.000 → a venda recebe R$ 1.000 (lucro R$ 2.000, margem 66,7%); segunda mudança para R$ 1.200 → a unidade muda, a venda continua R$ 1.000; valor e comissão da venda iguais.
+  - **Comissão e faturamento não dependem de custo:** nenhuma função do banco nem código do app calcula comissão a partir de custo, lucro ou margem (comissão é lançada na Equipe, por valor ou percentual); faturamento é `valor_venda`. Só o lucro muda quando o custo for informado.
 
 ### 4.6 Tempo 4 (entrega 1.1g): remover as colunas antigas
 
@@ -674,7 +679,13 @@ A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas 
 - **onde:** a notificação sai da própria função (mesma transação), pelo mecanismo de notificações já usado no app; e-mail fica de fora (decisão dos sócios, se quiserem);
 - **critério:** teste SQL (Dono A rebaixa Dono B → 1 notificação para B, nenhuma para A; Administrador continua recebendo `SO_DONO`); conferência na tela da Demonstração; nada muda para a JM até alguém trocar o cargo de um Dono.
 
+**Situação em 26/11/2026:** o item 1 (P2 + contador; migração `20261126000500`) e a primeira parte do item 3 (`core_horario` e `core_liberar_lotes_do_dia` na tabela nova; migração `20261126000600`) foram feitos e sobem juntos (commit `ebbffac3`). Detalhe da produção no `estado-atual`/§5.3.
+
 **2. 1.1g — remover as colunas antigas de custo** (detalhe no §4.6):
+- **coleta da evidência (começou em 26/11/2026):**
+  - **banco:** funções, views e dependências que citam as colunas. Em 26/11, além dos gatilhos-ponte, **duas funções ainda GRAVAM nas colunas antigas** (o gatilho leva o valor ao satélite): `compras_pedido_salvar` (`compras_pedidos.valor_total`) e `concluir_encomenda` (`vendas_vendas.valor_custo`); e o gatilho `vendas_valor_guarda` depende de `vendas_vendas.valor_custo`. **Antes do `drop`, uma migração da 1.1g reescreve as três para o satélite** (e o teste prova);
+  - **código:** `check-custo` verde no commit em produção (`afc457be`);
+  - **logs da API** (só janelas de 15 min, filtradas por rota — regra dos logs): requisições REST cujo `select=` (decodificado, sem as junções `*_custos(...)` e o apelido `custo:`) pede `*` ou coluna antiga nas quatro tabelas, ou junção `tabela(*)`. 26/11 12:55–13:10: 825 requisições REST, 10 nas quatro tabelas, **0 suspeitas**. O critério exige **um dia inteiro de loja aberta** (27/11), conferido em janelas ao longo do dia; os logs ficam ~1 dia, então a conferência do dia 27 tem de ser feita até a manhã de 28/11.
 - **antes de escrever a migração:** prova de que nada lê as colunas:
   - `check-custo` verde no commit em produção;
   - `pg_proc.prosrc`, `pg_views` e `pg_depend` sem citação fora dos gatilhos-ponte;
