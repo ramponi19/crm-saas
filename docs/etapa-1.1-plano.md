@@ -707,6 +707,51 @@ A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas 
 - **trava:** `check-config-padroes` no `npm run check` (padrão no chamador reprova);
 - **critério:** empresa nova criada no local tem as mesmas chaves e valores que o catálogo diz; JM e Aletrini sem nenhuma mudança de valor efetivo (`config_valor_emp` igual antes e depois); instalar um módulo grava os padrões dele.
 
+### 5.3 1.1i detalhada: PRONTA NO LOCAL em 26/11/2026 (commit `347ee7c5`), PARADA antes do deploy
+
+**Mapa (levantado antes do código):**
+- **Onde a empresa nasce:** `app/api/register` (cadastro, chave de serviço: empresa → branding → usuário → loja → vínculo → termos → preset) e `lib/superadmin-preview.ts` (empresa de preview do superadmin, sem loja). Nenhuma função SQL cria empresa. Até aqui, nenhum dos dois gravava configuração.
+- **Onde o módulo é instalado:** `aplicarPreset`, Central (`/api/modulos/instalar`), pedido do superadmin, módulos forçados e addon. Todos passam por `empresa_modulos` (insert ou `ativo`).
+- **Padrões que valiam sem configuração** (banco e app concordam):
+  - horário: seg–sex 09–18, sábado e domingo fechados, sem `sla_resposta_min`;
+  - "sem ofertas": botão "Não quero receber ofertas" e a confirmação padrão;
+  - condição na venda: `exigida`;
+  - sem dono: `esteira`;
+  - liberação diária: desligada;
+  - pós-venda: teto 30, prazo `loja_aberta`, nota 6, janela 3, só Utilidade, categorias do estoque, sem pausa por terceiro.
+  - `calendario.dias_semana_uteis` ninguém lê desde 24/11 (fica no catálogo como obsoleta, sem gravar).
+  - Os textos opcionais do pós-venda (responsável, link, mensagens) ficam sem valor: a tabela não aceita nulo e "sem valor" é o padrão deles.
+
+**O que foi feito:**
+1. `lib/config.ts`: todo padrão explícito, reaproveitando as constantes do app (`HORARIO_PADRAO`, textos do "sem ofertas"); `padroesParaSemear()`.
+2. `scripts/gerar-config-padroes.mts` (`npm run gerar:config-padroes`): escreve `config_padroes()` em `supabase/funcoes/config_padroes.sql`. `check:config-padroes`, no `npm run check`, reprova se o arquivo ou a última migração com `config_padroes()` ficarem diferentes do catálogo. Mudou um padrão: gera e cria migração nova com o bloco.
+3. Migração `20261126000700_config_padroes_semente`:
+   - `config_padroes()`;
+   - `config_semear(empresa, módulo)`: grava só o que falta, nunca sobrescreve;
+   - gatilho AFTER INSERT em `empresas` (padrões do núcleo) e AFTER INSERT/UPDATE OF ativo em `empresa_modulos` (padrões do módulo). Cobre todos os caminhos de uma vez, inclusive os que vierem.
+   - **Empresas existentes não mudam** (nada é gravado nelas).
+   - A semente local imita empresas antigas e liga a marca de sessão `nexus.semente_legado` (só ela usa).
+4. Volta: `supabase/scripts/volta/volta-config-padroes-semente.sql` (tira gatilhos e funções; o que já foi gravado em empresa nova fica, porque é configuração válida). Testada: sem a 0700 a empresa nasce com 0 chaves; reaplicada, com 5.
+
+**Provas no local:**
+- `teste-config-padroes`: a empresa nova nasce com as 5 chaves do núcleo, iguais ao catálogo; apagando as linhas, as funções devolvem exatamente o mesmo (horário, sem dono, confirmação do "sem ofertas", liberação "desligado"); instalar o pós-venda grava os 7 parâmetros; desligar e religar não duplica nem sobrescreve o valor que a empresa mudou; JM e Demonstração iguais.
+- `tests/config.test.ts`: 3 testes novos (toda chave viva tem padrão; padrões = constantes do app; o que nasce e o que vem com o pós-venda).
+- **Cadastro de verdade no app local** (`/api/register`): a empresa nasceu com as 5 chaves; instalar o Pós-venda pela rota da Central gravou os 7 parâmetros.
+- **Conferência visual** como Dono da empresa nova: Horário (seg–sex 09–18, sábado e domingo fechados) e Pós-venda > Parâmetros (Utilidade, teto 30, nota 6, janela 3, textos do "sem ofertas").
+- Ritual do zero verde; `npm test` 658/658; `npm run check` verde.
+
+**Efeitos a saber (não mudam nada para a JM):**
+- a liberação diária passa a percorrer também as empresas novas (todas "desligado" até ligarem);
+- empresa nova já não cai no formato antigo `horario_comercial` (não tem);
+- o passo "horário" do cartão de começo ainda olha `horario_comercial`: empresa nova continua vendo o passo como pendente até salvar o horário (sem mudança de hoje).
+
+**Roteiro de deploy (quando houver ok):** só banco, sem app. Portões de sempre (IOwait, 10 min sem atividade na JM, fora dos minutos 05–15). `apply_migration` da 0700. Conferências:
+- `config_valor_emp` de todas as chaves da JM, da Aletrini e da Demonstração **igual** antes e depois;
+- `empresa_config` com a mesma contagem por empresa antes e depois;
+- empresa de preview do superadmin criada pela tela (Laboratório) nasce com as 5 chaves; apagar a preview depois.
+
+Volta: o script acima.
+
 ---
 
 ## 6. Telas afetadas (conferência visual obrigatória em cada uma)
