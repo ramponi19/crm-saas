@@ -1,0 +1,39 @@
+{
+  "1_entrada": {
+    "dono_1000": [1000, 1000, 50, "entrada"],
+    "vendedor_zero_pendente": [null, null],
+    "troca_valor_oferecido": [800, "troca"],
+    "vendedor_com_valor_app_antigo": 500
+  },
+  "2_venda": {
+    "custo_da_unidade": [1000, 1000, 500],
+    "lote_vezes_quantidade": 20,
+    "unidade_pendente_venda_pendente": [null, null]
+  },
+  "3_vendedor": { "satelite_unidades": 0, "satelite_vendas": 0, "satelite_compras": 0, "coluna_antiga": 1000 },
+  "3_pendentes": "SEM_PERMISSAO",
+  "3_resultado": "SEM_PERMISSAO",
+  "3_informar": "SEM_PERMISSAO",
+  "3_criar_sem_permissao": [null, null, "disponivel", true, "compra"],
+  "4_dono_le": true,
+  "4_informar": {
+    "retorno_preencheu_a_venda": true,
+    "unidade": [700, 700, "informado"],
+    "venda": [700, 700, true],
+    "resultado": { "lucro": 200, "margem": 22.2, "valor_custo": 700, "valor_venda": 900 }
+  },
+  "4_segunda_vez_venda_nao_muda": { "unidade": 900, "venda": 700, "retorno": null },
+  "4_pendentes_resumo": 1,
+  "4_h2_primeiro": "Venda concluída não muda de valor",
+  "5_concluida": "CUSTO_CONGELADO",
+  "5_preenchida": "CUSTO_CONGELADO",
+  "5_marca_de_script": "1490.00",
+  "6_encomenda": {
+    "coluna_e_satelite": [200, 200],
+    "auditorias": ["custo:coluna antiga", "custo:venda_custo_ajustar"],
+    "ajustar_concluida": "Preço e custo só se ajustam em encomenda"
+  },
+  "7_compras": { "antigo_para_satelite": 320, "vendedor_sem_valor": [null, null] },
+  "7_itens_custo_nulo": 0,
+  "8_somas_iguais": { "unidades": true, "vendas": true, "compras": true }
+}

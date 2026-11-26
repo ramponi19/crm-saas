@@ -422,6 +422,28 @@ A primeira versão deste plano esvaziava a coluna antiga já no tempo 1, e as te
 6. Nenhuma venda antiga alterada: contagem e soma de `valor_venda`, `valor_custo` e `data_venda` iguais.
 7. Empresa 10 (Aletrini): contagens iguais em `estoque_*`, `vendas_*`, `orcamentos_*`, `compras_*` (critério fixo do roteiro §4.1).
 
+**Estado em 26/11/2026: pronta no local, PARADA antes do deploy.**
+- **Migração e testes:**
+  - migração `20261126000300_custo_satelites`, com a volta em `supabase/scripts/volta/volta-custo-satelites.sql`;
+  - teste SQL `teste-custo-satelites.sql`;
+  - integração `tests/integracao/custo-local.test.ts`, que é a tabela "Vendedor lendo custo pela API" com sessão real de Vendedor, Consulta e Dono.
+- **Onde a implementação difere do texto acima, e por quê:**
+  - **Gatilhos AFTER, sem FK adiada:** a coluna antiga vai ao satélite por gatilho AFTER, e o satélite volta à coluna também por AFTER.
+    - Assim o `vendas_valor_guarda` (H2) decide antes, e o teste confere a ordem: "Venda concluída não muda de valor" vem do H2.
+    - E a FK do satélite pode ser comum (`on delete cascade`).
+    - Só a regra do custo pendente e a do custo da venda vindo da unidade são BEFORE, porque mudam a linha que está entrando.
+  - **Escrita na coluna antiga não é recusada no tempo 1.** O app antigo grava custo (o vendedor também, nas encomendas), e recusar quebraria o app no ar.
+    - A permissão vale nas funções novas: `estoque_custo_informar`, `venda_custo_ajustar`, `estoque_unidade_criar` e `compras_pedido_salvar`.
+    - A porta fecha no tempo 3.
+  - **Custo pendente na entrada:** custo nulo, ou 0 vindo de quem não tem `estoque.ver_custo`. Troca nunca fica pendente. Com a permissão, 0 é 0.
+  - **Sem drop de gatilho nem de política** (lição de 25/11): usa `create or replace trigger`.
+- **Falta, no deploy, com o ok do Lucas:**
+  - e2e do app antigo (`entregar-pagamento-e2e`, `pdv-valor-catalogo-e2e`, `lote2-e2e`);
+  - leitura de produção com sessão simulada e desfeita (o vendedor da JM);
+  - somas por empresa antes e depois;
+  - contagens da Aletrini;
+  - portões (backup, IOwait, fora dos minutos 05–15, 10 min sem atividade na JM).
+
 ### 4.4 Tempo 2 (entrega 1.1e): o app só no satélite
 
 Sem migração. O app para de ler e de gravar as colunas antigas.
