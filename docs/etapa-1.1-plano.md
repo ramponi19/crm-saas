@@ -314,6 +314,21 @@ Gravação na JM: **só com ok explícito** (regra de 25/11). Script único com 
 - `tests/usuario-na-escrita.test.ts`;
 - `tests/integracao/plataforma-servico-local.test.ts`: rotas reais `/api/equipe/roleta`, `/api/empresa/fuso` e `/api/empresa`, mais os negativos.
 
+**Em produção (26/11/2026):**
+- **Migrações:** `20261126101826 auditoria_plataforma_servico` e `20261126101836 auditoria_plataforma_usuarios`, aplicadas separadas.
+  - IOwait em 0,08%, nenhuma atividade da JM nos 10 minutos antes.
+  - A função tem o mesmo md5 do local (`b82588aa…`). São 117 gatilhos `zz_plataforma_auditar`.
+- **App:** `7b33d924` = `dpl_27hbJMjgwGZcCMfjWt21RZnR3jFv`, READY às 10:23 UTC.
+  - O primeiro build Turbopack, de `3c135453`, recusou `next/headers` no grafo do navegador. A correção é o gancho ligado no `instrumentation.ts`.
+- **Conferência na produção:** simulação desfeita na Demonstração.
+  - Escrita com chave de serviço e o cabeçalho do superadmin gerou 1 linha (`empresa_usuarios:25`, `campos: [atende_clientes]`, origem `gatilho servico`).
+  - Sem o cabeçalho, nenhuma linha.
+- **Logs desde as 10:17 UTC:** nenhum 4xx/5xx, Vercel sem erro, nenhum deadlock.
+- **Falta:** o smoke pela tela, que precisa do login do Lucas no navegador do app (a sessão tinha expirado).
+- **Volta:**
+  - app: `dpl_7EJTXHc8CzY7oHPr4q5MBAgxWXwg`;
+  - banco: `volta-auditoria-plataforma-servico.sql`, com o gatilho de `usuarios` saindo antes.
+
 **Limite conhecido:** sem o cookie de impersonação (o navegador o apagou, mas o banco ainda está impersonando), a escrita não é auditada. Os dois caminhos de entrada (impersonar e laboratório) gravam o cookie com o mesmo prazo do banco.
 
 ### 3.5 Decisões e pendências de 26/11/2026
@@ -437,8 +452,11 @@ A primeira versão deste plano esvaziava a coluna antiga já no tempo 1, e as te
     - A porta fecha no tempo 3.
   - **Custo pendente na entrada:** custo nulo, ou 0 vindo de quem não tem `estoque.ver_custo`. Troca nunca fica pendente. Com a permissão, 0 é 0.
   - **Sem drop de gatilho nem de política** (lição de 25/11): usa `create or replace trigger`.
+- **e2e do app antigo, local:** `entregar-pagamento-e2e` passou inteiro, **sem ajuste**, com a 1.1d aplicada.
+  - Na primeira rodada falhou por tempo, com a tela compilando a frio. Para isolar, rodei sem a 1.1d (passou) e de novo com ela e o app aquecido (passou).
+  - `pdv-valor-catalogo-e2e` e `lote2-e2e` estão presos à cópia local da produção (porta 54322, senha `teste-local-22`, `montar-local.sh`, que precisa de um dump com a senha do Lucas). Eles rodam na preparação do deploy.
 - **Falta, no deploy, com o ok do Lucas:**
-  - e2e do app antigo (`entregar-pagamento-e2e`, `pdv-valor-catalogo-e2e`, `lote2-e2e`);
+  - e2e `pdv-valor-catalogo-e2e` e `lote2-e2e`, na cópia local da produção;
   - leitura de produção com sessão simulada e desfeita (o vendedor da JM);
   - somas por empresa antes e depois;
   - contagens da Aletrini;
