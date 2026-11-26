@@ -28,13 +28,19 @@ select n.empresa_id, n.filial_id, n.lista, eu.usuario_id,
    and (l.qtd < 2 or eu.filial_id = n.filial_id or (eu.filial_id is null and n.filial_id = l.matriz))
 on conflict do nothing;
 
-insert into public.empresa_usuario_comissao (empresa_id, usuario_id, filial_id, atualizado_por)
-select eu.empresa_id, eu.usuario_id,
-       coalesce((select f.id from public.filiais f where f.id = eu.filial_id and f.ativo),
-                (select f.id from public.filiais f where f.empresa_id = eu.empresa_id and f.matriz and f.ativo order by f.id limit 1),
-                (select f.id from public.filiais f where f.empresa_id = eu.empresa_id and f.ativo order by f.id limit 1)),
-       null
-  from public.empresa_usuarios eu
- where eu.ativo and eu.usuario_id is not null
-   and exists (select 1 from public.filiais f where f.empresa_id = eu.empresa_id and f.ativo)
-on conflict do nothing;
+-- A loja da comissão saiu em 26/11 (20261126001410: comissão é da pessoa). Reaplicada depois disso (ritual local),
+-- a semente pula este trecho.
+do $c$
+begin
+  if to_regclass('public.empresa_usuario_comissao') is null then return; end if;
+  insert into public.empresa_usuario_comissao (empresa_id, usuario_id, filial_id, atualizado_por)
+  select eu.empresa_id, eu.usuario_id,
+         coalesce((select f.id from public.filiais f where f.id = eu.filial_id and f.ativo),
+                  (select f.id from public.filiais f where f.empresa_id = eu.empresa_id and f.matriz and f.ativo order by f.id limit 1),
+                  (select f.id from public.filiais f where f.empresa_id = eu.empresa_id and f.ativo order by f.id limit 1)),
+         null
+    from public.empresa_usuarios eu
+   where eu.ativo and eu.usuario_id is not null
+     and exists (select 1 from public.filiais f where f.empresa_id = eu.empresa_id and f.ativo)
+  on conflict do nothing;
+end $c$;

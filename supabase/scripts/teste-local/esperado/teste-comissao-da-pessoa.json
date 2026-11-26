@@ -1,0 +1,6 @@
+{
+  "1_adm_topo_6": {"total_m1": 1500.00, "por_loja": {"3": 1000.00, "6": 500.00}, "meta_visivel": 1, "paga_visivel": 1, "vendas_da_loja_pela_rls": 500.00},
+  "2_vendedor": {"proprias": 1500.00, "de_outros": 0},
+  "3_tabela_saiu": true,
+  "3_funcao_saiu": true
+}

@@ -57,7 +57,7 @@ impersonando, e só os nomes dos campos).
   rede mostra "Todas (ver a rede)" sem marcar. Grava por `usuario_lojas_salvar(usuario, lojas[])`: recusa marcar loja
   que quem salva não enxerga (`LOJA_NAO_VISIVEL`) e audita (antes → depois).
 - **Migração dos dados:** cada vínculo sem a rede ganha a lista `[coalesce(filial_id, matriz)]` (exatamente o que vê
-  hoje); quem tem a rede fica sem lista (continua vendo tudo). Prova: matriz de acesso dos 18 vínculos da JM
+  hoje); quem tem a rede fica sem lista (continua vendo tudo). Prova: matriz de acesso dos 15 vínculos da JM (8 ativos)
   (`filiais_visiveis()` de cada um, simulado) igual antes e depois.
 
 ### 5b. Configuração da distribuição POR LOJA (lugar único)
@@ -83,7 +83,7 @@ impersonando, e só os nomes dos campos).
 - **Migração:** roleta da loja L = quem hoje é elegível em L (ativo, não conta de serviço, `participa_roleta`,
   `coalesce(filial_id, matriz) = L`); liberação = a mesma lista; reserva do pós-venda = os de hoje
   (`posvenda_administradores`, na mesma ordem); comissão = `coalesce(filial_id, matriz)`.
-  - **Prova:** matriz de distribuição dos 18 vínculos (por loja: roleta, liberação, roleta do pós-venda, reserva e
+  - **Prova:** matriz de distribuição dos 15 vínculos da JM (8 ativos) (por loja: roleta, liberação, roleta do pós-venda, reserva e
     comissão) igual antes e depois, e as rodadas reais seguintes de liberação e pós-venda ok na página Rotinas.
 
 ### Cuidados
@@ -134,7 +134,8 @@ Voltas: supabase/scripts/volta/volta-lojas-que-enxerga.sql.
 
 - Configurações › Vendas e atendimento › Distribuição (`/configuracoes/distribuicao`): uma aba por loja com Roleta,
   Liberação diária (ligar, negócios por pessoa, dias de conversa, pular o 1º dia, quem recebe), Reserva do pós-venda
-  (ordenada) e Loja da comissão. Link de/para Automações › Distribuição (regras por origem).
+  (ordenada). Link de/para Automações › Distribuição (regras por origem). (A "loja da comissão" que entrou aqui saiu em
+  26/11: ver §4.4.)
 - Banco: `distribuicao_listas` (cabeçalho = lista configurada) + `distribuicao_participantes` + `empresa_usuario_comissao`.
   `core_roleta_elegiveis`, `core_roleta_leads_proximo`, `core_liberacao_elegiveis` (nova), `core_liberar_lote_esteira`,
   `posvenda_vendedores_da_loja` e `posvenda_resolver_responsavel` leem a lista; sem cabeçalho, a regra antiga.
@@ -146,3 +147,26 @@ Voltas: supabase/scripts/volta/volta-lojas-que-enxerga.sql.
 - Pessoa nova ou readmitida entra na roleta e na liberação da loja principal (`distribuicao_incluir_pessoa`), como
   acontecia antes. A marca "Recebe leads pela roleta" saiu da tela de Usuários (vale só em loja sem lista).
 - Volta: supabase/scripts/volta/volta-distribuicao-por-loja.sql (listas viram "não configuradas"; nada é apagado).
+
+### 4.4 Correção de 26/11: comissão é da PESSOA (migrações 1400 e 1410)
+
+A 5b tinha posto cada pessoa numa "loja da comissão". Errado: cada venda conta para quem vendeu, em qualquer loja; a
+faixa soma todas as vendas concluídas da pessoa no período; a meta da loja conta pela loja da venda; a meta pessoal é da
+pessoa, sem loja. Regra registrada em `docs/pdv-v2-especificacao.md` (§H, "Comissão é da PESSOA").
+- 1400 (antes do app): `metas_comissoes` e `vendas_comissoes` sem recorte pela loja do topo (antes, com uma loja
+  escolhida, a meta e o pagamento gravados em outra loja sumiam — risco de pagar duas vezes; as duas tabelas estavam
+  vazias na produção); `vendas_da_equipe(inicio, fim)` devolve as vendas concluídas de todas as lojas, com a loja de
+  cada uma e a marca de retida.
+- App: Comissões e Metas somam por pessoa todas as lojas e mostram quanto foi em cada loja; o campo some da
+  Distribuição, de Usuários e de Metas. O painel já estava certo: em "Rede" cada pessoa aparece uma vez com o total;
+  com uma loja escolhida, as vendas feitas nela.
+- 1410 (depois do app): backup e remoção de `empresa_usuario_comissao` e `comissao_loja_salvar` (só tinha a semente).
+
+### 4.5 Registros (26/11)
+
+- A reserva do pós-venda começa **vazia** em todas as lojas (vai direto para administradores e Donos, como antes). O
+  Lucas configura pela tela de Distribuição.
+- A JM tem **15 vínculos (8 ativos)**; as referências a "18" foram corrigidas.
+- A troca de loja da Milena (vínculo nulo = matriz loja 3 até 25/11; loja 6 em 26/11, sem auditoria) foi **anterior à
+  5a**, quando a tela de Usuários ainda não auditava loja: **explicada**. Desde a 5a a mudança de lojas é auditada
+  (`usuario_lojas`).

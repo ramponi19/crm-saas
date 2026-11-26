@@ -11,7 +11,6 @@ import { formatCurrency } from '@/lib/utils'
 import { Topbar } from '@/components/layout/topbar'
 import { Button, IconButton, Input, Select, Modal, Table, Card, StatCard, Badge, Tabs, EmptyState, ConfirmDialog, notify, type Column } from '@/components/ui'
 import { NADA_GRAVADO, nadaGravado } from '@/lib/linhas-afetadas'
-import { filtroConcluidaNoPeriodo } from '@/lib/vendas-mes'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -30,28 +29,8 @@ interface Usuario {
   lojas?: number[]
   /** 5a: o cargo vê a rede (dono, admin, cargo de sistema ou `lojas.ver_rede`): enxerga todas sem marcar. */
   ve_rede?: boolean
-  /** 5b: loja em que a pessoa aparece em Metas e Comissões (vazia = a principal). Só o /admin carrega. */
-  loja_comissao?: number | null
 }
 
-/**
- * 5b (26/11/2026): em Metas e Comissões cada pessoa aparece na LOJA DA COMISSÃO (Configurações › Distribuição). Com a
- * loja do topo escolhida, só as pessoas daquela loja; em todas as lojas, todo mundo com o nome da loja. As vendas
- * continuam com a loja em que foram feitas.
- */
-interface EscopoLoja { filiais: LojaOpcao[]; lojaTopo: number | null }
-function lojaDaComissao(u: Usuario, filiais: LojaOpcao[]): number | null {
-  return u.loja_comissao ?? u.filial_id ?? filiais[0]?.id ?? null
-}
-function naLojaDoTopo(u: Usuario, e?: EscopoLoja): boolean {
-  if (!e || e.filiais.length < 2 || e.lojaTopo == null) return true
-  return lojaDaComissao(u, e.filiais) === e.lojaTopo
-}
-function rotuloLojaComissao(u: Usuario, e?: EscopoLoja): string {
-  if (!e || e.filiais.length < 2) return ''
-  const f = e.filiais.find(x => x.id === lojaDaComissao(u, e.filiais))
-  return f ? ' · ' + f.nome : ''
-}
 /** Loja para escolher no cadastro. Lista vazia = empresa de uma loja só. */
 export interface LojaOpcao { id: number; nome: string; cidade: string | null }
 interface Meta {
@@ -59,7 +38,7 @@ interface Meta {
   meta_vendas_valor: number | null; meta_vendas_qtd: number | null
   percentual_comissao_padrao: number | null; empresa_id?: number
 }
-interface VendaResumo { vendedor_id: string | null; valor_venda: number | null; status: string | null; grupo_pdv?: string | null }
+interface VendaResumo { vendedor_id: string | null; valor_venda: number | null; status?: string | null; grupo_pdv?: string | null; filial_id?: number | null; retida?: boolean }
 interface ComissaoPaga {
   id: number; usuario_id: string | null; valor_comissao: number | null
   data_pagamento: string | null; created_at: string | null
@@ -79,8 +58,6 @@ interface Props {
    * Vem pronto de cima porque a consulta é do servidor e exige papel de admin.
    */
   uso?: React.ReactNode
-  /** 5b: loja escolhida no topo (Metas e Comissões mostram só as pessoas dessa loja da comissão). */
-  lojaTopo?: number | null
   /**
    * Lojas da empresa. Mesma convenção da prop `uso`: só o /admin passa, então no
    * CRM não existe campo de loja nenhum — quem define onde a pessoa trabalha é o
@@ -392,14 +369,14 @@ function UsuarioModal({ usuario, onClose, onSaved, filiais }: {
 
 const supabase = createClient()
 
-function MetasTab({ usuarios, escopo }: { usuarios: Usuario[]; escopo?: EscopoLoja }) {
+function MetasTab({ usuarios }: { usuarios: Usuario[] }) {
   const fuso = useFuso()
   // O mês da loja, não o do UTC (que vira às 21h do último dia em Brasília).
   const [mes, setMes] = useState(() => mesNoFuso(undefined, fuso))
   const [metas, setMetas] = useState<Record<string, Meta & { _dirty?: boolean }>>({})
   const [saving, setSaving] = useState<string | null>(null)
 
-  const vendedores = usuarios.filter(u => ['vendedor', 'admin', 'owner'].includes(u.role ?? '') && naLojaDoTopo(u, escopo))
+  const vendedores = usuarios.filter(u => ['vendedor', 'admin', 'owner'].includes(u.role ?? ''))
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('metas_comissoes').select('*').eq('mes_ano', mes)
@@ -456,7 +433,7 @@ function MetasTab({ usuarios, escopo }: { usuarios: Usuario[]; escopo?: EscopoLo
           <Avatar nome={u.nome} />
           <div className="min-w-0">
             <div className="truncate text-[13px] font-semibold text-ink">{u.nome}</div>
-            <div className="text-[11px] text-ink-3">{ROLES.find(r => r.value === u.role)?.label ?? u.role}{rotuloLojaComissao(u, escopo)}</div>
+            <div className="text-[11px] text-ink-3">{ROLES.find(r => r.value === u.role)?.label ?? u.role}</div>
           </div>
         </div>
       ),
@@ -515,17 +492,15 @@ function MetasTab({ usuarios, escopo }: { usuarios: Usuario[]; escopo?: EscopoLo
 
 // ─── Aba Comissões ────────────────────────────────────────────────────────────
 
-function ComissoesTab({ usuarios, escopo }: { usuarios: Usuario[]; escopo?: EscopoLoja }) {
+function ComissoesTab({ usuarios, filiais = [] }: { usuarios: Usuario[]; filiais?: LojaOpcao[] }) {
   const fuso = useFuso()
   const [mes, setMes] = useState(() => mesNoFuso(undefined, fuso))
   const [vendas, setVendas] = useState<VendaResumo[]>([])
   const [metas, setMetas] = useState<Array<Meta & { empresa_id: number }>>([])
   const [pagas, setPagas] = useState<ComissaoPaga[]>([])
   const [quitando, setQuitando] = useState<string | null>(null)
-  /** Fechamentos com aparelho de troca ainda não recebido — comissão retida. */
-  const [gruposRetidos, setGruposRetidos] = useState<Set<string>>(new Set())
 
-  const vendedores = usuarios.filter(u => ['vendedor', 'admin', 'owner'].includes(u.role ?? '') && naLojaDoTopo(u, escopo))
+  const vendedores = usuarios.filter(u => ['vendedor', 'admin', 'owner'].includes(u.role ?? ''))
 
   const load = useCallback(async () => {
     // Janela pela função única. O cálculo que estava aqui produzia 3 HORAS em vez
@@ -535,23 +510,17 @@ function ComissoesTab({ usuarios, escopo }: { usuarios: Usuario[]; escopo?: Esco
     const janela = limitesDoMes(mes, fuso)
     const inicio = janela.de.toISOString()
     const fim = janela.ate.toISOString()
-    const [{ data: v }, { data: m }, { data: p }, { data: pend }] = await Promise.all([
-      // Mês da CONCLUSÃO (hotfix H1): a entrega da encomenda conta no mês em que foi concluída.
-      supabase.from('vendas_vendas').select('vendedor_id, valor_venda, status, grupo_pdv').or(filtroConcluidaNoPeriodo(inicio, fim)).eq('status', 'concluida'),
+    const [{ data: v }, { data: m }, { data: p }] = await Promise.all([
+      // COMISSÃO É DA PESSOA (26/11/2026): as vendas concluídas no mês (da conclusão) de TODAS as lojas, mesmo com uma
+      // loja escolhida no topo — a venda conta para quem vendeu, em qualquer loja. Vêm com a loja de cada uma e a marca
+      // de retida (aparelho de troca pendente), pela função vendas_da_equipe (migração 20261126001400).
+      supabase.rpc('vendas_da_equipe' as never, { p_inicio: inicio, p_fim: fim } as never),
       supabase.from('metas_comissoes').select('*').eq('mes_ano', mes),
       supabase.from('vendas_comissoes').select('*').eq('mes_referencia', mes).eq('status', 'pago'),
-      // Aparelhos aceitos em troca que ainda não chegaram na loja. Cada um segura
-      // a comissão do fechamento inteiro que o trouxe — não só da primeira linha,
-      // porque o PDV cria uma venda por item do carrinho.
-      //
-      // `ativo` no filtro é a saída para o caso do cliente nunca entregar: excluir
-      // a unidade no estoque (que a desativa) libera a comissão. Sem esse filtro a
-      // retenção não teria fim e o vendedor ficaria refém de uma troca que morreu.
-      supabase.from('estoque_unidades').select('grupo_pdv')
-        .eq('status', 'pendente').eq('ativo', true).not('grupo_pdv', 'is', null),
     ])
-    setVendas(v ?? []); setMetas(m ?? []); setPagas(p ?? [])
-    setGruposRetidos(new Set(((pend ?? []) as { grupo_pdv: string | null }[]).map((u) => u.grupo_pdv).filter((g): g is string => !!g)))
+    // Retida = aparelho aceito em troca ainda não chegou (estoque_unidades pendente e ativa): segura a comissão do
+    // fechamento inteiro; excluir a unidade (desativa) libera. A marca vem da função, olhando todas as lojas.
+    setVendas((v ?? []) as unknown as VendaResumo[]); setMetas(m ?? []); setPagas(p ?? [])
   }, [mes, fuso])
 
   useEffect(() => { load() }, [load])
@@ -579,13 +548,16 @@ function ComissoesTab({ usuarios, escopo }: { usuarios: Usuario[]; escopo?: Esco
   // troca ainda não chegou NÃO entra aqui: vai para `retido` e só migra quando
   // alguém confirmar a chegada no estoque. Sem isso a loja pagaria comissão por
   // um aparelho que pode nunca aparecer.
-  const vendasPorUser: Record<string, { qtd: number; total: number; retido: number; qtdRetida: number }> = {}
+  // Por pessoa, somando TODAS as lojas; `porLoja` mostra quanto foi vendido em cada uma.
+  const vendasPorUser: Record<string, { qtd: number; total: number; retido: number; qtdRetida: number; porLoja: Record<string, number> }> = {}
   vendas.forEach(v => {
     if (!v.vendedor_id) return
-    if (!vendasPorUser[v.vendedor_id]) vendasPorUser[v.vendedor_id] = { qtd: 0, total: 0, retido: 0, qtdRetida: 0 }
+    if (!vendasPorUser[v.vendedor_id]) vendasPorUser[v.vendedor_id] = { qtd: 0, total: 0, retido: 0, qtdRetida: 0, porLoja: {} }
     const linha = vendasPorUser[v.vendedor_id]
     const valor = Number(v.valor_venda ?? 0)
-    if (v.grupo_pdv && gruposRetidos.has(v.grupo_pdv)) {
+    const loja = String(v.filial_id ?? '')
+    linha.porLoja[loja] = (linha.porLoja[loja] ?? 0) + valor
+    if (v.retida) {
       linha.retido += valor
       linha.qtdRetida += 1
       return
@@ -619,9 +591,7 @@ function ComissoesTab({ usuarios, escopo }: { usuarios: Usuario[]; escopo?: Esco
             <Avatar nome={u.nome} />
             <div className="min-w-0">
               <div className="truncate text-[13px] font-semibold text-ink">{u.nome}</div>
-              {(pctMeta !== null || rotuloLojaComissao(u, escopo)) && (
-                <div className="text-[11px] text-ink-3">{pctMeta !== null ? `meta ${pctMeta}%` : ''}{pctMeta !== null ? rotuloLojaComissao(u, escopo) : rotuloLojaComissao(u, escopo).replace(/^ · /, '')}</div>
-              )}
+              {pctMeta !== null && <div className="text-[11px] text-ink-3">meta {pctMeta}%</div>}
             </div>
           </div>
         )
@@ -635,6 +605,12 @@ function ComissoesTab({ usuarios, escopo }: { usuarios: Usuario[]; escopo?: Esco
         return (
           <div className="flex flex-col items-end">
             <span className="font-semibold text-ink">{formatCurrency(l?.total ?? 0)}</span>
+            {/* Comissão é da pessoa: o total soma todas as lojas; aqui, quanto foi em cada uma. */}
+            {filiais.length >= 2 && l && Object.keys(l.porLoja).length > 0 && (
+              <span className="text-[10.5px] text-ink-3">
+                {filiais.filter(f => l.porLoja[String(f.id)]).map(f => `${f.nome} ${formatCurrency(l.porLoja[String(f.id)])}`).join(' · ')}
+              </span>
+            )}
             {/* O que está fora da conta precisa aparecer, senão o vendedor só vê
                 um número menor do que esperava e ninguém sabe explicar. */}
             {(l?.retido ?? 0) > 0 && (
@@ -738,7 +714,7 @@ function ComissoesTab({ usuarios, escopo }: { usuarios: Usuario[]; escopo?: Esco
 
 // ─── View principal ───────────────────────────────────────────────────────────
 
-export default function EquipeView({ usuarios, uso, filiais = [], sinaisIniciais = {}, lojaTopo = null }: Props) {
+export default function EquipeView({ usuarios, uso, filiais = [], sinaisIniciais = {} }: Props) {
   const router = useRouter()
   const fuso = useFuso()
 
@@ -962,8 +938,8 @@ export default function EquipeView({ usuarios, uso, filiais = [], sinaisIniciais
             />
           </Card>
         )}
-        {tab === 'metas' && <MetasTab usuarios={usuarios} escopo={{ filiais, lojaTopo: lojaTopo ?? null }} />}
-        {tab === 'comissoes' && <ComissoesTab usuarios={usuarios} escopo={{ filiais, lojaTopo: lojaTopo ?? null }} />}
+        {tab === 'metas' && <MetasTab usuarios={usuarios} />}
+        {tab === 'comissoes' && <ComissoesTab usuarios={usuarios} filiais={filiais} />}
         {tab === 'uso' && uso}
       </div>
 

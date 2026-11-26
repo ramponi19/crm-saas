@@ -1,7 +1,6 @@
 {
   "1_matriz_igual": true,
   "1_lojas": 3,
-  "1_comissao": {"0e5e0000…101": 3, "0e5e0000…102": 3, "0e5e0000…103": 3, "0e5e0000…104": 6, "0e5e0000…201": 3, "0e5e0000…202": 3, "a632db2c…479": 3, "f4ec6a87…af0": 6},
   "2_ausente_fora": true,
   "2_ausente_na_lista": true,
   "3_auditados": 3,
@@ -10,11 +9,15 @@
   "3_roleta_3_inalterada": true,
   "3_roleta_6_vazia": 0,
   "3_proximo_lead_6": "ninguém",
-  "4_reserva": {"e_j2": true, "origem": "reserva_loja"},
+  "4_reserva": {
+    "e_j2": true,
+    "origem": "reserva_loja"
+  },
   "4_reserva_ausente": "administradores",
   "5_fora_da_loja": "LOJA_NAO_VISIVEL",
-  "5_comissao_fora": "LOJA_NAO_VISIVEL",
-  "5_admin_comissao_dono": "SEM_PERMISSAO",
   "5_vendedor_salva": "SEM_PERMISSAO",
-  "6_incluida": ["liberacao", "roleta"]
+  "6_incluida": [
+    "liberacao",
+    "roleta"
+  ]
 }

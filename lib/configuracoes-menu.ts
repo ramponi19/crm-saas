@@ -79,7 +79,7 @@ export function secoesDeConfiguracoes({ isAdmin, abasDosModulos, zapintel }: {
         { href: '/configuracoes/funil', label: 'Etapas do funil' },
         { href: '/configuracoes/funis', label: 'Funis' },
         { href: '/configuracoes/sla', label: 'SLA de atendimento' },
-        // 5b (26/11/2026): roleta, liberação diária, reserva do pós-venda e loja da comissão, por loja.
+        // 5b (26/11/2026): roleta, liberação diária e reserva do pós-venda, por loja.
         { href: '/configuracoes/distribuicao', label: 'Distribuição' },
         { href: '/configuracoes/motivos', label: 'Motivos de perda' },
         { href: '/configuracoes/etiquetas', label: 'Etiquetas' },

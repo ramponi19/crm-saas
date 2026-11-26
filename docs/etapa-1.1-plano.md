@@ -271,7 +271,7 @@ Gravação na JM: **só com ok explícito** (regra de 25/11). Script único com 
 
 ### 3.1 Execução (25/11/2026)
 
-- **Passo 1 em produção (22:52 UTC, ok do Lucas):** Matheus e Eduardo foram de Administrador (cargo 2, `admin`) para Dono (cargo 1, `owner`). Backup `public._backup_empresa_usuarios_1_1c_donos_20261125` (15 vínculos da JM). Só essas 2 linhas mudaram (`cargo_id` e `role`), com 2 linhas em `auditoria_eventos` (origem `script 1.1c`). A matriz dos 18 vínculos é igual à da 1.1b, exceto o papel dos dois; ambos seguem com 13/13 permissões, as mesmas lojas e a mesma escrita. `posvenda_administradores(1)` = `{Matheus, JM Store, Eduardo}`, `eh_dono` verdadeiro. Volta: `conciliacao-pedidos/etapa-1.1c-20261125/1-promover-donos-volta.sql`.
+- **Passo 1 em produção (22:52 UTC, ok do Lucas):** Matheus e Eduardo foram de Administrador (cargo 2, `admin`) para Dono (cargo 1, `owner`). Backup `public._backup_empresa_usuarios_1_1c_donos_20261125` (15 vínculos da JM). Só essas 2 linhas mudaram (`cargo_id` e `role`), com 2 linhas em `auditoria_eventos` (origem `script 1.1c`). A matriz dos 15 vínculos da JM (8 ativos) é igual à da 1.1b, exceto o papel dos dois; ambos seguem com 13/13 permissões, as mesmas lojas e a mesma escrita. `posvenda_administradores(1)` = `{Matheus, JM Store, Eduardo}`, `eh_dono` verdadeiro. Volta: `conciliacao-pedidos/etapa-1.1c-20261125/1-promover-donos-volta.sql`.
 - **Passo 2 (só leitura):** a checagem da JM Store **não está vazia**: mensagens enviadas, ações em negócios e acessos quase diários. Pelo §3, o passo 3 espera a decisão do Lucas. As ações em lote em nome dela (24/11 16:28, 25/11 08:11) são a esteira de devolução (`lib/esteira.ts`), que roda com a sessão de quem abre `/leads` e grava `por_usuario = auth.uid()`.
 
 ### 3.2 Pendências registradas na 1.1c (sem execução)
@@ -783,7 +783,7 @@ A volta da 1.1f foi provada no local, com dados: 0400 → volta → 0400, somas 
 - digital dos efetivos igual antes e depois (todas as empresas e lojas);
 - `config_valor_emp` de todas as chaves igual;
 - rodadas reais seguintes de liberação, pós-venda e automações ok na página Rotinas;
-- Cargos igual para todo vínculo (matriz dos 18 da JM antes e depois);
+- Cargos igual para todo vínculo (matriz dos 15 vínculos da JM, 8 ativos, antes e depois);
 - teste do §5.1 (Vendedor e Consulta sem `precificacao.*` por `empresa_config`, `config_valor`, Auditoria e tela; o Dono lê);
 - ritual do zero, build e e2e verdes.
 

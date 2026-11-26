@@ -9,8 +9,8 @@ type Lista = 'roleta' | 'liberacao' | 'reserva_posvenda'
 
 /**
  * CONFIGURAÇÕES › VENDAS E ATENDIMENTO › DISTRIBUIÇÃO (5b, 26/11/2026). Uma aba por loja com as listas da roleta, da
- * liberação diária e da reserva do pós-venda, a liberação diária (ligar, lote por pessoa) e a loja da comissão de cada
- * pessoa. Só dono/admin (layout do grupo; as funções do banco conferem de novo ao gravar). A leitura é pela chave de
+ * liberação diária e da reserva do pós-venda e a liberação diária (ligar, lote por pessoa). A comissão é da PESSOA, sem
+ * loja (correção de 26/11/2026): não fica aqui. Só dono/admin (layout do grupo; as funções do banco conferem de novo ao gravar). A leitura é pela chave de
  * serviço, filtrada pela empresa da sessão (precisa das lojas que cada pessoa enxerga).
  */
 export default async function Page() {
@@ -18,14 +18,13 @@ export default async function Page() {
   const svc = createServiceClient()
   const s = svc as unknown as import('@supabase/supabase-js').SupabaseClient
 
-  const [{ data: lojas }, { data: vinculos }, { data: cabecalhos }, { data: participantes }, { data: comissoes }, config] = await Promise.all([
+  const [{ data: lojas }, { data: vinculos }, { data: cabecalhos }, { data: participantes }, config] = await Promise.all([
     svc.from('filiais').select('id, nome, cidade, matriz').eq('empresa_id', empresaId).eq('ativo', true)
       .order('matriz', { ascending: false }).order('nome'),
     svc.from('empresa_usuarios').select('usuario_id, role, filial_id, ausente, conta_servico, participa_roleta, usuarios!empresa_usuarios_usuario_public_fkey(nome)')
       .eq('empresa_id', empresaId).eq('ativo', true),
     s.from('distribuicao_listas').select('filial_id, lista').eq('empresa_id', empresaId),
     s.from('distribuicao_participantes').select('filial_id, lista, usuario_id, ordem').eq('empresa_id', empresaId).order('ordem'),
-    s.from('empresa_usuario_comissao').select('usuario_id, filial_id').eq('empresa_id', empresaId),
     envelopesDaConfig(svc, empresaId, { chaves: ['distribuicao.liberacao_diaria'] }),
   ])
 
@@ -43,7 +42,6 @@ export default async function Page() {
 
   const configuradas = new Set(((cabecalhos ?? []) as { filial_id: number; lista: Lista }[]).map((c) => `${c.filial_id}:${c.lista}`))
   const parts = (participantes ?? []) as { filial_id: number; lista: Lista; usuario_id: string }[]
-  const comissaoDe = new Map(((comissoes ?? []) as { usuario_id: string; filial_id: number }[]).map((c) => [c.usuario_id, Number(c.filial_id)]))
   const env = config['distribuicao.liberacao_diaria']
 
   const dados: DadosDistribuicao = {
@@ -72,7 +70,6 @@ export default async function Page() {
       return {
         id: v.usuario_id, nome: u?.nome ?? '—', papel: v.role, ausente: !!v.ausente, contaServico: v.conta_servico,
         lojas: lojasDe.get(v.usuario_id) ?? [],
-        lojaComissao: comissaoDe.get(v.usuario_id) ?? v.filial_id ?? matriz,
       }
     }).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
   }

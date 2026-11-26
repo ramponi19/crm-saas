@@ -14,7 +14,7 @@ export interface ValorLiberacao { ativo: boolean; por_vendedor: number; dias_cli
 interface ListaLoja { ids: string[]; configurada: boolean }
 export interface DadosDistribuicao {
   lojas: { id: number; nome: string; roleta: ListaLoja; liberacao: ListaLoja; reserva: ListaLoja; liberacaoValor: ValorLiberacao }[]
-  pessoas: { id: string; nome: string; papel: string; ausente: boolean; contaServico: boolean; lojas: number[]; lojaComissao: number | null }[]
+  pessoas: { id: string; nome: string; papel: string; ausente: boolean; contaServico: boolean; lojas: number[] }[]
 }
 type Pessoa = DadosDistribuicao['pessoas'][number]
 
@@ -46,12 +46,12 @@ export function DistribuicaoPorLoja({ dados }: { dados: DadosDistribuicao }) {
       {dados.lojas.length > 1 && (
         <Tabs className="mb-4" value={aba} onValueChange={setAba} items={dados.lojas.map((l) => ({ value: String(l.id), label: l.nome }))} />
       )}
-      {loja && <AbaLoja key={loja.id} loja={loja} pessoas={dados.pessoas} lojas={dados.lojas} />}
+      {loja && <AbaLoja key={loja.id} loja={loja} pessoas={dados.pessoas} />}
     </div>
   )
 }
 
-function AbaLoja({ loja, pessoas, lojas }: { loja: DadosDistribuicao['lojas'][number]; pessoas: Pessoa[]; lojas: DadosDistribuicao['lojas'] }) {
+function AbaLoja({ loja, pessoas }: { loja: DadosDistribuicao['lojas'][number]; pessoas: Pessoa[] }) {
   const daLoja = useMemo(() => pessoas.filter((p) => p.lojas.includes(loja.id) && !p.contaServico), [pessoas, loja.id])
   return (
     <div className="flex flex-col gap-4">
@@ -59,7 +59,6 @@ function AbaLoja({ loja, pessoas, lojas }: { loja: DadosDistribuicao['lojas'][nu
         ajuda="Recebem, em rodízio, os leads novos desta loja e os acompanhamentos do pós-venda sem vendedor (no pós-venda, só cargo de vendedor)." />
       <BlocoLiberacao loja={loja} pessoas={daLoja} />
       <BlocoReserva loja={loja.id} inicial={loja.reserva} pessoas={daLoja} />
-      <BlocoComissao loja={loja.id} pessoas={daLoja} lojas={lojas} />
     </div>
   )
 }
@@ -202,33 +201,6 @@ function BlocoReserva({ loja, inicial, pessoas }: { loja: number; inicial: Lista
           {fora.map((p) => <option key={p.id} value={p.id}>{p.nome} · {PAPEL[p.papel] ?? p.papel}</option>)}
         </Select>
       )}
-    </Secao>
-  )
-}
-
-function BlocoComissao({ loja, pessoas, lojas }: { loja: number; pessoas: Pessoa[]; lojas: DadosDistribuicao['lojas'] }) {
-  const router = useRouter()
-  const [salvando, setSalvando] = useState<string | null>(null)
-  if (lojas.length < 2) return null
-  return (
-    <Secao titulo="Loja da comissão" ajuda="Em que loja a pessoa aparece em Metas e Comissões. As vendas continuam com a loja em que foram feitas.">
-      <div className="grid gap-1.5">
-        {pessoas.map((p) => (
-          <div key={p.id} className="flex items-center justify-between gap-3">
-            <NomePessoa p={p} />
-            <select className="rounded-control border border-line bg-card px-2 py-1 text-[12.5px] text-ink-2" disabled={salvando === p.id}
-              value={p.lojaComissao ?? ''} onChange={async (e) => {
-                setSalvando(p.id)
-                const ok = await salvar({ acao: 'comissao', usuarioId: p.id, filialId: Number(e.target.value) })
-                setSalvando(null)
-                if (ok) router.refresh()
-              }}>
-              {lojas.filter((l) => p.lojas.includes(l.id)).map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
-            </select>
-          </div>
-        ))}
-        <p className="mt-1 text-[11.5px] text-ink-3">Mostra quem enxerga {lojas.find((l) => l.id === loja)?.nome ?? 'esta loja'}; a lista de cada pessoa traz só as lojas que ela enxerga.</p>
-      </div>
     </Secao>
   )
 }

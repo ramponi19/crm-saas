@@ -778,6 +778,17 @@ Não existe nada hoje. É tudo novo. Boleto e carnê registrado vêm por conecto
   - **período aberto:** some sozinho da prévia;
   - **período fechado:** a RPC de cancelamento/devolução chama `comissao_ajustar(p_venda)`. Ela recalcula o período fechado **sem** a venda e lança a diferença (novo − original) como `ajuste` negativo no **período aberto**, com `referencia_periodo_id`. Se a devolução derrubar a faixa, a diferença inteira (de todas as vendas) entra no ajuste.
 
+### Comissão é da PESSOA, não de uma loja (decidido em 26/11/2026)
+
+- Cada venda conta para quem vendeu, em **qualquer** loja (ex.: a Milena vende em Jaguariúna e em Mogi Guaçu: as duas
+  contam). A faixa soma todas as vendas da pessoa no período, em todas as lojas (a faixa atingida vale para tudo).
+- A meta da **loja** conta as vendas pela loja da venda; a meta **pessoal** é da pessoa, sem loja.
+- Não existe "loja da comissão" no cadastro da pessoa (o campo da 5b saiu em 26/11, migração 20261126001410). Se um dia
+  uma loja tiver tabela de comissão diferente, isso é configuração da **regra** de comissão por loja (ex.: um plano ou
+  uma regra com `filtro` pela loja da venda), não um campo da pessoa.
+- Hoje (antes deste motor): Metas e Comissões leem as vendas de todas as lojas pela função `vendas_da_equipe` e
+  `metas_comissoes`/`vendas_comissoes` não são recortadas pela loja do topo (migração 20261126001400).
+
 ### Caso de validação: a comissão da JM como dados (decidido em 19/11/2026)
 
 **Decisões da JM** (outras empresas escolhem as suas; nada disto é código):

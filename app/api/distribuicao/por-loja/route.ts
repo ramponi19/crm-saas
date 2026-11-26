@@ -7,7 +7,6 @@ import { createClient } from '@/lib/supabase/server'
  * pelas funções do banco, que conferem dono/administrador, só aceitam quem enxerga a loja e auditam cada mudança.
  *
  * PATCH { acao: 'lista', filialId, lista: 'roleta' | 'liberacao' | 'reserva_posvenda', usuarios: uuid[] }  (na ordem)
- *       { acao: 'comissao', usuarioId, filialId }
  *       { acao: 'liberacao', filialId, valor: { ativo, por_vendedor, dias_cliente, pular_primeiro_dia } }
  */
 const ERROS: Record<string, number> = {
@@ -38,12 +37,6 @@ export async function PATCH(req: Request) {
     const usuarios = Array.isArray(b.usuarios) ? b.usuarios.map(String) : null
     if (!usuarios || usuarios.some((u) => !UUID.test(u))) return erro('Lista de pessoas inválida')
     const { data, error } = await supabase.rpc('distribuicao_salvar', { p_filial: filialId, p_lista: b.lista, p_usuarios: usuarios })
-    return error ? doBanco(error) : NextResponse.json({ ok: true, ...(data as object) })
-  }
-
-  if (b.acao === 'comissao') {
-    if (!UUID.test(String(b.usuarioId))) return erro('Pessoa inválida')
-    const { data, error } = await supabase.rpc('comissao_loja_salvar', { p_usuario: b.usuarioId, p_filial: filialId })
     return error ? doBanco(error) : NextResponse.json({ ok: true, ...(data as object) })
   }
 
