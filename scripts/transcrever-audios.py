@@ -102,8 +102,27 @@ RUIDO = {
 
 def baixar(url: str, destino: str, cabecalhos: dict | None = None) -> None:
     req = urllib.request.Request(url, headers=cabecalhos or {})
-    with urllib.request.urlopen(req, timeout=60) as r, open(destino, "wb") as f:
-        f.write(r.read())
+    # Lê tudo ANTES de abrir o arquivo: se a rede cair no meio, não sobra um
+    # arquivo de 0 byte no disco — e arquivo pequeno é o sinal de "quebrado",
+    # que apaga o link e o áudio no Storage (ver `descartar`).
+    with urllib.request.urlopen(req, timeout=60) as r:
+        dados = r.read()
+    with open(destino, "wb") as f:
+        f.write(dados)
+
+
+# ══ DOWNLOAD QUE FALHA NÃO DERRUBA A RODADA ═══════════════════════════════
+#
+# 27/11/2026: depois de ~300 áudios o Storage devolveu `HTTPError 403
+# Forbidden` para um arquivo. O download roda dentro de `piscina.map`, então a
+# exceção estourou no `for` do laço — fora do `try` — e o script morreu com
+# traceback. O 403 era passageiro: rodando de novo, os 71 restantes baixaram.
+#
+# Por isso cada arquivo tem mais duas tentativas, com espera curta (o download
+# corre em thread, à frente da GPU: esperar aqui não para a transcrição). Se
+# ainda falhar, vira UMA falha contada, com o id impresso, e o laço segue. A
+# transcrição fica nula — o item continua pendente para a próxima rodada.
+ESPERAS_DOWNLOAD = (2, 6)  # segundos antes da 2ª e da 3ª tentativa
 
 
 def carregar(caminho: str):
@@ -250,17 +269,36 @@ def main() -> int:
             urllib.request.urlopen(req, timeout=60).read()
 
     def pegar(linha):
+        """
+        Devolve `(linha, destino, erro)`. NUNCA levanta: uma exceção aqui
+        estoura no `for` de `piscina.map`, fora do `try`, e derruba a rodada
+        inteira (27/11/2026). `erro` é a exceção da última tentativa, ou None.
+        """
         destino = os.path.join(tmp, f"a{linha['id']}")
         # O bucket chat-midia é privado: a URL gravada não abre. Com a chave de
         # serviço o arquivo vem pelo endpoint autenticado do Storage.
         marca = "/storage/v1/object/public/chat-midia/"
         if marca in linha["midia_url"]:
             caminho = linha["midia_url"].split(marca, 1)[1].split("?")[0]
-            baixar(f"{url_base}/storage/v1/object/authenticated/chat-midia/{caminho}", destino,
-                   {"apikey": chave, "Authorization": f"Bearer {chave}"})
+            url = f"{url_base}/storage/v1/object/authenticated/chat-midia/{caminho}"
+            cabecalhos = {"apikey": chave, "Authorization": f"Bearer {chave}"}
         else:
-            baixar(linha["midia_url"], destino)
-        return linha, destino
+            url, cabecalhos = linha["midia_url"], None
+
+        erro = None
+        for espera in (0, *ESPERAS_DOWNLOAD):
+            if espera:
+                time.sleep(espera)
+            try:
+                baixar(url, destino, cabecalhos)
+                return linha, destino, None
+            except Exception as e:
+                erro = e
+        # Desistiu: nada de meio arquivo no disco — nem áudio de cliente,
+        # nem um falso "quebrado" que apagaria o link (ver `descartar`).
+        if os.path.exists(destino):
+            os.unlink(destino)
+        return linha, destino, erro
 
     n = 0
     while pendentes:
@@ -276,10 +314,15 @@ def main() -> int:
       # havia voz". Então a saída é parar e dizer quais são — alguém decide o
       # que fazer com dois arquivos quebrados, o laço não.
       gravou_nesta_leva = 0
-      for item in piscina.map(pegar, pendentes):
+      for linha, destino, erro_download in piscina.map(pegar, pendentes):
         n += 1
         try:
-            linha, destino = item
+            if erro_download:
+                # Não baixou nem na 3ª tentativa: falha contada, nada gravado.
+                falhas += 1
+                print(f"  [{linha['id']}] download falhou ({1 + len(ESPERAS_DOWNLOAD)} tentativas): "
+                      f"{type(erro_download).__name__}: {str(erro_download)[:70]}")
+                continue
             audio = carregar(destino)
             seg_audio += len(audio) / TAXA
 
@@ -301,20 +344,17 @@ def main() -> int:
         except Exception as e:
             # Menos de 1 KB e não decodifica: não é áudio, é o download que
             # nunca veio. Ver `descartar`.
-            if (isinstance(item, tuple) and os.path.exists(item[1])
-                    and os.path.getsize(item[1]) < 1024):
-                print(f"  [{item[0]['id']}] arquivo quebrado "
-                      f"({os.path.getsize(item[1])} bytes): link e arquivo apagados")
-                descartar(item[0])
+            if os.path.exists(destino) and os.path.getsize(destino) < 1024:
+                print(f"  [{linha['id']}] arquivo quebrado "
+                      f"({os.path.getsize(destino)} bytes): link e arquivo apagados")
+                descartar(linha)
                 quebrados += 1
                 gravou_nesta_leva += 1
                 continue
             falhas += 1
-            print(f"  [{item[0]['id'] if isinstance(item, tuple) else '?'}] "
-                  f"{type(e).__name__}: {str(e)[:70]}")
+            print(f"  [{linha['id']}] {type(e).__name__}: {str(e)[:70]}")
         finally:
-            alvo = item[1] if isinstance(item, tuple) else None
-            for f in ([alvo, alvo + ".wav"] if alvo else []):
+            for f in (destino, destino + ".wav"):
                 if os.path.exists(f):
                     os.unlink(f)
 
